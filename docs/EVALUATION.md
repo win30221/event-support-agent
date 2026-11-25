@@ -2,6 +2,17 @@
 
 [返回 README](../README.md) · [設計決策](DESIGN_DECISIONS.md)
 
+## Intent-first 實驗分支驗收
+
+新流程的腳本測試位於 tests/test_intent_workflow.py；原有針對舊回答契約的測試明確使用 legacy_answer，保留基準，不代表新流程通過所有舊案例。真實模型測試及 eval_rag.py 使用新預設入口。task_cases.json 增加操作拒絕、混合需求、不存在的商品與差額案例；只加入實機重播，原 27 題離線檢索基準不變。
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest tests.test_intent_workflow -v
+.\.venv\Scripts\python.exe eval_rag.py --live ollama --case unsupported-operation --gate --report reports/intent-operation.json
+```
+
+檢查需求覆蓋、工具範圍、逐需求終止狀態、實際來源與最終正文。線上模型 verifier 通過不等於人工語意驗收；尚未完成此分支完整回歸及實機驗證。CI 結果以對應 commit 的 Actions 為準。
+
 ## 1. 已確認的基準
 
 下列回歸及檢索數據為遷移前 Pydantic Graph 的歷史基準。LangGraph 新分支新增 SDK、非作用欄位、具體修復回饋及證據去重測試；第一版 LangGraph CI（c0082a4）已通過；本輪變更、本機 PostgreSQL 19 及實機模型仍待驗證，不把歷史成績當成新版本成績。

@@ -4,6 +4,14 @@
 
 本作品著重後端業務與 LLM 的整合、可靠性、可觀測性及可重現評測。星夜祭是示範活動名稱；所有公告、商品、角色和玩家資料皆為原創模擬資料。系統僅提供唯讀查詢及運算，不是正式營運客服，不具備發幣、兌換或退款功能。
 
+## 實驗分支：Intent-first Task Workflow
+
+本分支自 `refactor/langgraph-agent` 的 3ea6e67 建立，預設入口 `agent.answer` 使用新流程。舊工作流仍保留在 `agent.legacy_answer` 供離線比較，原分支不變。優先驗證語意及業務結果，暫不以延遲為優化目標。
+
+意圖拆分 → 主機核定需求及必要資料 → 原生工具 → 獨立證據評估 → 主機呈現結構化事實／LLM 生成知識回答 → 語意驗證 → 分項完成或降級。無全域 action/missing；不支援的操作、權限限制與資料不足分開處理。驗證模型可能判斷錯誤，尚未完成真實模型驗收。現有畫面為基準版本展示，不代表本分支實測成果。
+
+既有虛擬環境及 PostgreSQL 19 不變；已安裝基準版本依賴時不必重裝。停止 Streamlit 後切換本分支，再從同一設定好的終端啟動。
+
 ## 操作展示
 
 本機 qwen3:8b 對話：活動玩法 → 商城價格 → 本人餘額 → 要求客服贈送星星幣。
@@ -16,7 +24,7 @@
 
 | 功能 | 技術及設計 |
 | --- | --- |
-| Agent Harness | LangGraph StateGraph / MessagesState / ToolNode、有界工具循環、Stop Gate |
+| Agent Harness | LangGraph StateGraph / MessagesState / ToolNode、逐需求狀態與有界工具循環 |
 | RAG | BM25；選用 Ollama bge-m3 + PostgreSQL/pgvector，RRF 排名融合 |
 | 工具 | 公開公告、商城、指定商品、本人 PostgreSQL 進度及四則運算 |
 | LLM | Ollama / OpenAI；ChatOllama / ChatOpenAI、共用工具登錄與結構化回答契約 |
@@ -37,7 +45,11 @@ Ollama 與 OpenAI 由 LangChain 共用工具契約，ChatOllama 使用 Ollama SD
 ```text
 app.py                 # Streamlit 入口
 agent.py               # Graph 節點
-agent_runtime.py       # LangGraph State、ToolNode、證據與路由
+agent_runtime.py       # 共用工具、證據、基準工作流
+task_contracts.py      # 意圖、證據評估、生成與驗證契約
+task_business.py       # 主機能力、必要欄位及結構化呈現
+task_runtime.py        # 新的逐需求 LangGraph 工作流
+task_cases.json        # 新分支的實機業務案例
 tool_selection.py      # 工具選擇介接
 model_client.py        # LangChain 原生模型介接、Structured Output 與紀錄
 request_context.py     # 可信多輪指涉

@@ -62,7 +62,13 @@ Hybrid：以 Ollama /api/embed（bge-m3）向量化檔期、文件、發布日�
 | computed | 運算結果，須同時引用原始依據 |
 | invalid_arguments / tool_error / budget_exhausted | 參數、執行或預算問題，不是查無事實 |
 
-## 4. 回答契約
+## 4. 新分支的任務及回答契約
+
+IntentPlan 的 tasks 每項包含 kind、goal、editions、product、account、depends_on（1 起始前置任務序號），主機配置任務 ID 並核對能力及指涉。TaskState 為主機內部資料，不接受模型直接改寫。EvidenceAssessment 逐項回傳 ready、needs_retrieval、no_evidence、clarify 或 unavailable；補查提出可用工具、檔期及具體缺口，主機結合必要資料及預算判斷。DraftBundle 只提供知識回答及短來源 ID；VerificationResult 提供需求覆蓋與個別草稿 verdict/issues。所有請求與權限仍由主機核定。unsupported 代表沒有該操作能力，而非服務異常。
+
+結構化業務候選如商城清單、本人餘額、已計場次、商品價格及單商品價格差額，由主機從可信結果產生；需經證據評估與語意驗證，不以工具成功當作任務完成。價格差額不代表完整兌換資格。events.json 的 overview_required_clauses 為資料維護者標記的關鍵公告原句，與有效公告核對，不是可執行兌換規則引擎。
+
+## 4A. 基準回答契約（legacy_answer）
 
 ```json
 {
@@ -90,7 +96,7 @@ action 可為 retrieve（missing 說明必要的新證據）；否則 answer。a
 | account_limit | 超出本人查詢權限 |
 | service_help | 服務範圍引導 |
 
-非 supported 的正文和引用留空，由 Python 產生對應訊息。已確認 not_found 被錯標 no_evidence 時，僅在本輪有效查無來源 ID、原問和子問題均明示對象等條件下恢復為 supported；採用工具原文，不採用模型推測。條件條款保留原文。沒有獨立 capability_limit，唯讀能力辨識待評估。
+非 supported 的正文和引用留空，由 Python 產生對應訊息。已確認 not_found 被錯標 no_evidence 時，僅在本輪有效查無來源 ID、原問和子問題均明示對象等條件下恢復為 supported；採用工具原文，不採用模型推測。條件條款保留原文。基準工作流沒有獨立 capability_limit；新工作流以 unsupported 表達不支援操作。
 
 ## 5. 資料更新
 

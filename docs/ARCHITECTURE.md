@@ -23,7 +23,20 @@ LLM 負責理解意圖、選擇工具與生成回答；Python 負責工具權限
 | answer_quality.py | 審查候選、修訂及保護既有回答 |
 | eval_rag.py / tests | 檢索評測、腳本回歸、實機重播 |
 
-## 3. Agent 生命週期
+## 3. 新分支的預設 Agent 生命週期
+
+`agent.answer` 建立 IntentRuntime，沿用共用 ToolNode、registry、證據與傳輸，改用以下節點：
+
+1. Intent：LLM 分類、拆分及提出依賴；主機配置 T1 等 ID，驗證數量、依賴方向、檔期、商品指涉、帳號及能力。寫入操作為 unsupported、其他帳號為 account_limit。
+2. Select / Prepare tools / ToolNode / Collect：根據未完成需求選原生工具；主機核對工具範圍及必要資料，先核對依賴的指定商品再查本人紀錄。保留本輪原始結果及來源。以新增來源判斷檢索進展。
+3. Evidence assessment：主機檢查必要欄位，模型獨立評估是否足以回答每項需求。補查須有具體工具及資料需求、有效預算；不能僅因非空文字補查。
+4. Generate：已確認的結構化事實以主機呈現，知識任務由 LLM 生成並核對本輪來源。活動總覽的重要條款由資料設定保留。
+5. Verify：核對原問與需求覆蓋及各草稿；最多一次需求重規劃、一次具體語意修正。終止需求不再任意執行工具。模型驗證不等於語意保證。
+6. Finalize：逐需求整合已確認的回答及限制；來源與最終採用內容對照。
+
+`task_contracts.py` 定義各階段 Pydantic 契約；`task_business.py` 管理能力、槽位及結構化呈現；`task_runtime.py` 負責逐需求狀態轉移。工具上限仍為 3 輪、12 次嘗試、單批 6；每次結構化階段最多一次契約修正；模型傳輸可有限重試；recursion_limit=64。新增階段預期增加延遲，尚未有實測效益。
+
+## 3A. 基準 Agent 生命週期（legacy_answer，僅供比較）
 
 LangGraph StateGraph / MessagesState 管理每輪狀態與訊息；獨立節點透過 conditional edges 路由，不直接操作 Pydantic Graph。每輪建立獨立 registry，ToolNode 並行執行主機核准且去重的呼叫。
 
@@ -51,7 +64,7 @@ Select 對暫時性傳輸錯誤使用 RetryPolicy（至多 2 次嘗試）；其�
 
 工具均唯讀或純運算；進度工具不接受任意帳號 ID。demo 帳號由 UI 選擇，不是正式登入驗證。RAG 不包含玩家資料，公開與本人紀錄各有來源。PostgreSQL 的 player_event_progress 與 event_support_agent_embeddings 分表；demo 共用 DSN，尚未配置獨立最小權限角色。商品查無是查詢事實，不等於查明交易失敗原因。計算來源 ID 有驗證，但並未保證每個運算元都語意受支持。引用驗證是本輪短 ID 對照、主機原文與狀態核對，非完整語意證明。
 
-品質審查觸發條件為重複需求、未引用同文件章節或未採用的工具組；候選不等於必要證據，可能有過度審查問題。預設 off，保留 auto 作實測比較，不以單一案例修改流程。
+基準工作流的品質審查觸發條件為重複需求、未引用同文件章節或未採用的工具組；候選不等於必要證據，可能有過度審查問題。預設 off，保留 auto 作實測比較，不以單一案例修改流程。
 
 工程檢視顯示 Graph 節點、模型請求/回傳、用量、工具、證據與停止原因。正式系統需補認證、授權、日誌遮罩及保留政策。正文透過共用 Markdown 指引與 Streamlit 渲染；沒有新增排版模型呼叫或正規表示式重排。
 

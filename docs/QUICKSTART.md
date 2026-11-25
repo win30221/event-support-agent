@@ -204,6 +204,10 @@ export OPENAI_MODEL=gpt-4o-mini
 
 保留第 4 節 PostgreSQL DSN；若採 hybrid，亦保留第 4A 的設定。
 
+## 新分支測試
+
+既有基準環境可停止 Streamlit 後執行 git fetch origin，再以 git switch --track origin/refactor/intent-task-workflow 首次切換；已建立本地分支時改用 git switch refactor/intent-task-workflow 與 git pull --ff-only。先檢查 git status，不覆蓋未提交修改。從原終端以既有 DSN、模型及檢索設定啟動 Streamlit。不需重建資料庫。工程檢視應出現 Python Intent Workflow、意圖分析、需求清單、證據充足性評估及獨立語意驗證（終止需求不需查詢）。
+
 ## 6. 環境變數
 
 ChatOllama 直接透過 Ollama SDK 的原生 /api/chat。舊 OLLAMA_BASE_URL 末尾 /v1 會自動移除；新設定請使用下表主機 URL。
@@ -218,8 +222,8 @@ ChatOllama 直接透過 Ollama SDK 的原生 /api/chat。舊 OLLAMA_BASE_URL 末
 | EVENT_SUPPORT_AGENT_PG_DSN | 無；玩家進度查詢及 hybrid 必填 |
 | EVENT_SUPPORT_AGENT_EMBED_MODEL | bge-m3 |
 | EVENT_SUPPORT_AGENT_EMBED_URL | http://localhost:11434（不加 /v1） |
-| EVENT_SUPPORT_AGENT_STOP_GATE | auto；off 關額外矛盾停止檢查，不取消原有預算 |
-| EVENT_SUPPORT_AGENT_ANSWER_REVIEW | off；auto 啟用額外一次品質審查作對照 |
+| EVENT_SUPPORT_AGENT_STOP_GATE | 僅基準 legacy_answer；auto 或 off |
+| EVENT_SUPPORT_AGENT_ANSWER_REVIEW | 僅基準 legacy_answer；新流程獨立語意驗證預設啟用 |
 | EVENT_SUPPORT_AGENT_OLLAMA_TIMEOUT_SECONDS | 120；非負整數秒，0 為無 SDK HTTP timeout |
 | EVENT_SUPPORT_AGENT_OLLAMA_NUM_CTX | 未設定；選用正整數 context size |
 | EVENT_SUPPORT_AGENT_OLLAMA_REASONING | 未設定；選用 true/false 或模型支援的 low/medium/high |
