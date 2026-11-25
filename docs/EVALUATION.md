@@ -138,7 +138,7 @@ macOS/Linux 將 Python 路徑改為 `./.venv/bin/python`。先固定模型、資
 
 ## 第一層意圖獨立驗收
 
-依玩家最終目的分類（knowledge / query / analysis / operation / other），不因查詢手段、資料不足或執行權限改變意圖。分類與業務核定仍是不同階段。只改第一層 Prompt；既有 Schema、Audit、工具、證據、Renderer 與 Verifier 不變。
+依玩家最終目的分類（knowledge / query / analysis / operation / other），每類獨立寫明定義、適用、不適用、判斷原則及對照範例。不因查詢手段、資料不足或執行權限改變意圖。第一層不再接收能力清單；第二層仍保留原有能力資料。既有 Schema、Audit 判斷邏輯、工具、證據、Renderer 與 Verifier 不變。
 
 啟動 Ollama 並使用原有模型設定，在專案根目錄執行：
 
@@ -148,4 +148,14 @@ macOS/Linux 將 Python 路徑改為 `./.venv/bin/python`。先固定模型、資
 
 macOS/Linux：`./.venv/bin/python eval_intent.py`。逐題輸入，空白行離開；各題獨立，不需要 PostgreSQL 或 Streamlit。工具與後續節點不執行。輸出 type、原問片段、契約是否有效、模型呼叫及耗時。格式錯誤維持既有最多一次修正；契約有效不表示分類正確。
 
-單題可加 `--question "你的問題"`；`--cases` 逐一執行 intent_cases.json，輸出期望及嚴格比對結果，任何不符回傳非零。多輪題的歷史僅在題集中明確提供；原問片段的標點或切分差異須人工複核。固定同一模型、設定及題集比較版本，另外使用未出現在 Prompt 的新問句驗證泛化。離線測試 `python -m unittest tests.test_intent_analysis -v` 只驗證共用入口、契約及標記資料；實機分類成效須另跑。
+單題可加 `--question "你的問題"`；`--cases` 逐一執行 intent_cases.json（保留原 23 題及預期答案，補充分類理由和 13 個邊界案例，共 36 題），`--case ID` 單獨執行指定題目。標記題集獨立於 Prompt；expected/rationale 不會傳送模型。
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest tests.test_intent_analysis -v
+.\.venv\Scripts\python.exe eval_intent.py --case diagnosis --repeat 3 --report reports/intent-diagnosis.json
+.\.venv\Scripts\python.exe eval_intent.py --cases --report reports/intent-all.json
+```
+
+離線單元測試不需要模型、PostgreSQL 或 Streamlit，只驗證共用入口、契約、標記資料、第一層與 Audit 輸入邊界和評測統計。真實模型驗收另外執行。報告分開統計 contract_valid、count_match、type_sequence_match、span_match、exact_match，並記錄模型設定、Prompt 雜湊、原始輸出、耗時及供應商資訊；連線錯誤計入失敗，未知呼叫數保留 null。任何嚴格比對不符回傳非零。多輪題的歷史僅在題集中明確提供；標點或等價切分須人工複核，不能只看總分。固定同一模型、設定及題集比較版本，再以未見問句驗證泛化。
+
+**階段門檻**：第一層離線測試通過後，逐題核對分類與拆分；代表性案例可用 --repeat 3 確認一致性，並加入未見問句人工檢查。未確認結果前不進入第二層修改。第一層通過不代表整體回歸或語意品質通過。

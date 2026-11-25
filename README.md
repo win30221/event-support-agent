@@ -20,7 +20,7 @@
 
 ## 第一層意圖測試
 
-先以 `python eval_intent.py` 逐題測試五種意圖；不執行 Audit 或任何資料工具，不需資料庫。使用既有虛擬環境及模型設定，詳見 [EVALUATION](docs/EVALUATION.md#第一層意圖獨立驗收)。
+第一層五類意圖各自具有定義、適用、不適用、判斷原則及對照範例。只理解語意與拆分需求，不接收工具能力及權限清單。先執行 `python -m unittest tests.test_intent_analysis -v`（離線契約測試），再執行 `python eval_intent.py`（自由提問），或 `python eval_intent.py --cases`（真實模型標記題集）。可用 `--case diagnosis --repeat 3 --report reports/intent.json` 單獨重跑；不執行 Audit 或任何資料工具，不需資料庫。詳見 [EVALUATION](docs/EVALUATION.md#第一層意圖獨立驗收)。
 
 ## 操作展示
 

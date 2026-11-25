@@ -112,8 +112,8 @@ class IntentRuntime(TurnRuntime):
         return None
 
     def intent_packet(self, feedback):
+        # 第一層只理解語意；工具能力與授權限制留給第二層。
         return {"玩家原問": self.question, "服務上下文": self.context.public_summary(),
-                "能力": "公開公告、公開商城、本人活動紀錄及運算；無寫入或其他帳號工具。",
                 "修正回饋": feedback}
 
     async def classify_intents(self, packet):
@@ -134,7 +134,9 @@ class IntentRuntime(TurnRuntime):
             if intents is None:
                 break
             from intent_analysis import CAPABILITIES
-            audit_packet = {**packet, "需求": intents,
+            audit_packet = {"玩家原問": packet["玩家原問"], "服務上下文": packet["服務上下文"],
+                "能力": "公開公告、公開商城、本人活動紀錄及運算；無寫入或其他帳號工具。",
+                "修正回饋": packet["修正回饋"], "需求": intents,
                 "允許業務能力": {k: sorted(v) for k, v in CAPABILITIES.items()}}
             def checked(audit):
                 return audit, bind_intents(audit, intents, self.context, self.observe)

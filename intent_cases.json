@@ -7,7 +7,8 @@
         "type": "knowledge",
         "request": "新手怎麼玩這個活動？"
       }
-    ]
+    ],
+    "rationale": "一般玩法知識，不是個人狀態。"
   },
   {
     "id": "public-limit",
@@ -17,7 +18,8 @@
         "type": "knowledge",
         "request": "每日最多可以獲得多少活動點數？"
       }
-    ]
+    ],
+    "rationale": "公告中的固定規則上限，不是計算衍生數值。"
   },
   {
     "id": "public-why",
@@ -27,7 +29,8 @@
         "type": "knowledge",
         "request": "為什麼活動規則有每日次數限制？"
       }
-    ]
+    ],
+    "rationale": "詢問一般政策的理由，未要求依觀察資料推導未知原因；依本系統定義為 knowledge。"
   },
   {
     "id": "public-dates",
@@ -37,7 +40,8 @@
         "type": "knowledge",
         "request": "上一期活動什麼時候結束？"
       }
-    ]
+    ],
+    "rationale": "活動檔期公告，非個人或商城紀錄。"
   },
   {
     "id": "how-to",
@@ -47,7 +51,8 @@
         "type": "knowledge",
         "request": "外觀兌換完要去哪裡裝備？"
       }
-    ]
+    ],
+    "rationale": "自行操作方式，不要求代辦。"
   },
   {
     "id": "balance",
@@ -57,7 +62,8 @@
         "type": "query",
         "request": "我有幾個星星幣?"
       }
-    ]
+    ],
+    "rationale": "既有個人餘額。"
   },
   {
     "id": "catalog",
@@ -67,7 +73,8 @@
         "type": "query",
         "request": "那商城裡的物品價格各是多少?"
       }
-    ]
+    ],
+    "rationale": "既有商城商品價格清單。"
   },
   {
     "id": "unknown-existence",
@@ -77,7 +84,8 @@
         "type": "query",
         "request": "商城裡有沒有月亮造型的帽子？"
       }
-    ]
+    ],
+    "rationale": "查詢商品存在性，不先假定結果。"
   },
   {
     "id": "other-account",
@@ -87,7 +95,8 @@
         "type": "query",
         "request": "幫我查 B 玩家的餘額"
       }
-    ]
+    ],
+    "rationale": "查詢目的不因帳號權限而改變。"
   },
   {
     "id": "missing-slot",
@@ -97,7 +106,8 @@
         "type": "query",
         "request": "幫我查一下我的活動紀錄。"
       }
-    ]
+    ],
+    "rationale": "缺少細節不影響可辨識的查詢目的。"
   },
   {
     "id": "diagnosis",
@@ -107,7 +117,8 @@
         "type": "analysis",
         "request": "為什麼我換不到七龍珠模型？"
       }
-    ]
+    ],
+    "rationale": "找出具體兌換異常原因；核對商品只是手段。"
   },
   {
     "id": "diagnosis-missing-reward",
@@ -117,7 +128,8 @@
         "type": "analysis",
         "request": "昨天報名後玩了兩場卻沒有拿到點數，是哪裡出問題？"
       }
-    ]
+    ],
+    "rationale": "具體異常原因，不只是一般獎勵規則。"
   },
   {
     "id": "gap",
@@ -127,7 +139,8 @@
         "type": "analysis",
         "request": "距離兌換名片框還差幾枚點數？"
       }
-    ]
+    ],
+    "rationale": "由價格與餘額推導差額。"
   },
   {
     "id": "eligibility",
@@ -137,7 +150,8 @@
         "type": "analysis",
         "request": "如果今天已經打過兩場，再玩一場還能拿獎勵嗎？"
       }
-    ]
+    ],
+    "rationale": "判斷具體假設是否符合條件。"
   },
   {
     "id": "compare",
@@ -147,7 +161,8 @@
         "type": "analysis",
         "request": "比較這兩期活動的玩法和獎勵差異。"
       }
-    ]
+    ],
+    "rationale": "要求產出比較差異，而非單純列出規則；缺少檔期細節由後續處理。"
   },
   {
     "id": "grant",
@@ -157,7 +172,8 @@
         "type": "operation",
         "request": "直接幫我補發二十枚星星幣。"
       }
-    ]
+    ],
+    "rationale": "要求執行補發。"
   },
   {
     "id": "operation-purpose",
@@ -167,7 +183,8 @@
         "type": "operation",
         "request": "我想換披風，幫我把點數扣掉完成兌換。"
       }
-    ]
+    ],
+    "rationale": "前半句是目的，後半句是同一代辦請求，不另拆。"
   },
   {
     "id": "unrelated",
@@ -177,7 +194,8 @@
         "type": "other",
         "request": "教我怎麼換汽車輪胎。"
       }
-    ]
+    ],
+    "rationale": "與活動客服無關。"
   },
   {
     "id": "unclear",
@@ -187,7 +205,8 @@
         "type": "other",
         "request": "那個呢？"
       }
-    ]
+    ],
+    "rationale": "沒有歷史指涉，目的也不可辨識。"
   },
   {
     "id": "followup",
@@ -207,7 +226,8 @@
         "type": "query",
         "request": "那上期呢？"
       }
-    ]
+    ],
+    "rationale": "延續前一輪價格清單的查詢。"
   },
   {
     "id": "followup-analysis",
@@ -227,7 +247,8 @@
         "type": "analysis",
         "request": "那我還差多少？"
       }
-    ]
+    ],
+    "rationale": "延續上下文，要求計算差額。"
   },
   {
     "id": "independent-query-operation",
@@ -241,7 +262,8 @@
         "type": "operation",
         "request": "再幫我發十枚。"
       }
-    ]
+    ],
+    "rationale": "明確要求兩個可交付結果：餘額及代辦。"
   },
   {
     "id": "independent-knowledge-query",
@@ -255,6 +277,162 @@
         "type": "query",
         "request": "商城有哪些商品？"
       }
-    ]
+    ],
+    "rationale": "分別要求報名知識及商城清單。"
+  },
+  {
+    "id": "published-rationale",
+    "question": "公告有沒有解釋為何限制每天參加的次數？",
+    "expected": [
+      {
+        "type": "knowledge",
+        "request": "公告有沒有解釋為何限制每天參加的次數？"
+      }
+    ],
+    "rationale": "只求公布的政策說明，不要求推論。"
+  },
+  {
+    "id": "unknown-rationale",
+    "question": "依前後兩期的參加人數與獎勵成本，推測官方調低每日上限的原因。",
+    "expected": [
+      {
+        "type": "analysis",
+        "request": "依前後兩期的參加人數與獎勵成本，推測官方調低每日上限的原因。"
+      }
+    ],
+    "rationale": "依資料推導未知原因。"
+  },
+  {
+    "id": "general-eligibility-rule",
+    "question": "領獎需要符合哪些一般條件？",
+    "expected": [
+      {
+        "type": "knowledge",
+        "request": "領獎需要符合哪些一般條件？"
+      }
+    ],
+    "rationale": "一般條件說明，尚未套用到具體情境。"
+  },
+  {
+    "id": "specific-eligibility",
+    "question": "如果還沒報名就完成對局，這些場次算不算？",
+    "expected": [
+      {
+        "type": "analysis",
+        "request": "如果還沒報名就完成對局，這些場次算不算？"
+      }
+    ],
+    "rationale": "將規則套用到假設情境。"
+  },
+  {
+    "id": "public-list-two",
+    "question": "分別告訴我上期與本期的報名規則。",
+    "expected": [
+      {
+        "type": "knowledge",
+        "request": "分別告訴我上期與本期的報名規則。"
+      }
+    ],
+    "rationale": "列出兩期公開規則，沒有要求比較或產出差異。"
+  },
+  {
+    "id": "unknown-record",
+    "question": "想知道我帳號去年參加活動的紀錄。",
+    "expected": [
+      {
+        "type": "query",
+        "request": "想知道我帳號去年參加活動的紀錄。"
+      }
+    ],
+    "rationale": "資料可能不存在，但目的仍是讀取紀錄。"
+  },
+  {
+    "id": "polite-operation",
+    "question": "能不能請客服替我把重複的領獎紀錄取消掉？",
+    "expected": [
+      {
+        "type": "operation",
+        "request": "能不能請客服替我把重複的領獎紀錄取消掉？"
+      }
+    ],
+    "rationale": "委婉的實際代辦請求，不是資格判斷。"
+  },
+  {
+    "id": "conditional-gap",
+    "question": "要換頭像框，我現在還得多拿幾點才夠？",
+    "expected": [
+      {
+        "type": "analysis",
+        "request": "要換頭像框，我現在還得多拿幾點才夠？"
+      }
+    ],
+    "rationale": "目的只有推導差額，不另拆餘額、價格或操作。"
+  },
+  {
+    "id": "known-intent-missing-object",
+    "question": "幫我查這個獎品的售價。",
+    "expected": [
+      {
+        "type": "query",
+        "request": "幫我查這個獎品的售價。"
+      }
+    ],
+    "rationale": "商品指涉可能缺少，但查價目的可辨識。"
+  },
+  {
+    "id": "domain-outside-operation",
+    "question": "替我取消明天的餐廳訂位。",
+    "expected": [
+      {
+        "type": "other",
+        "request": "替我取消明天的餐廳訂位。"
+      }
+    ],
+    "rationale": "與活動客服無關，即使語意形式像操作也屬 other。"
+  },
+  {
+    "id": "same-type-independent",
+    "question": "我的活動點數有多少？今天已經計入幾場？",
+    "expected": [
+      {
+        "type": "query",
+        "request": "我的活動點數有多少？"
+      },
+      {
+        "type": "query",
+        "request": "今天已經計入幾場？"
+      }
+    ],
+    "rationale": "兩個明示且獨立的既有紀錄需求。"
+  },
+  {
+    "id": "independent-query-analysis",
+    "question": "商城目前有什麼道具？我目前的點數能買哪些？",
+    "expected": [
+      {
+        "type": "query",
+        "request": "商城目前有什麼道具？"
+      },
+      {
+        "type": "analysis",
+        "request": "我目前的點數能買哪些？"
+      }
+    ],
+    "rationale": "同時要求完整清單及依本人狀態判斷的結論。"
+  },
+  {
+    "id": "independent-other-knowledge",
+    "question": "明天會下雨嗎？活動報名到哪一天？",
+    "expected": [
+      {
+        "type": "other",
+        "request": "明天會下雨嗎？"
+      },
+      {
+        "type": "knowledge",
+        "request": "活動報名到哪一天？"
+      }
+    ],
+    "rationale": "不能因其中一項不屬服務就遺漏另一項。"
   }
 ]

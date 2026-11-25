@@ -27,7 +27,7 @@ LLM 負責理解意圖、選擇工具與生成回答；Python 負責工具權限
 
 `agent.answer` 建立 IntentRuntime，沿用共用 ToolNode、registry、證據與傳輸，改用以下節點：
 
-1. Intent：第一個 LLM 呼叫依最終目的分類五類 type，逐字保留 request；主機驗證片段並配置 T1 等 ID。第二個 LLM 呼叫 Audit 驗證需求覆蓋及業務綁定；主機驗證業務能力、檔期、商品指涉及帳號。寫入操作為 unsupported、其他帳號為 account_limit。第一層可由 eval_intent.py 獨立執行，不進入第二層或工具。
+1. Intent：第一個 LLM 呼叫依最終目的分類五類 type，逐字保留 request；主機驗證片段並配置 T1 等 ID。第二個 LLM 呼叫 Audit 驗證需求覆蓋及業務綁定；主機驗證業務能力、檔期、商品指涉及帳號。寫入操作為 unsupported、其他帳號為 account_limit。第一層不接收工具能力及權限清單；原能力資訊留給 Audit。第一層可由 eval_intent.py 獨立執行，不進入第二層或工具。
 2. Select / Prepare tools / ToolNode / Collect：根據未完成需求選原生工具；主機核對工具範圍及必要資料，先核對依賴的指定商品再查本人紀錄。保留本輪原始結果及來源。以新增來源判斷檢索進展。
 3. Evidence assessment：主機檢查必要欄位，模型獨立評估是否足以回答每項需求。補查須有具體工具及資料需求、有效預算；不能僅因非空文字補查。
 4. Generate：已確認的結構化事實以主機呈現，知識任務由 LLM 生成並核對本輪來源。活動總覽的重要條款由資料設定保留。

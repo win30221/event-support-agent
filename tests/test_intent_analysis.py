@@ -3,10 +3,11 @@ import asyncio
 import json
 import unittest
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
-from eval_intent import classify, matches
+from eval_intent import classify, compare, evaluate_cases, load_cases, matches
 from intent_analysis import INTENT_PROMPT, INTENT_SCHEMA, SimpleIntentPlan, anchor_intents
+from task_runtime import IntentRuntime
 
 
 class IntentAnalysisTests(unittest.TestCase):
@@ -35,7 +36,9 @@ class IntentAnalysisTests(unittest.TestCase):
         self.assertEqual(provider, "ollama")
         self.assertEqual(tools, [])
         self.assertEqual(messages[0]["content"], INTENT_PROMPT)
-        self.assertEqual(json.loads(messages[-1]["content"])["玩家原問"], question)
+        packet = json.loads(messages[-1]["content"])
+        self.assertEqual(packet["玩家原問"], question)
+        self.assertEqual(set(packet), {"玩家原問", "服務上下文", "修正回饋"})
         self.assertEqual(complete.call_args.kwargs["response_schema"], INTENT_SCHEMA)
 
     def test_contract_repair_does_not_rewrite_question(self):
@@ -73,3 +76,63 @@ class IntentAnalysisTests(unittest.TestCase):
         messages = complete.call_args.args[1]
         self.assertEqual(messages[1:-1], history)
         self.assertEqual(json.loads(messages[-1]["content"])["玩家原問"], question)
+
+
+    def test_prompt_defines_each_intent_without_omitting_agreed_sections(self):
+        # 保護約定的 Prompt 結構，不以檢查文字宣稱模型語意正確。
+        for category in ("knowledge", "query", "analysis", "operation", "other"):
+            with self.subTest(category=category):
+                section = INTENT_PROMPT.split(f"【{category}】", 1)[1].split("【", 1)[0]
+                for label in ("定義：", "適用：", "不適用：", "判斷原則：", "對照範例："):
+                    self.assertIn(label, section)
+                self.assertIn("\n不適用：", section)
+
+    def test_production_classifier_omits_authority_but_audit_keeps_it(self):
+        question = "替我領取活動獎勵"
+        complete = Mock(side_effect=[
+            {"content": json.dumps({"intents": [{"type": "operation", "request": question}]})},
+            {"content": json.dumps({"decision": "accept", "issues": [], "bindings": [
+                {"task_id": "T1", "kind": "operation", "editions": [], "product": "", "account": "self"}
+            ]})},
+        ])
+        runtime = IntentRuntime("A", "ollama", [], question, complete, lambda *_: None)
+        with patch("backend.ToolRegistry.execute", side_effect=AssertionError("不應執行資料工具")):
+            result = asyncio.run(runtime.intent(runtime.initial_state()))
+        self.assertEqual(complete.call_count, 2)
+        first, second = [json.loads(call.args[1][-1]["content"]) for call in complete.call_args_list]
+        self.assertEqual(set(first), {"玩家原問", "服務上下文", "修正回饋"})
+        self.assertIn("無寫入或其他帳號工具", second["能力"])
+        self.assertIn("允許業務能力", second)
+        self.assertEqual(result["task_states"]["T1"]["status"], "unsupported")
+
+    def test_comparison_separates_wrong_type_wrong_span_and_invalid_contract(self):
+        expected = [{"type": "query", "request": "查點數。"}, {"type": "knowledge", "request": "怎麼參加？"}]
+        wrong_type = {"contract_valid": True, "intents": [
+            {"type": "analysis", "request": "查點數。"}, expected[1]]}
+        wrong_span = {"contract_valid": True, "intents": [
+            {"type": "query", "request": "查點數"}, expected[1]]}
+        self.assertEqual(compare(wrong_type, expected), {"count_match": True,
+                         "type_sequence_match": False, "span_match": True, "exact_match": False})
+        self.assertEqual(compare(wrong_span, expected), {"count_match": True,
+                         "type_sequence_match": True, "span_match": False, "exact_match": False})
+        self.assertFalse(any(compare({"contract_valid": False, "intents": None}, expected).values()))
+        self.assertFalse(compare({"contract_valid": True, "intents": expected[:1]}, expected)["count_match"])
+
+    def test_select_single_case(self):
+        self.assertEqual([c["id"] for c in load_cases("diagnosis")], ["diagnosis"])
+        with self.assertRaises(ValueError):
+            load_cases("invalid-case-id")
+
+    def test_repeat_batch_preserves_failure_and_does_not_send_expected(self):
+        case = {"id": "local", "question": "查點數。", "expected": [
+            {"type": "query", "request": "查點數。"}], "rationale": "既有紀錄"}
+        good = {"question": case["question"], "contract_valid": True, "intents": case["expected"]}
+        classify_mock = AsyncMock(side_effect=[good, RuntimeError("模型服務無法使用")])
+        with patch("eval_intent.classify", classify_mock), patch("eval_intent.print_result"), patch("builtins.print"):
+            report = asyncio.run(evaluate_cases([case], "ollama", 2))
+        self.assertEqual(report["summary"]["total"], 2)
+        self.assertEqual(report["summary"]["exact_match"], 1)
+        self.assertEqual(report["summary"]["contract_valid"], 1)
+        self.assertIsNone(report["results"][1]["model_calls"])
+        self.assertEqual([c.args for c in classify_mock.call_args_list],
+                         [(case["question"], "ollama", []), (case["question"], "ollama", [])])

@@ -64,7 +64,7 @@ Hybrid：以 Ollama /api/embed（bge-m3）向量化檔期、文件、發布日�
 
 ## 4. 新分支的任務及回答契約
 
-目前第一層 SimpleIntentPlan 每項只含 type 與逐字 request，主機配置任務 ID；IntentAudit 再核定 kind、editions、product、account。主機形成含 goal、depends_on 的內部 TaskProposal 並核對能力及指涉。第一層只分類最終目的，不判斷權限或選工具。TaskState 為主機內部資料，不接受模型直接改寫。EvidenceAssessment 逐項回傳 ready、needs_retrieval、no_evidence、clarify 或 unavailable；補查提出可用工具、檔期及具體缺口，主機結合必要資料及預算判斷。DraftBundle 只提供知識回答及短來源 ID；VerificationResult 提供需求覆蓋與個別草稿 verdict/issues。所有請求與權限仍由主機核定。unsupported 代表沒有該操作能力，而非服務異常。
+目前第一層 SimpleIntentPlan 每項只含 type 與逐字 request，主機配置任務 ID；IntentAudit 再核定 kind、editions、product、account。主機形成含 goal、depends_on 的內部 TaskProposal 並核對能力及指涉。第一層只分類最終目的，不判斷權限或選工具；輸入玩家原問、公開服務上下文、近期對話及既有修正回饋，不接收工具能力或權限清單。原能力資料留在第二層。TaskState 為主機內部資料，不接受模型直接改寫。EvidenceAssessment 逐項回傳 ready、needs_retrieval、no_evidence、clarify 或 unavailable；補查提出可用工具、檔期及具體缺口，主機結合必要資料及預算判斷。DraftBundle 只提供知識回答及短來源 ID；VerificationResult 提供需求覆蓋與個別草稿 verdict/issues。所有請求與權限仍由主機核定。unsupported 代表沒有該操作能力，而非服務異常。
 
 結構化業務候選如商城清單、本人餘額、已計場次、商品價格及單商品價格差額，由主機從可信結果產生；需經證據評估與語意驗證，不以工具成功當作任務完成。價格差額不代表完整兌換資格。events.json 的 overview_required_clauses 為資料維護者標記的關鍵公告原句，與有效公告核對，不是可執行兌換規則引擎。
 

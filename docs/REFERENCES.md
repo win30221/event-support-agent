@@ -55,3 +55,5 @@
 
 - [Google Dialogflow CX — Intents](https://docs.cloud.google.com/dialogflow/cx/docs/concept/intent) 與 [General agent design best practices](https://docs.cloud.google.com/dialogflow/cx/docs/concept/agent-design)：2026-11-25 查閱；參考分類邊界、正反對照與避免相似意圖，將概念用於現有 LLM Prompt；未導入 Dialogflow NLU 或訓練模型。
 - [Anthropic — Building effective agents / Routing](https://www.anthropic.com/research/building-effective-agents)：2026-11-25 查閱；路由需具備可區隔、可可靠分類的類別，先獨立驗證第一層再評估是否改架構。
+
+- [Claude Platform — Prompting best practices](https://platform.claude.com/docs/en/prompt-library/library)：2026-11-25 查閱；參考範例相關性、多樣性與清楚結構，將對照範例與分類定義分開，獨立測試題不提供模型。不代表已證實本地小模型準確率改善。

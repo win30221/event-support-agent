@@ -281,3 +281,5 @@ Ollama 請選用支援 tool calling 的模型。兩個供應商的工具選擇�
 ## 單獨測試第一層意圖
 
 完成 Python 套件安裝並啟動 Ollama 後，即可執行 `.\.venv\Scripts\python.exe eval_intent.py`（macOS/Linux：`./.venv/bin/python eval_intent.py`）。不需先啟動 PostgreSQL 或 Streamlit。逐題輸入，空白行結束。完整題集加 `--cases`，詳見 [EVALUATION](EVALUATION.md#第一層意圖獨立驗收)。
+
+離線契約測試：`python -m unittest tests.test_intent_analysis -v`（不需 Ollama 或 PostgreSQL）。真實模型指定單題 ID：`python eval_intent.py --case diagnosis --repeat 3 --report reports/intent-diagnosis.json`。完整題集：`python eval_intent.py --cases --report reports/intent-all.json`。Windows 使用同一虛擬環境的 `.\.venv\Scripts\python.exe`；macOS/Linux 使用 `./.venv/bin/python`。報告放 reports/，預設不納入 Git。
