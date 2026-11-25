@@ -4,7 +4,7 @@
 
 ## 1. 已確認的基準
 
-既有純檢索基準為 Ubuntu / Python 3.11；公告及評測語料未變更。完整回歸加入 PostgreSQL 服務及資料庫整合測試。
+既有純檢索基準為 Ubuntu / Python 3.11；公告及評測語料未變更。完整回歸加入 PostgreSQL 服務及資料庫整合測試。下表保留既有歷史結果，不代表已在 PostgreSQL 19 重跑；目前 CI workflow 仍指定 `postgres:16`，本機安裝與測試說明改採 PostgreSQL 19（此文件更新未修改 CI）。
 
 | 項目 | 結果 |
 | --- | --- |
@@ -38,7 +38,7 @@
 
 下列用 Python 表示已安裝 requirements 的虛擬環境 Python。Windows 可將 python 換為 .\.venv\Scripts\python.exe，macOS/Linux 換為 ./.venv/bin/python。
 
-先準備獨立測試 PostgreSQL，設定 EVENT_SUPPORT_AGENT_PG_DSN 指向空白測試資料庫。整合測試使用獨立 schema；既有腳本回歸依賴未修改的初始示範資料。禁止對正式資料庫執行。
+先依 [QUICKSTART 第 4 節](QUICKSTART.md#4-共用-postgresql-19-初始化ab-均必須) 啟動 `pgvector/pgvector:pg19-trixie`，確認 PostgreSQL 19 就緒且主機 DSN 驗證成功，再依 [第 8 節](QUICKSTART.md#8-測試) 建立獨立空白測試資料庫並設定 `EVENT_SUPPORT_AGENT_PG_DSN` 為 `postgresql://postgres:event-support-agent-demo@127.0.0.1:55432/event_support_agent_test`。整合測試使用獨立 schema；既有腳本回歸依賴未修改的初始示範資料。禁止對正式或已修改的 demo 資料庫執行。測試完成後切回 demo DSN（資料庫 `event_support_agent`）。
 
 ```bash
 python player_progress.py
@@ -55,11 +55,11 @@ python eval_rag.py --hybrid
 python eval_rag.py --hybrid --case ranked-slang
 ```
 
-Hybrid 離線評測會使用嵌入模型與 pgvector，不使用聊天模型。完整回歸使用真實 PostgreSQL，但不需 Ollama 或 pgvector extension；純 BM25 檢索評測仍不需資料庫連線。
+Hybrid 離線評測會使用嵌入模型與 pgvector，不使用聊天模型。本機完整回歸使用真實 PostgreSQL 19，但不需 Ollama 或 pgvector extension；純 BM25 檢索評測仍不需資料庫連線。
 
 ## 4. 真實模型評測
 
-先啟動模型服務及 PostgreSQL，依 QUICKSTART 設定環境變數並初始化玩家進度。聊天檢索模式由 EVENT_SUPPORT_AGENT_RETRIEVAL 指定；--hybrid 與 --live 不可同時使用。
+先啟動模型服務及 PostgreSQL 19，依 QUICKSTART 設定環境變數、驗證 DSN、初始化玩家進度並查詢玩家 A 餘額。聊天檢索模式由 EVENT_SUPPORT_AGENT_RETRIEVAL 指定；--hybrid 與 --live 不可同時使用。
 
 ```bash
 python eval_rag.py --case first-night --live ollama --strict --report reports/first-night.json

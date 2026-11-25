@@ -14,7 +14,9 @@
 | [Ollama Embed API](https://docs.ollama.com/api/embed) | 採用 /api/embed；vector_search.py |
 | [Psycopg 3 基本用法](https://www.psycopg.org/psycopg3/docs/basic/usage.html) | 採用連線、交易 context manager 及參數化 SQL |
 | [PostgreSQL INSERT](https://www.postgresql.org/docs/current/sql-insert.html) | 採用 ON CONFLICT DO NOTHING 的非覆寫初始化 |
-| [pgvector](https://github.com/pgvector/pgvector) | 採用 PostgreSQL vector、精確 cosine distance，非近似索引 |
+| [pgvector](https://github.com/pgvector/pgvector) | 採用 PostgreSQL vector、精確 cosine distance，非近似索引；本機安裝使用 `pg19-trixie` 映像 |
+| [PostgreSQL Docker 官方映像](https://hub.docker.com/_/postgres) | PostgreSQL 18 起使用版本化 PGDATA 及 `/var/lib/postgresql` 掛載；初始化環境變數只對空白資料目錄生效，舊大版本資料卷須保留並另行遷移 |
+| [pg_isready](https://www.postgresql.org/docs/19/app-pg-isready.html) | 檢查服務是否接受連線；不取代以應用程式 DSN 實際驗證帳密 |
 | [Anthropic Contextual Retrieval](https://www.anthropic.com/research/contextual-retrieval) | 參考詞彙/向量互補及段落背景；保留 BM25 基準，未宣稱實作其完整 contextual embedding 方法 |
 | [Microsoft Azure RAG preparation](https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/rag/rag-preparation-phase) | 參考標記問題、來源及參考答案；rag_cases.json |
 | [Microsoft RAG evaluators](https://learn.microsoft.com/en-us/azure/foundry/concepts/evaluation-evaluators/rag-evaluators) | 參考檢索與回答品質分開評估；未使用 Azure 評測服務 |
