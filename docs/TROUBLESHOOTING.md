@@ -6,12 +6,12 @@
 
 | 症狀 | 排查與處理 |
 | --- | --- |
-| ModuleNotFoundError: pydantic_graph | 安裝或更新專案後執行 python -m pip install -r requirements.txt；python -c "import pydantic_graph"；用同一 Python 啟動 Streamlit |
+| ModuleNotFoundError: langgraph | 安裝或更新專案後執行 python -m pip install -r requirements.txt；python -c "import langgraph"；用同一 Python 啟動 Streamlit |
 | Python 版本不足 | 使用 3.11+ 重建 venv，確認 python --version |
-| Ollama connection refused | 啟動 Ollama，ollama list，核對 OLLAMA_BASE_URL 預設 http://localhost:11434/v1 |
+| Ollama connection refused | 啟動 Ollama，ollama list，核對 OLLAMA_BASE_URL 預設 http://localhost:11434 |
 | Ollama model not found | ollama pull qwen3:8b 或指定實際已裝且相容的 OLLAMA_MODEL |
 | 本機 Vulkan/Flash Attention pipeline 失敗 | 先核對 Ollama 版本、GPU driver、記憶體及日誌；已觀察到部分 Windows 環境可透過 OLLAMA_FLASH_ATTENTION=0 排查，需重啟 Ollama 服務才生效，不是本專案設定或通用解法 |
-| 模型回應逾時 | 核對模型日誌及硬體；必要時提高 EVENT_SUPPORT_AGENT_OLLAMA_TIMEOUT_SECONDS（如 600），預設 120；0 代表 Python socket 無 timeout，不建議預設使用 |
+| 模型回應逾時 | 核對模型日誌及硬體；必要時提高 EVENT_SUPPORT_AGENT_OLLAMA_TIMEOUT_SECONDS（如 600），預設 120；0 代表 SDK HTTP 無 timeout，不建議預設使用 |
 | OpenAI API key 缺失或 401 | 在啟動程序同一終端設定正確 OPENAI_API_KEY；確認模型存取權、額度；勿將 key 寫入 repo |
 | 原生工具呼叫空內容 | 兩個供應商共用一次原生工具選擇重試機會。查看 provider meta，勿自動增加無限重試 |
 | JSON 回答不符合契約 | 查看格式驗證事件；既有流程只有有限修復機會，非 supported 正文不直接採用 |
@@ -93,6 +93,13 @@ docker exec -it event-support-agent-pg19 psql -U postgres -d postgres
 ```
 
 在 psql 內執行 `\password postgres`，依提示輸入新密碼兩次，再用 `\q` 離開。若無法登入管理角色，停止操作並使用正規管理員復原流程；不要開啟 trust 驗證或刪除資料卷來繞過問題。修改密碼後更新同一終端的 DSN，重做上述主機連線驗證，依 QUICKSTART 第 4 節執行 player_progress.py、查詢玩家 A 的 2026-11 餘額（全新 demo 預期 80 枚），再由同一終端啟動 Streamlit。舊資料卷及已持久化的餘額不會被重置。
+
+## LangGraph / LangChain 排錯
+
+- Ollama 新版 base URL 使用 http://localhost:11434；舊 /v1 設定會自動去除。確認 Ollama 服務及模型支援 tools 與 json_schema。
+- 核對互動流程內模型 metadata、實際 context、prompt_eval_duration、eval_duration；若需調整可設定 EVENT_SUPPORT_AGENT_OLLAMA_NUM_CTX 或 EVENT_SUPPORT_AGENT_OLLAMA_REASONING，需實測品質及延遲。
+- ToolNode 只執行主機核准的唯讀工具。工具驗證錯誤、查無、服務錯誤及證據不足不同；不可直接放寬 registry 或帳號驗證。
+- 回答格式錯誤會記錄具體欄位及原因；一次修復仍失敗則安全降級。歷史回答不視為本輪事實。
 
 ## 問題定位順序
 

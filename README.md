@@ -16,15 +16,15 @@
 
 | 功能 | 技術及設計 |
 | --- | --- |
-| Agent Harness | Pydantic Graph、有界工具循環、Stop Gate |
+| Agent Harness | LangGraph StateGraph / MessagesState / ToolNode、有界工具循環、Stop Gate |
 | RAG | BM25；選用 Ollama bge-m3 + PostgreSQL/pgvector，RRF 排名融合 |
 | 工具 | 公開公告、商城、指定商品、本人 PostgreSQL 進度及四則運算 |
-| LLM | Ollama / OpenAI；共用工具登錄與結構化回答契約 |
+| LLM | Ollama / OpenAI；ChatOllama / ChatOpenAI、共用工具登錄與結構化回答契約 |
 | 可靠性 | 工具參數驗證、帳號綁定、適用條件、引用驗證、部分回答 |
 | UI 與觀測 | Streamlit、參考資料、查詢紀錄、互動流程及模型用量 |
 | 品質與評測 | 自動化回歸測試、RAG 檢索評測及真實模型重播；詳見 [EVALUATION](docs/EVALUATION.md) |
 
-Ollama 與 OpenAI 共用原生 Function Calling；不是 MCP。引用存在性不等同於回答語意完全正確。
+Ollama 與 OpenAI 由 LangChain 共用工具契約，ChatOllama 使用 Ollama SDK /api/chat；不是 MCP。引用存在性不等同於回答語意完全正確。
 
 ## 從零啟動（含 RAG）
 
@@ -37,9 +37,9 @@ Ollama 與 OpenAI 共用原生 Function Calling；不是 MCP。引用存在性�
 ```text
 app.py                 # Streamlit 入口
 agent.py               # Graph 節點
-agent_runtime.py       # 每輪狀態與工具循環
+agent_runtime.py       # LangGraph State、ToolNode、證據與路由
 tool_selection.py      # 工具選擇介接
-model_client.py        # 模型傳輸與紀錄
+model_client.py        # LangChain 原生模型介接、Structured Output 與紀錄
 request_context.py     # 可信多輪指涉
 backend.py             # 工具契約、權限與證據
 guide.py               # 公告 BM25、商城、進度契約

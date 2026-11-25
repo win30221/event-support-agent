@@ -23,7 +23,7 @@ py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe -m pip check
-.\.venv\Scripts\python.exe -c "import streamlit, pydantic_graph, psycopg; print('OK')"
+.\.venv\Scripts\python.exe -c "import streamlit, langgraph, langchain_openai, langchain_ollama, pydantic, psycopg; print('OK')"
 ```
 
 macOS/Linux：
@@ -34,7 +34,7 @@ python3 -m venv .venv
 ./.venv/bin/python -m pip install --upgrade pip
 ./.venv/bin/python -m pip install -r requirements.txt
 ./.venv/bin/python -m pip check
-./.venv/bin/python -c "import streamlit, pydantic_graph, psycopg; print('OK')"
+./.venv/bin/python -c "import streamlit, langgraph, langchain_openai, langchain_ollama, pydantic, psycopg; print('OK')"
 ```
 
 若預設 Python 低於 3.11，改用已安裝的 3.11+ 建立 venv。以下全程使用相同 .venv Python，不需要執行環境啟用腳本。
@@ -206,9 +206,11 @@ export OPENAI_MODEL=gpt-4o-mini
 
 ## 6. 環境變數
 
+ChatOllama 直接透過 Ollama SDK 的原生 /api/chat。舊 OLLAMA_BASE_URL 末尾 /v1 會自動移除；新設定請使用下表主機 URL。
+
 | 變數 | 預設與用途 |
 | --- | --- |
-| OLLAMA_BASE_URL | http://localhost:11434/v1 |
+| OLLAMA_BASE_URL | http://localhost:11434 |
 | OLLAMA_MODEL | qwen3:8b |
 | OPENAI_API_KEY | 無；OpenAI 必填 |
 | OPENAI_MODEL | gpt-4o-mini |
@@ -218,7 +220,9 @@ export OPENAI_MODEL=gpt-4o-mini
 | EVENT_SUPPORT_AGENT_EMBED_URL | http://localhost:11434（不加 /v1） |
 | EVENT_SUPPORT_AGENT_STOP_GATE | auto；off 關額外矛盾停止檢查，不取消原有預算 |
 | EVENT_SUPPORT_AGENT_ANSWER_REVIEW | auto；off 用於對照 |
-| EVENT_SUPPORT_AGENT_OLLAMA_TIMEOUT_SECONDS | 120；非負整數秒，0 為無 Python socket timeout |
+| EVENT_SUPPORT_AGENT_OLLAMA_TIMEOUT_SECONDS | 120；非負整數秒，0 為無 SDK HTTP timeout |
+| EVENT_SUPPORT_AGENT_OLLAMA_NUM_CTX | 未設定；選用正整數 context size |
+| EVENT_SUPPORT_AGENT_OLLAMA_REASONING | 未設定；選用 true/false 或模型支援的 low/medium/high |
 | EVENT_SUPPORT_AGENT_LIVE_OLLAMA | 未設定；1 啟用 opt-in 實機測試 |
 
 程序直接讀環境變數，不自動載入 .env。新終端須重新設定；timeout 是 socket timeout，不是整輪 Agent deadline。慢速模型可先提高有限 timeout（例如 600），不建議一律無限等待。

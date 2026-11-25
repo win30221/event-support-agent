@@ -4,7 +4,7 @@
 
 ## 職責分離
 
-LLM 理解需求、選擇資料工具及生成回答；Python 管理工具契約、資料範圍、權限、證據、停止條件與確定性運算。Pydantic Graph 負責執行節點與狀態，不負責推論業務事實。
+LLM 理解需求、選擇資料工具及生成回答；Python 管理工具契約、資料範圍、權限、證據、停止條件與確定性運算。LangGraph 負責執行節點與狀態，不負責推論業務事實。
 
 ## 資料與工具
 
@@ -20,4 +20,8 @@ LLM 理解需求、選擇資料工具及生成回答；Python 管理工具契約
 
 實際測試方法與已知限制見 [EVALUATION](EVALUATION.md)。
 
-兩個供應商在工具選擇與重試時均使用相容 API 的 tools 與 tool_calls，以同一個 ToolRegistry 驗證及執行。回答與審查另以 JSON Schema 生成。
+兩個供應商在工具選擇與重試時均使用 LangChain bind_tools 與原生 tool_calls。主機以同一個 ToolRegistry 驗證及正規化參數，LangGraph ToolNode 並行執行唯一核准的查詢；依賴本輪新資料的運算需下一輪。回答與審查另以 with_structured_output 使用 JSON Schema。Pydantic BaseModel 驗證輸出資料契約，無作用欄位不觸發重試。
+
+## LangGraph 遷移決策
+
+從 ollama-native-tool-calls 的 7c9385c 建立獨立重構分支。採用 StateGraph、MessagesState、ToolNode、Conditional Edges 與有限 RetryPolicy，不重建 RAG、SQL、商城或業務驗證。先保留工具與回答分離，不同模型相容性待實機驗證。保留原始回歸測試意圖，傳輸測試改驗證 SDK 行為；外部 tracing 預設停用。本次未導入 MCP、Checkpointer 或 Multi-Agent。舊分支保留作比較基準。

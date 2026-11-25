@@ -4,7 +4,7 @@ import json
 import os
 import unittest
 from concurrent.futures import ThreadPoolExecutor
-from io import BytesIO
+from langchain_core.messages import AIMessage
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -184,13 +184,14 @@ class BoundedAgentTests(OfflineTests):
             asyncio.run(answer("A", "ollama", [], "活動玩法", Mock(side_effect=[])))
 
     def test_provider_finish_reason_is_preserved_without_reasoning_text(self):
-        payload = {"model": "local", "choices": [{"finish_reason": "length",
-                    "message": {"role": "assistant", "content": "", "reasoning_content": "private"}}]}
-        with patch("urllib.request.urlopen", return_value=BytesIO(json.dumps(payload).encode())):
+        reply = AIMessage(content="", additional_kwargs={"reasoning_content": "private"},
+                          response_metadata={"model": "local", "finish_reason": "length"})
+        with patch("model_client.model_for") as factory:
+            factory.return_value.invoke.return_value = reply
             output = completion("ollama", [{"role": "user", "content": "test"}], [])
         self.assertEqual(output["_provider_meta"]["finish_reason"], "length")
         self.assertEqual(output["_provider_meta"]["model"], "local")
-        self.assertNotIn("private", str(output["_provider_meta"]))
+        self.assertNotIn("private", str(output))
 
     def test_default_ollama_uses_native_tool_selection_and_canonical_context(self):
         question = "這個活動要怎麼玩?"
@@ -475,19 +476,59 @@ class BoundedAgentTests(OfflineTests):
 
     def test_transport_separates_tool_definitions_and_response_schema(self):
         for provider in ("ollama", "openai"):
-            with self.subTest(provider=provider), patch.dict(os.environ, {"OPENAI_API_KEY": "test"}):
-                for tools, kwargs in ((ToolRegistry("A").definitions(), {}),
-                                      ([], {"response_schema": ANSWER_SCHEMA})):
-                    with patch("urllib.request.urlopen", return_value=BytesIO(
-                        b'{"choices":[{"message":{"content":"{}"}}]}')) as send:
-                        completion(provider, [{"role": "user", "content": "test"}], tools, **kwargs)
-                        body = json.loads(send.call_args.args[0].data)
-                        self.assertEqual("tools" in body, bool(tools))
-                        self.assertEqual("response_format" in body, not tools)
-                        if not tools:
-                            self.assertEqual(body["response_format"]["json_schema"]["schema"], ANSWER_SCHEMA)
-                        elif provider == "openai":
-                            self.assertTrue(all(t["function"]["strict"] for t in body["tools"]))
+            with self.subTest(provider=provider), patch("model_client.model_for") as factory:
+                model = factory.return_value
+                model.bind_tools.return_value.invoke.return_value = AIMessage(content="")
+                model.with_structured_output.return_value.invoke.return_value = {
+                    "raw": AIMessage(content="{}"), "parsed": {}, "parsing_error": None}
+                tools = ToolRegistry("A").definitions()
+                completion(provider, [{"role": "user", "content": "test"}], tools)
+                model.bind_tools.assert_called_once_with(
+                    tools, **({"strict": True} if provider == "openai" else {}))
+                model.with_structured_output.assert_not_called()
+                completion(provider, [{"role": "user", "content": "test"}], [],
+                           response_schema=ANSWER_SCHEMA)
+                model.with_structured_output.assert_called_once_with(
+                    ANSWER_SCHEMA, method="json_schema", include_raw=True,
+                    **({"strict": True} if provider == "openai" else {}))
+                with self.assertRaises(ValueError):
+                    completion(provider, [], tools, response_schema=ANSWER_SCHEMA)
+
+    def test_answer_ignores_inactive_missing_field_without_model_retry(self):
+        question = "我的餘額多少？"
+        part = supported(question, "80 枚", (f"{CURRENT}/my-progress", '"星星幣": 80'))
+        for missing in ("none", "不需要補查", "  "):
+            with self.subTest(missing=missing):
+                text, trace, events, model = self.run_case(
+                    question, select(call("get_my_event_progress", edition="current")),
+                    response(part, missing=missing))
+                self.assertEqual(text, "80 枚")
+                self.assertEqual(model.call_count, 2)
+                self.assertEqual(len(trace), 1)
+
+    def test_duplicate_evidence_is_sent_once_and_duplicate_calls_execute_once(self):
+        question = "新手如何參加活動？"
+        def finish(provider, messages, tools, **kwargs):
+            rows = [row["段落ID"] for src in packet(messages)["工具結果"] for row in src["段落"]]
+            self.assertEqual(len(rows), len(set(rows)))
+            key = f"{CURRENT}/launch/參加"
+            return response(supported(question, original(key), (key, original(key))))
+        text, trace, events, _ = self.run_case(question, select(
+            rules("報名", "search"), rules("報名", "search"), rules("參加", "eligibility")), finish)
+        self.assertEqual(len(trace), 2)
+        self.assertIn("Python 重用工具結果", [title for title, _ in events])
+        self.assertIn(original(f"{CURRENT}/launch/參加"), text)
+
+    def test_format_retry_provides_specific_error_and_original_output(self):
+        q = "我的餘額？"
+        def fix(provider, messages, tools, **kwargs):
+            feedback = packet(messages)["修正回饋"]
+            self.assertIn("results", feedback["錯誤"])
+            self.assertEqual(feedback["前次輸出"], '{"action":"answer","missing":"","results":[]}')
+            return response(supported(q, "80 枚", (f"{CURRENT}/my-progress", '"星星幣": 80')))
+        text, _, _, _ = self.run_case(q, select(call("get_my_event_progress", edition="current")),
+            {"content": '{"action":"answer","missing":"","results":[]}'}, fix)
+        self.assertEqual(text, "80 枚")
 
 
 class FixtureReplayTests(OfflineTests):

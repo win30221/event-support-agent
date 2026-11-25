@@ -1,93 +1,155 @@
-"""Provider transport and observable model calls."""
+"""LangChain model integrations; one provider-neutral request and observation seam."""
 import asyncio
 import json
 import os
-import urllib.error
-import urllib.request
-
 from copy import deepcopy
 
+import httpx
+from langchain_core.messages import AIMessage, convert_to_messages
+from langchain_ollama import ChatOllama
+from langchain_openai import ChatOpenAI
+from ollama import ResponseError
+from openai import APIConnectionError, APIStatusError
 
-# 統一 OpenAI-compatible API；原生工具呼叫與結構化回答分開傳送。
-def completion(provider, messages, tools, *, response_schema=None):
-    timeout = 120
+
+class TransientModelError(RuntimeError):
+    """Only transport/rate-limit/server failures are eligible for node retry."""
+
+
+def model_for(provider):
     if provider == "openai":
-        url = "https://api.openai.com/v1"
-        model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-        headers = {"Authorization": "Bearer " + os.environ["OPENAI_API_KEY"]}
-    else:
-        url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
-        model = os.getenv("OLLAMA_MODEL", "qwen3:8b")
-        headers = {}
-        setting = os.getenv("EVENT_SUPPORT_AGENT_OLLAMA_TIMEOUT_SECONDS", str(timeout)).strip()
-        if not setting.isdecimal():
-            raise ValueError("EVENT_SUPPORT_AGENT_OLLAMA_TIMEOUT_SECONDS 請填 0 或正整數秒數。")
-        # urllib uses None to wait without a Python socket timeout.
-        timeout = int(setting) or None
-    body = {"model": model, "messages": messages, "stream": False}
+        return ChatOpenAI(model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+                          timeout=120, max_retries=0, use_responses_api=False)
+    if provider != "ollama":
+        raise ValueError("未知模型服務。")
+    setting = os.getenv("EVENT_SUPPORT_AGENT_OLLAMA_TIMEOUT_SECONDS", "120").strip()
+    if not setting.isdecimal():
+        raise ValueError("EVENT_SUPPORT_AGENT_OLLAMA_TIMEOUT_SECONDS 請填 0 或正整數秒數。")
+    # 舊 /v1 設定相容轉換；ChatOllama 使用 Ollama SDK 的 /api/chat。
+    base = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
+    if base.endswith("/v1"):
+        base = base[:-3]
+    options = {"model": os.getenv("OLLAMA_MODEL", "qwen3:8b"),
+               "base_url": base, "temperature": 0,
+               "client_kwargs": {"timeout": int(setting) or None}}
+    context = os.getenv("EVENT_SUPPORT_AGENT_OLLAMA_NUM_CTX", "").strip()
+    if context:
+        if not context.isdecimal() or int(context) <= 0:
+            raise ValueError("EVENT_SUPPORT_AGENT_OLLAMA_NUM_CTX 須為正整數。")
+        options["num_ctx"] = int(context)
+    reasoning = os.getenv("EVENT_SUPPORT_AGENT_OLLAMA_REASONING", "").strip().lower()
+    if reasoning:
+        if reasoning not in ("true", "false", "low", "medium", "high"):
+            raise ValueError("EVENT_SUPPORT_AGENT_OLLAMA_REASONING 設定無效。")
+        options["reasoning"] = {"true": True, "false": False}.get(reasoning, reasoning)
+    return ChatOllama(**options)
+
+
+def bound_model(provider, tools, response_schema):
     if tools and response_schema is not None:
         raise ValueError("工具選擇與最終結構化回答分開請求。")
+    model = model_for(provider)
     if tools:
-        body["tools"] = [
-            {**tool, "function": {**tool["function"], "strict": True}}
-            if provider == "openai" else tool for tool in tools
-        ]
-    elif response_schema is not None:
-        body["response_format"] = {"type": "json_schema", "json_schema": {
-            "name": "activity_answer", "strict": True, "schema": response_schema,
-        }}
-    if provider == "ollama":
-        body["temperature"] = 0
+        # 同一份 registry 定義，不用文字 JSON 模擬 function calling。
+        return model.bind_tools(tools, **({"strict": True} if provider == "openai" else {}))
+    if response_schema is not None:
+        options = {"method": "json_schema", "include_raw": True}
+        if provider == "openai":
+            options["strict"] = True
+        return model.with_structured_output(response_schema, **options)
+    return model
 
-    def send():
-        req = urllib.request.Request(url.rstrip("/") + "/chat/completions", json.dumps(body).encode(),
-                                     {"Content-Type": "application/json", **headers})
-        with urllib.request.urlopen(req, timeout=timeout) as response:
-            payload = json.load(response)
-            choice = payload["choices"][0]
-            message = dict(choice["message"])
-            metadata = {key: value for key, value in {
-                "model": payload.get("model"), "finish_reason": choice.get("finish_reason"),
-                "message_fields": sorted(message) if "finish_reason" in choice else None,
-                "usage": payload.get("usage"),
-            }.items() if value is not None}
-            if metadata:
-                message["_provider_meta"] = metadata
-            return message
 
+def normalize_reply(value):
+    """Keep native tool calls, parsed JSON and safe metadata; never expose reasoning."""
+    parsed = None
+    parsing_error = None
+    if isinstance(value, dict) and "raw" in value:
+        parsed, parsing_error, value = value.get("parsed"), value.get("parsing_error"), value["raw"]
+    if not isinstance(value, AIMessage):
+        raise ValueError("模型回傳不是 AIMessage。")
+    content = value.content
+    if isinstance(content, list):
+        content = "\n".join(block if isinstance(block, str) else block.get("text", "")
+                            for block in content if isinstance(block, str)
+                            or isinstance(block, dict) and block.get("type") == "text")
+    if parsed is not None:
+        if hasattr(parsed, "model_dump"):
+            parsed = parsed.model_dump(mode="json")
+        content = json.dumps(parsed, ensure_ascii=False)
+    calls = []
+    for item in value.tool_calls:
+        calls.append({"id": item.get("id"), "type": "function",
+                      "function": {"name": item["name"], "arguments":
+                                   json.dumps(item["args"], ensure_ascii=False)}})
+    for item in value.invalid_tool_calls:
+        calls.append({"id": item.get("id"), "type": "function",
+                      "function": {"name": item.get("name"), "arguments": item.get("args")}})
+    meta = value.response_metadata or {}
+    usage = value.usage_metadata or {}
+    safe = {key: meta[key] for key in (
+        "total_duration", "load_duration", "prompt_eval_count", "prompt_eval_duration",
+        "eval_count", "eval_duration", "done_reason") if key in meta}
+    safe.update({key: val for key, val in {
+        "model": meta.get("model_name") or meta.get("model"),
+        "finish_reason": meta.get("finish_reason") or meta.get("done_reason"),
+        "usage": {"prompt_tokens": usage.get("input_tokens"),
+                  "completion_tokens": usage.get("output_tokens"),
+                  "total_tokens": usage.get("total_tokens")} if usage else None,
+        "parsing_error": type(parsing_error).__name__ if parsing_error else None,
+    }.items() if val is not None})
+    reply = {"role": "assistant", "content": content, "tool_calls": calls}
+    if safe:
+        reply["_provider_meta"] = safe
+    return reply
+
+
+def transport_error(error):
+    if isinstance(error, (APIConnectionError, httpx.TransportError, ConnectionError)):
+        return TransientModelError("模型服務連線或等待逾時。")
+    status = getattr(error, "status_code", None)
+    if status == 429 or isinstance(status, int) and status >= 500:
+        return TransientModelError("模型服務暫時無法使用。")
+    return RuntimeError("模型服務請求失敗；請檢查模型、服務設定及供應商日誌。")
+
+
+def completion(provider, messages, tools, *, response_schema=None):
+    """Synchronous public adapter; tests can inject a scripted completion instead."""
     try:
-        return send()
-    except urllib.error.HTTPError as error:
-        # Older compatible deployments may only offer JSON object mode.
-        if response_schema is None or error.code != 400:
-            raise
-        reason = error.read().decode(errors="replace").lower()
-        if "json_schema" not in reason or not any(s in reason for s in ("not supported", "unsupported")):
-            raise
-        body["response_format"] = {"type": "json_object"}
-        return send()
+        model = bound_model(provider, tools, response_schema)
+        return normalize_reply(model.invoke(convert_to_messages(messages)))
+    except (APIConnectionError, APIStatusError, ResponseError, httpx.HTTPError, ConnectionError) as error:
+        raise transport_error(error) from error
+
+
+async def acompletion(provider, messages, tools, *, response_schema=None):
+    try:
+        model = bound_model(provider, tools, response_schema)
+        return normalize_reply(await model.ainvoke(convert_to_messages(messages)))
+    except (APIConnectionError, APIStatusError, ResponseError, httpx.HTTPError, ConnectionError) as error:
+        raise transport_error(error) from error
 
 
 def ignore_event(title, data):
     pass
 
 
-# 保留階段、請求及供應商回傳 metadata；阻塞的 HTTP 呼叫交給執行緒。
 async def model_step(provider, messages, tools, complete, observe, stage, *, response_schema=None):
     request = {"服務": provider, "messages": deepcopy(messages), "tools": deepcopy(tools)}
     if response_schema is not None:
         request["預期回答格式"] = response_schema
     observe(f"送出模型請求 · {stage}", request)
-    def invoke():
-        # StopIteration must not cross an asyncio Future boundary (e.g. an
-        # exhausted scripted model in tests). Fail explicitly instead of hanging.
-        try:
-            if response_schema is None:
-                return complete(provider, deepcopy(messages), tools)
-            return complete(provider, deepcopy(messages), tools, response_schema=response_schema)
-        except StopIteration as error:
-            raise RuntimeError("模型回傳序列意外結束。") from error
-    reply = await asyncio.to_thread(invoke)
+    if complete is completion:
+        reply = await acompletion(provider, messages, tools, response_schema=response_schema)
+    else:
+        def invoke():
+            try:
+                if response_schema is None:
+                    return complete(provider, deepcopy(messages), tools)
+                return complete(provider, deepcopy(messages), tools, response_schema=response_schema)
+            except StopIteration as error:
+                raise RuntimeError("模型回傳序列意外結束。") from error
+        reply = await asyncio.to_thread(invoke)
     if not isinstance(reply, dict):
         raise ValueError("模型回傳不是有效訊息。")
     output = {key: reply[key] for key in ("role", "content", "tool_calls", "_provider_meta") if key in reply}

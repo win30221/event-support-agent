@@ -1,20 +1,24 @@
-"""Request-local execution state. Model output is never execution authority."""
+"""Request-local LangGraph nodes; no model output is execution authority."""
 from __future__ import annotations
 
 import asyncio
 import json
 import os
-from dataclasses import dataclass, field
-from typing import Callable
+from typing import TypedDict
 
-from answering import (ANSWER_PROMPT, ANSWER_SCHEMA, ANSWER_VERIFICATION_FAILED,
-                       decode_response, render_response)
+from langchain_core.messages import (AIMessage, HumanMessage, ToolMessage,
+                                     convert_to_messages, convert_to_openai_messages)
+from langchain_core.tools import StructuredTool
+from langgraph.graph import MessagesState
+from langgraph.prebuilt import ToolNode
+
+from answering import (ANSWER_PROMPT, ANSWER_SCHEMA, ANSWER_MARKDOWN_GUIDANCE,
+                       ANSWER_VERIFICATION_FAILED, decode_response, render_response)
 from answer_quality import review_answer
 from backend import ToolRegistry, compact_json, evidence_for
 from model_client import model_step
 from request_context import RequestContext
-from tool_selection import (AGENT_PROMPT, MAX_TOOL_CALLS, MAX_TOOL_ROUNDS,
-                            normalized_calls)
+from tool_selection import AGENT_PROMPT, MAX_TOOL_CALLS, MAX_TOOL_ROUNDS, normalized_calls
 
 
 STOP_RECHECK_REASON = (
@@ -24,246 +28,340 @@ STOP_RECHECK_REASON = (
 )
 
 
-@dataclass
-# 每輪請求的執行狀態；保存已驗證證據、工具預算、補查與審查狀態。
-class TurnState:
-    player: str
-    provider: str
-    history: list
-    question: str
-    complete: Callable
-    observe: Callable
-    context: RequestContext = field(init=False)
-    registry: ToolRegistry = field(init=False)
-    tools: list = field(init=False)
-    stop_mode: str = field(init=False)
-    conversation: list = field(init=False)
-    selection: list = field(init=False)
-    sources: list = field(default_factory=list)
-    errors: list = field(default_factory=list)
-    trace: list = field(default_factory=list)
-    cache: dict = field(default_factory=dict)
-    evidence: dict = field(default_factory=dict)
-    attempts: int = 0
-    round_number: int = 0
-    repair_available: bool = True
-    previous_answer: dict | None = None
-    selection_retry_used: bool = False
-    calls: list = field(default_factory=list)
-    progress: bool = False
-    can_retrieve: bool = False
-    packet: dict = field(default_factory=dict)
-    data: dict | None = None
-    stop_candidates: list = field(default_factory=list)
-    stop_used: bool = False
-    stop_pending: bool = False
-    unresolved: bool = False
-    review_allowed: bool = True
+class SupportState(MessagesState, total=False):
+    # messages 是選擇階段的模型訊息；dispatch_messages 只包含主機核准的呼叫。
+    dispatch_messages: list
+    calls: list
+    plans: list
+    sources: list
+    evidence: dict
+    cache: dict
+    errors: list
+    trace: list
+    attempts: int
+    round_number: int
+    repair_available: bool
+    selection_retry_used: bool
+    progress: bool
+    can_retrieve: bool
+    packet: dict
+    data: dict | None
+    previous_answer: dict | None
+    stop_candidates: list
+    stop_used: bool
+    stop_pending: bool
+    unresolved: bool
+    review_allowed: bool
+    next_step: str
+    result: str
 
-    def __post_init__(self):
-        self.context = RequestContext.build(self.question, self.history)
-        self.registry = ToolRegistry(self.player)
-        self.tools = self.registry.definitions()
+
+def dedupe_source(source, seen):
+    """Only send each evidence paragraph once, while preserving lookup status and IDs."""
+    rows = source.get("段落", [])
+    fresh = [row for row in rows if row["段落ID"] not in seen]
+    # Update while iterating as well as across tool groups.
+    unique = []
+    for row in fresh:
+        if row["段落ID"] not in seen:
+            unique.append(row)
+            seen.add(row["段落ID"])
+    out = {**source, "段落": unique}
+    omitted = [row["段落ID"] for row in rows if row not in unique]
+    if omitted:
+        out["已回傳段落ID"] = list(dict.fromkeys(omitted))
+    return out
+
+
+def evidence_packet(sources):
+    seen = set()
+    return [dedupe_source(source, seen) for source in sources]
+
+
+def raw_arguments(call):
+    return json.loads(call["function"]["arguments"])
+
+
+def native_call(call, arguments):
+    return {"name": call["function"]["name"], "args": arguments,
+            "id": call["id"], "type": "tool_call"}
+
+
+class TurnRuntime:
+    """Dependencies live outside graph state; each answer owns one runtime and registry."""
+
+    def __init__(self, player, provider, history, question, complete, observe):
+        self.provider, self.question = provider, question
+        self.complete, self.observe = complete, observe
+        self.context = RequestContext.build(question, history)
+        self.registry = ToolRegistry(player)
+        self.definitions = self.registry.definitions()
         self.stop_mode = os.getenv("EVENT_SUPPORT_AGENT_STOP_GATE", "auto").strip().lower()
         if self.stop_mode not in ("auto", "off"):
             raise ValueError("EVENT_SUPPORT_AGENT_STOP_GATE 請填 auto 或 off。")
-        self.conversation = [*self.context.history, {"role": "user", "content": self.question}]
-        self.selection = [{"role": "system", "content": AGENT_PROMPT + "\n服務上下文："
-                           + compact_json(self.context.public_summary())}, *self.conversation]
-        self.observe("Python 工具介接模式", {"服務": self.provider, "模式": "native"})
-        self.observe("Python Agent Harness", {"框架": "pydantic-graph", "停止檢查": self.stop_mode})
+        self.conversation = [*self.context.history, {"role": "user", "content": question}]
+        # ToolNode 使用同一份工具登錄；不向模型暴露玩家 ID 或主機正規化欄位。
+        self.tool_node = ToolNode(
+            [self.make_tool(d["function"]) for d in self.definitions],
+            messages_key="dispatch_messages", handle_tool_errors=False)
+        self.observe("Python 工具介接模式", {"服務": provider, "模式": "native"})
+        self.observe("Python Agent Harness", {"框架": "langgraph", "停止檢查": self.stop_mode})
 
-    def node(self, name):
-        self.observe("Python Harness 節點", {"節點": name, "輪次": self.round_number,
-                     "工具嘗試": self.attempts, "有效證據數": len(self.evidence)})
+    def make_tool(self, definition):
+        name = definition["name"]
 
-    # 模型提出工具請求，兩個供應商共用原生呼叫及後續驗證；選擇不等於授權。
-    async def select_tools(self):
-        self.round_number += 1
-        if self.round_number > MAX_TOOL_ROUNDS:
+        async def execute(**args):
+            # 只接受 prepare_tools 節點通過 registry.validate 的主機參數。
+            try:
+                result = await asyncio.to_thread(self.registry.execute, name, args)
+                source, refs, withheld = evidence_for(name, args, result, self.question)
+                return compact_json(source), {"source": source, "raw": result,
+                                               "refs": refs, "withheld": withheld}
+            except Exception as error:
+                payload = {"工具": name, "檔期": args.get("edition", ""), "狀態": "tool_error",
+                           "原因": "資料工具未能完成查詢。"}
+                return compact_json(payload), {"source": payload, "error": type(error).__name__}
+
+        # dict schema 保留單一 registry 定義；權限及嚴格參數驗證在派發前完成。
+        return StructuredTool.from_function(
+            coroutine=execute, name=name, description=definition["description"],
+            args_schema=definition["parameters"], infer_schema=False,
+            response_format="content_and_artifact")
+
+    def initial_state(self):
+        selection = [{"role": "system", "content": AGENT_PROMPT + "\n服務上下文："
+                      + compact_json(self.context.public_summary())}, *self.conversation]
+        return {"messages": convert_to_messages(selection), "dispatch_messages": [],
+                "calls": [], "plans": [], "sources": [], "evidence": {}, "cache": {},
+                "errors": [], "trace": [], "attempts": 0, "round_number": 0,
+                "repair_available": True, "selection_retry_used": False,
+                "progress": False, "can_retrieve": False, "packet": {}, "data": None,
+                "previous_answer": None, "stop_candidates": [], "stop_used": False,
+                "stop_pending": False, "unresolved": False, "review_allowed": True,
+                "next_step": "select"}
+
+    def node(self, state, name):
+        self.observe("Python Harness 節點", {"節點": name, "輪次": state["round_number"],
+                     "工具嘗試": state["attempts"], "有效證據數": len(state["evidence"])})
+
+    async def select(self, state: SupportState):
+        number = state["round_number"] + 1
+        if number > MAX_TOOL_ROUNDS:
             raise RuntimeError("Harness 超出工具輪數上限。")
-        self.node("select")
-        stage = "選擇資料工具" if self.round_number == 1 else "補查資料工具"
+        self.node({**state, "round_number": number}, "select")
+        stage = "選擇資料工具" if number == 1 else "補查資料工具"
+        messages = list(state["messages"])
+        additions = []
+        retried = state["selection_retry_used"]
+        errors = list(state["errors"])
         while True:
-            selected = await model_step(self.provider, self.selection, self.tools,
-                                        self.complete, self.observe, stage)
-            self.calls = normalized_calls(selected, self.round_number)
-            content = selected.get("content")
-            if self.calls or (isinstance(content, str) and content.strip()):
-                return
-            self.observe("Python 模型回傳空工具選擇", {"輪次": self.round_number,
-                         "回傳資訊": selected.get("_provider_meta", {})})
-            if self.selection_retry_used or self.stop_pending:
-                self.errors.append({"狀態": "selection_error", "原因": "模型未回傳工具選擇。"})
-                return
-            self.selection_retry_used = True
+            reply = await model_step(self.provider, convert_to_openai_messages(messages),
+                                     self.definitions, self.complete, self.observe, stage)
+            calls = normalized_calls(reply, number)
+            text = reply.get("content")
+            if calls or isinstance(text, str) and text.strip():
+                break
+            self.observe("Python 模型回傳空工具選擇",
+                         {"輪次": number, "回傳資訊": reply.get("_provider_meta", {})})
+            if retried or state["stop_pending"]:
+                errors.append({"狀態": "selection_error", "原因": "模型未回傳工具選擇。"})
+                break
+            retried = True
             stage = "重試資料工具"
-            self.selection.append({"role": "user", "content":
-                "前次沒有回傳工具或文字。需要查詢時請呼叫工具，無需查詢時請以文字說明停止。"})
+            feedback = HumanMessage(content="前次沒有回傳工具或文字。需要查詢時請呼叫工具，無需查詢時請以文字說明停止。")
+            messages.append(feedback)
+            additions.append(feedback)
+        return {"round_number": number, "calls": calls, "messages": additions,
+                "selection_retry_used": retried, "errors": errors}
 
-    # 先驗證參數及可信指涉，再查詢；相同正規化參數重用本輪結果。
-    async def execute_call(self, call):
-        name = call["function"]["name"]
-        try:
-            raw = json.loads(call["function"]["arguments"])
-            args = self.registry.validate(name, raw, self.context, self.evidence)
-        except (KeyError, TypeError, ValueError) as error:
-            payload = {"工具": name, "狀態": "invalid_arguments", "原因": str(error)}
-            self.errors.append(payload)
-            self.observe("Python 工具驗證失敗", payload)
-            return payload, False
-        key = (name, compact_json(args))
-        if key in self.cache:
-            self.observe("Python 重用工具結果", {"工具": name, "參數": args})
-            return self.cache[key], False
-        self.observe(f"呼叫工具 · {name}", dict(args))
-        try:
-            result = await asyncio.to_thread(self.registry.execute, name, args)
-            source, refs, withheld = evidence_for(name, args, result, self.question)
-        except Exception as error:
-            payload = {"工具": name, "檔期": args.get("edition", ""), "狀態": "tool_error",
-                       "原因": "資料工具未能完成查詢。"}
-            self.errors.append(payload)
-            self.observe(f"收到工具回傳 · {name}", {"isError": True, "錯誤類型": type(error).__name__})
-            self.cache[key] = payload
-            return payload, False
-        blocks = result if isinstance(result, list) else [result]
-        content = [json.dumps(block, ensure_ascii=False, indent=2) for block in blocks]
-        self.observe(f"收到工具回傳 · {name}", {"isError": False, "內容": content,
-                "結構化資料": {"result": result} if isinstance(result, list) else result})
-        if withheld:
-            self.observe("Python 核對公告適用條件", {"未採用段落": withheld})
-        self.trace.append({"工具": name, "參數": dict(args), "結果": "\n".join(content),
-                           "商品參照": refs})
-        self.cache[key] = source
-        self.sources.append(source)
-        for row in source["段落"]:
-            self.evidence[row["段落ID"]] = row
-        return source, True
+    async def prepare_tools(self, state: SupportState):
+        self.node(state, "execute")
+        calls = state["calls"]
+        self.observe("Python 工具批次", {"輪次": state["round_number"],
+                     "請求工具": [c["function"]["name"] for c in calls]})
+        attempts, plans, dispatch, history_calls = state["attempts"], [], [], []
+        batch_keys = {}
+        for call in calls:
+            name, cid = call["function"]["name"], call["id"]
+            try:
+                raw = raw_arguments(call)
+            except (TypeError, ValueError, KeyError):
+                raw = None
+            # 即使無效或超額也有合法的 ToolMessage 對應，不能執行其參數。
+            history_calls.append(native_call(call, raw if isinstance(raw, dict) else {}))
+            plan = {"id": cid, "name": name}
+            plans.append(plan)
+            if attempts >= MAX_TOOL_CALLS:
+                plan["payload"] = {"狀態": "budget_exhausted", "原因": "已達本輪工具上限。"}
+                continue
+            attempts += 1
+            try:
+                args = self.registry.validate(name, raw, self.context, state["evidence"])
+            except (KeyError, TypeError, ValueError) as error:
+                plan["payload"] = {"工具": name, "狀態": "invalid_arguments", "原因": str(error)}
+                continue
+            key = compact_json([name, args])
+            plan.update(key=key, args=args)
+            if key in state["cache"]:
+                plan["payload"] = state["cache"][key]
+                plan["reused"] = True
+            elif key in batch_keys:
+                plan["leader"] = batch_keys[key]
+                plan["reused"] = True
+            else:
+                batch_keys[key] = cid
+                plan["leader"] = cid
+                dispatch.append(native_call(call, args))
+                self.observe(f"呼叫工具 · {name}", dict(args))
+        return {"plans": plans, "attempts": attempts,
+                "messages": [AIMessage(content="", tool_calls=history_calls)] if calls else [],
+                "dispatch_messages": [AIMessage(content="", tool_calls=dispatch)] if dispatch else []}
 
-    # 每次嘗試都計入預算，補查沒有新成功結果時回到安全的前次回答。
-    async def execute_batch(self):
-        self.node("execute")
-        self.observe("Python 工具批次", {"輪次": self.round_number,
-                     "請求工具": [c["function"]["name"] for c in self.calls]})
-        self.progress = False
-        if self.calls:
-            self.selection.append({"role": "assistant", "content": "", "tool_calls": self.calls})
-            for call in self.calls:
-                if self.attempts >= MAX_TOOL_CALLS:
-                    payload = {"狀態": "budget_exhausted", "原因": "已達本輪工具上限。"}
-                else:
-                    self.attempts += 1
-                    payload, changed = await self.execute_call(call)
-                    self.progress = self.progress or changed
-                self.selection.append({"role": "tool", "tool_call_id": call["id"],
-                                       "content": compact_json(payload)})
-        if self.stop_pending:
-            self.stop_pending = False
-            if not self.progress:
-                # A recheck must not churn on identical calls or no tools.
-                self.observe("Python 停止檢查結果", {"判定": "no_progress",
-                             "原因": "沒有新的成功查詢，保留先前安全回答。"})
-                self.data = self.previous_answer
-                self.review_allowed = False
-                return False
-        return True
+    def route_tools(self, state):
+        return "tools" if state["dispatch_messages"] else "collect"
 
-    # 使用本輪證據及原問題生成結構化結果；格式修復機會全輪有界。
-    async def assess_evidence(self):
-        self.node("assess")
-        self.can_retrieve = (self.round_number < MAX_TOOL_ROUNDS and self.attempts < MAX_TOOL_CALLS
-                             and (self.round_number == 1 or self.progress))
-        self.packet = {"服務上下文": self.context.public_summary(), "玩家原問": self.question,
-                       "工具結果": self.sources, "工具錯誤": self.errors,
-                       "允許補查": self.can_retrieve,
-                       "可用資料工具": [{"name": t["function"]["name"],
-                                       "description": t["function"]["description"]} for t in self.tools],
-                       "已執行查詢": [{"工具": row["工具"], "參數": row["參數"]} for row in self.trace]}
-        messages = [{"role": "system", "content": ANSWER_PROMPT + "\n回答格式：" + compact_json(ANSWER_SCHEMA)},
-                    *self.conversation, {"role": "user", "content": compact_json(self.packet)}]
-        self.data = None
-        self.stop_candidates = []
+    async def collect(self, state: SupportState):
+        # ToolNode 平行執行；由單一節點按原呼叫順序合併證據及快取，避免競態。
+        outputs = {message.tool_call_id: message for message in state["dispatch_messages"]
+                   if isinstance(message, ToolMessage)}
+        sources, trace, errors = (list(state[k]) for k in ("sources", "trace", "errors"))
+        evidence, cache = dict(state["evidence"]), dict(state["cache"])
+        seen = set(evidence)
+        additions, progress = [], False
+        for plan in state["plans"]:
+            name, cid = plan["name"], plan["id"]
+            payload = plan.get("payload")
+            if plan.get("reused"):
+                self.observe("Python 重用工具結果", {"工具": name, "參數": plan["args"]})
+            if payload is None:
+                message = outputs.get(plan["leader"])
+                artifact = getattr(message, "artifact", None)
+                if not isinstance(artifact, dict) or "source" not in artifact:
+                    raise RuntimeError("ToolNode 未回傳可核對的工具結果。")
+                payload = artifact["source"]
+                if not plan.get("reused"):
+                    cache[plan["key"]] = payload
+                    if artifact.get("error"):
+                        errors.append(payload)
+                        self.observe(f"收到工具回傳 · {name}", {"isError": True,
+                                     "錯誤類型": artifact["error"]})
+                    else:
+                        raw = artifact["raw"]
+                        blocks = raw if isinstance(raw, list) else [raw]
+                        content = [json.dumps(block, ensure_ascii=False, indent=2) for block in blocks]
+                        self.observe(f"收到工具回傳 · {name}", {"isError": False, "內容": content,
+                                     "結構化資料": {"result": raw} if isinstance(raw, list) else raw})
+                        if artifact["withheld"]:
+                            self.observe("Python 核對公告適用條件", {"未採用段落": artifact["withheld"]})
+                        trace.append({"工具": name, "參數": dict(plan["args"]),
+                                      "結果": "\n".join(content), "商品參照": artifact["refs"]})
+                        sources.append(payload)
+                        for row in payload["段落"]:
+                            evidence.setdefault(row["段落ID"], row)
+                        progress = True
+            elif not plan.get("reused") and payload.get("狀態") == "invalid_arguments":
+                errors.append(payload)
+                self.observe("Python 工具驗證失敗", payload)
+            compact = dedupe_source(payload, seen) if "段落" in payload else payload
+            additions.append(ToolMessage(content=compact_json(compact), tool_call_id=cid, name=name))
+        updates = {"messages": additions, "dispatch_messages": [], "sources": sources,
+                   "trace": trace, "errors": errors, "evidence": evidence, "cache": cache,
+                   "progress": progress, "stop_pending": False, "next_step": "assess"}
+        if state["stop_pending"] and not progress:
+            self.observe("Python 停止檢查結果", {"判定": "no_progress",
+                         "原因": "沒有新的成功查詢，保留先前安全回答。"})
+            updates.update(data=state["previous_answer"], review_allowed=False, next_step="finalize")
+        return updates
+
+    def route_collect(self, state):
+        return state["next_step"]
+
+    async def assess(self, state: SupportState):
+        self.node(state, "assess")
+        can_retrieve = (state["round_number"] < MAX_TOOL_ROUNDS and state["attempts"] < MAX_TOOL_CALLS
+                        and (state["round_number"] == 1 or state["progress"]))
+        packet = {"服務上下文": self.context.public_summary(), "玩家原問": self.question,
+                  "工具結果": evidence_packet(state["sources"]), "工具錯誤": state["errors"],
+                  "允許補查": can_retrieve,
+                  "可用資料工具": [{"name": t["function"]["name"],
+                                   "description": t["function"]["description"]} for t in self.definitions],
+                  "已執行查詢": [{"工具": t["工具"], "參數": t["參數"]} for t in state["trace"]]}
+        prompt = ANSWER_PROMPT + "\n" + ANSWER_MARKDOWN_GUIDANCE
+        messages = [{"role": "system", "content": prompt}, *self.conversation,
+                    {"role": "user", "content": compact_json(packet)}]
+        data, candidates, repair_available = None, [], state["repair_available"]
         for retry in range(2):
             candidates = []
+            reply = await model_step(self.provider, messages, [], self.complete, self.observe,
+                                     "結構化回答" if not retry else "修正回答格式",
+                                     response_schema=ANSWER_SCHEMA)
             try:
-                reply = await model_step(self.provider, messages, [], self.complete, self.observe,
-                                         "結構化回答" if not retry else "修正回答格式",
-                                         response_schema=ANSWER_SCHEMA)
-                self.data = decode_response(reply.get("content"), observe=self.observe,
-                    evidence=self.evidence, original_question=self.question, stop_candidates=candidates)
-                self.stop_candidates = candidates
+                data = decode_response(reply.get("content"), observe=self.observe,
+                                       evidence=state["evidence"], original_question=self.question,
+                                       stop_candidates=candidates)
                 if retry:
                     self.observe("Python 回答格式修正完成", {"判定": "format_valid"})
                 break
             except ValueError as error:
                 self.observe("Python 回答格式驗證失敗", {"原因": str(error)})
-                if not self.repair_available:
+                if not repair_available:
                     break
-                self.repair_available = False
-                messages[0] = {"role": "system", "content": ANSWER_PROMPT
-                              + "\n回答格式：" + compact_json(ANSWER_SCHEMA)
-                              + "\n前次輸出不符合契約，請重新生成完整 JSON。"}
+                repair_available = False
+                # 保留原始草稿和實際錯誤，避免無提示地重複生成。
+                feedback = {"錯誤": str(error), "前次輸出": reply.get("content")}
+                messages[-1] = {"role": "user", "content": compact_json(
+                    {**packet, "修正回饋": feedback})}
+        return {"packet": packet, "data": data, "stop_candidates": candidates,
+                "repair_available": repair_available, "can_retrieve": can_retrieve}
 
-    # 補查原因屬系統回饋，不得成為新的玩家事實或可引用證據。
-    def request_more(self, reason):
-        self.previous_answer = self.data
+    def more(self, state, reason):
         self.observe("Python 接受補查需求", {"缺少資料": reason,
-                     "剩餘工具輪數": MAX_TOOL_ROUNDS - self.round_number})
-        self.selection.append({"role": "user", "content": compact_json({
+                     "剩餘工具輪數": MAX_TOOL_ROUNDS - state["round_number"]})
+        feedback = HumanMessage(content=compact_json({
             "系統補查回饋": reason, "說明": "這是證據評估，不是玩家新增的事實。"
-            "請依原問與現有工具結果選有意義的下一個查詢。"})})
+            "請依原問與現有工具結果選有意義的下一個查詢。"}))
+        return {"previous_answer": state["data"], "messages": [feedback], "next_step": "select"}
 
-    # 決定回到工具選擇或結束；矛盾拒答最多重新檢查一次，不直接提升回答狀態。
-    def stop_gate(self):
-        """Return True only when another bounded selection is warranted.
-
-        Inspired by a Stop hook, not a claim that a model's citations prove
-        entailment. It grants a single opportunity to recheck a contradictory
-        single abstention. It never authorizes a tool or promotes claims.
-        """
-        self.node("stop_gate")
-        if self.data is None:
-            self.data = self.previous_answer
-            self.unresolved = self.data is not None
-            self.review_allowed = False
-            return False
-        parts = self.data["results"]
-        unqueried = not self.sources and any(p["status"] == "no_evidence" for p in parts)
-        if unqueried and self.can_retrieve and not self.selection_retry_used:
-            self.selection_retry_used = True
-            self.request_more("尚未取得任何資料工具結果，不可將未查詢當成查無依據。")
-            return True
+    async def stop_gate(self, state: SupportState):
+        self.node(state, "stop_gate")
+        data = state["data"]
+        if data is None:
+            return {"data": state["previous_answer"], "unresolved": state["previous_answer"] is not None,
+                    "review_allowed": False, "next_step": "finalize"}
+        parts = data["results"]
+        unqueried = not state["sources"] and any(p["status"] == "no_evidence" for p in parts)
+        if unqueried and state["can_retrieve"] and not state["selection_retry_used"]:
+            return {**self.more(state, "尚未取得任何資料工具結果，不可將未查詢當成查無依據。"),
+                    "selection_retry_used": True}
         if unqueried:
-            for part in parts:
-                if part["status"] == "no_evidence":
-                    part["status"] = "unavailable"
+            data = {**data, "results": [{**p, "status": "unavailable"} if p["status"] == "no_evidence"
+                                       else p for p in parts]}
+            parts = data["results"]
             self.observe("Python 未取得工具資料", {"原因": "本輪沒有成功的工具查詢。"})
-        if self.data["action"] == "retrieve":
-            if self.can_retrieve:
-                self.request_more(self.data["missing"])
-                return True
+        if data["action"] == "retrieve":
+            if state["can_retrieve"]:
+                return self.more({**state, "data": data}, data["missing"])
             self.observe("Python 停止補查", {"原因": "已達上限或未取得新資料。"})
-            return False
-        # Restrict to a single unresolved demand: do not rewrite independently
-        # supported answers or account/scope refusals to rescue another part.
-        if (self.stop_mode == "auto" and not self.stop_used and self.sources
-                and self.can_retrieve and len(parts) == 1
-                and parts[0]["status"] == "no_evidence" and self.stop_candidates):
-            self.stop_used = self.stop_pending = True
-            self.observe("Python 停止檢查", {"判定": "recheck",
-                         "線索": self.stop_candidates, "原因": STOP_RECHECK_REASON})
-            self.request_more(STOP_RECHECK_REASON)
-            return True
-        return False
+            return {"data": data, "next_step": "finalize"}
+        if (self.stop_mode == "auto" and not state["stop_used"] and state["sources"]
+                and state["can_retrieve"] and len(parts) == 1
+                and parts[0]["status"] == "no_evidence" and state["stop_candidates"]):
+            self.observe("Python 停止檢查", {"判定": "recheck", "線索": state["stop_candidates"],
+                         "原因": STOP_RECHECK_REASON})
+            return {**self.more({**state, "data": data}, STOP_RECHECK_REASON),
+                    "stop_used": True, "stop_pending": True}
+        return {"data": data, "next_step": "finalize"}
 
-    # 工具流程已停止，才允許有界審查與最終引用驗證；審查不重新開放工具。
-    async def finalize(self):
-        self.node("finalize")
-        if self.data is None:
-            return ANSWER_VERIFICATION_FAILED, self.trace
-        if self.review_allowed and self.data["action"] == "answer":
-            self.data = await review_answer(self.provider, self.data, self.evidence,
-                self.packet, self.conversation, self.complete, self.observe)
-        return render_response(self.data, self.evidence, self.observe,
-                               unresolved=self.unresolved), self.trace
+    def route_stop(self, state):
+        return state["next_step"]
+
+    async def finalize(self, state: SupportState):
+        self.node(state, "finalize")
+        data = state["data"]
+        if data is None:
+            return {"result": ANSWER_VERIFICATION_FAILED}
+        if state["review_allowed"] and data["action"] == "answer":
+            data = await review_answer(self.provider, data, state["evidence"], state["packet"],
+                                       self.conversation, self.complete, self.observe)
+        return {"data": data, "result": render_response(
+            data, state["evidence"], self.observe, unresolved=state["unresolved"])}

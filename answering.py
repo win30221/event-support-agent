@@ -1,6 +1,9 @@
 """Independent structured response validation. A valid citation is not a semantic proof."""
 import json
 import unicodedata
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from guide import mentions_identifier
 
@@ -38,6 +41,7 @@ PART = {"type": "object", "properties": {
     "citations": {"type": "array", "items": CITATION},
 }, "required": ["question", "status", "answer", "citations"], "additionalProperties": False}
 ANSWER_SCHEMA = {
+    "title": "ActivityAnswer",
     "type": "object",
     "properties": {
         "action": {"type": "string", "enum": ["answer", "retrieve"],
@@ -55,6 +59,22 @@ ANSWER_PROMPT = """你是遊戲活動客服。針對玩家最新問題及對話�
 supported 的每個子問題均引用本輪來源 ID 與逐字摘錄，摘錄必須是原文連續文字；所有說法均須有依據。成功查詢且有明確 not_found 結果，屬於可驗證的否定事實，應以 supported 回覆並引用完整查詢狀態原文；不得推論實際交易或其他檔期的狀態。查詢失敗或沒有足夠證據則不是確認不存在。其他狀態的 answer 與 citations 留空。
 若仍有必要且可取得的新證據，且允許補查，選 action=retrieve，missing 說明欠缺的資料；已能回答的部分仍放入 results。已查過且沒有資料、真正需要玩家補充、或超出服務範圍時，不要重複查詢。
 不允許補查時必須以現有資料作部分回答或拒答。使用繁體中文，輸出指定 JSON 格式。"""
+
+
+# 結構檢查由 Pydantic 負責；非作答欄位先按業務狀態處理，避免不必要的重試。
+class RawPart(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+    question: str
+    status: Literal["supported", "service_help", "account_limit", "clarify", "no_evidence", "unavailable"]
+    answer: str
+    citations: list[Any]
+
+
+class AnswerEnvelope(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+    action: Literal["answer", "retrieve"]
+    missing: str
+    results: list[RawPart]
 
 
 # 引用資料形狀驗證與語意正確性不同，後續仍須核對本輪原文。
@@ -102,22 +122,27 @@ def decode_response(raw, *, observe=None, evidence=None, original_question="", s
         data = json.loads(raw) if isinstance(raw, str) else raw
     except (TypeError, ValueError) as error:
         raise ValueError("最終回答不是合法 JSON。") from error
-    if not isinstance(data, dict) or data.keys() != ANSWER_SCHEMA["properties"].keys():
-        raise ValueError("最終回答缺少必要欄位或欄位不符。")
+    try:
+        data = AnswerEnvelope.model_validate(data).model_dump()
+    except ValidationError as error:
+        details = "; ".join(".".join(map(str, item["loc"])) + ": " + item["msg"]
+                            for item in error.errors(include_input=False, include_url=False))
+        raise ValueError("回答契約不符：" + details) from error
     action, missing, parts = data["action"], data["missing"], data["results"]
-    if action not in ("answer", "retrieve") or not isinstance(missing, str) or not isinstance(parts, list):
-        raise ValueError("回答動作或結果型別不符。")
-    if (action == "retrieve") != bool(missing.strip()) or (action == "answer" and not parts):
-        raise ValueError("補查原因或回答結果不完整。")
+    if action == "retrieve" and not missing.strip():
+        raise ValueError("missing：補查必須提供必要的新證據及原因。")
+    if action == "answer":
+        if not parts:
+            raise ValueError("results：最終回答至少包含一個獨立需求。")
+        # action 已確定停止查詢；missing 不再具有作用。不是針對某個字串的特例。
+        if missing.strip() and observe is not None:
+            observe("Python 捨棄非補查欄位", {"欄位": "missing", "動作": action})
+        data["missing"] = ""
     if len(parts) > 16:
         raise ValueError("子問題數量超出上限。")
     for part in parts:
-        if not isinstance(part, dict) or part.keys() != PART["properties"].keys():
-            raise ValueError("子問題結構不符。")
-        if (not isinstance(part["question"], str) or not part["question"].strip()
-                or part["status"] not in STATUSES or not isinstance(part["answer"], str)
-                or not isinstance(part["citations"], list)):
-            raise ValueError("子問題欄位型別不符。")
+        if not part["question"].strip():
+            raise ValueError("results.question：獨立需求不可為空。")
         if evidence is not None and recover_verified_absence(part, evidence, original_question):
             if observe is not None:
                 observe("Python 正規化查詢狀態", {"問題": part["question"],

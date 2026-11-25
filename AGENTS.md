@@ -2,7 +2,7 @@
 
 本檔供維護者與 AI coding agent 使用。
 
-- 維持既有 Python / Streamlit / Pydantic Graph 及本地工具架構，除非有實測證據與獨立設計決策。
+- 維持既有 Python / Streamlit / LangGraph / LangChain 及本地工具架構，除非有實測證據與獨立設計決策。
 - 先定位根因、閱讀目前實作及成熟產品官方文件。記錄來源、適用性及取捨至 docs/REFERENCES.md、docs/DESIGN_DECISIONS.md。
 - 禁止針對單一提問、測試商品、固定回答寫特殊路由或硬編碼。示範業務資料與公告條件應來自資料設定。
 - LLM 理解語意；Python 控制工具、權限、參數、證據、停止及業務不變量。不得新增模型呼叫或放寬權限只為改善文案。

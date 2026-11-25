@@ -4,7 +4,7 @@
 
 ## 1. 設計目標
 
-LLM 負責理解意圖、選擇工具與生成回答；Python 負責工具權限、參數、業務條件、證據與停止預算。實際採用 Pydantic Graph 2.66.0 編排既有 Agent，不是完整 Pydantic AI Agent、Codex SDK 或 Claude Agent SDK。參考來源及採用範圍見 [REFERENCES](REFERENCES.md)。
+LLM 負責理解意圖、選擇工具與生成回答；Python 負責工具權限、參數、業務條件、證據與停止預算。實際採用 LangGraph 1.2.24 編排既有 Agent，不是完整 Pydantic AI Agent、Codex SDK 或 Claude Agent SDK。參考來源及採用範圍見 [REFERENCES](REFERENCES.md)。
 
 ## 2. 模組責任
 
@@ -14,7 +14,7 @@ LLM 負責理解意圖、選擇工具與生成回答；Python 負責工具權限
 | agent.py | Graph 節點、狀態轉移、answer 入口 |
 | agent_runtime.py | 每輪 TurnState、預算、工具、證據快取及降級 |
 | tool_selection.py | 原生工具呼叫正規化 |
-| model_client.py | OpenAI-compatible API、JSON Schema、相容備援、紀錄 |
+| model_client.py | LangChain ChatOpenAI / ChatOllama、原生 Structured Output、紀錄 |
 | request_context.py | 最近 8 則訊息；上一輪可信工具檔期及商品參照 |
 | backend.py | Tool Registry、參數/帳號驗證、證據轉換及適用條件 |
 | guide.py / vector_search.py | 公開公告、版本、BM25、hybrid、商城及進度契約 |
@@ -25,13 +25,15 @@ LLM 負責理解意圖、選擇工具與生成回答；Python 負責工具權限
 
 ## 3. Agent 生命週期
 
-1. answer 建立每輪獨立狀態及綁定目前 player 的 registry；歷史文字供指涉，不直接當成本輪事實。
-2. SelectTools 選擇唯讀工具。兩個供應商在首次選擇、補查、空回應重試及 Stop Gate 複查都傳送同一份 tools，僅接受 tool_calls。
-3. ExecuteTools 驗證名稱、參數、檔期與可信指涉後呼叫本地函式；同一輪相同正規化參數重用結果。
-4. evidence_for 產生本輪引用資料；以原問核對公開條款的適用條件，排除不適用段落。
-5. AssessEvidence 使用本輪證據產生 action/missing/results，格式不符有有限修復機會。
-6. StopGate 檢查補查預算及進展。無資料時有限備援；單一 no_evidence 需求若同時有正文及有效引用，可額外補查一次；不直接認定正文正確。
-7. Finalize 在審查條件成立時最多進行一次品質審查，修訂不合契約時保留草稿；最後逐需求驗證引用、狀態及原文保護。
+LangGraph StateGraph / MessagesState 管理每輪狀態與訊息；獨立節點透過 conditional edges 路由，不直接操作 Pydantic Graph。每輪建立獨立 registry，ToolNode 並行執行主機核准且去重的呼叫。
+
+1. Select：首次、補查及空回應重試均從同一 registry 取得工具定義，透過 ChatOpenAI/ChatOllama.bind_tools 使用原生 tool_calls。
+2. Prepare tools：主機檢查名稱、參數、檔期、可信指涉、計算依據與預算；相同正規化參數在本輪共用結果。ToolNode 只接收已核准的唯一呼叫。
+3. ToolNode：並行執行獨立唯讀工具；需要既有證據的運算不得使用尚未完成的同批結果。
+4. Collect：按原呼叫順序合併結果、查詢紀錄、適用條件及證據；模型上下文去重，保留合法 tool_call_id 對應。
+5. Assess：以 with_structured_output(method="json_schema") 獨立生成回答；Pydantic 驗證欄位型別與狀態，保留逐需求引用驗證。answer 時捨棄無作用的 missing，retrieve 必須提供原因。
+6. Stop Gate：依證據與預算決定補查或停止，維持既有矛盾拒答有限複查。格式修復回饋實際驗證原因及原草稿。
+7. Finalize：可選的一次品質審查；修訂失敗保留可驗證草稿，依子問題產生回答與參考資料。
 
 | 上限 | 數值 |
 | --- | ---: |
@@ -41,8 +43,9 @@ LLM 負責理解意圖、選擇工具與生成回答；Python 負責工具權限
 | 回答格式修復 | 全輪 1 次 |
 | 額外矛盾停止檢查 | 1 次 |
 | 最終審查 | 1 次 |
+| LangGraph recursion_limit | 24 |
 
-原生選擇無有效呼叫及文字時可有一次原生重試；無來源而報 no_evidence 也使用有限備援狀態。常見成功路徑為選擇、回答各一次模型步驟；不保證每輪僅兩次。底層 HTTP 相容備援可能增加傳輸次數，工程事件計數不等同所有 HTTP 請求。
+Select 對暫時性傳輸錯誤使用 RetryPolicy（至多 2 次嘗試）；其他業務結果不是傳輸重試。原生工具選擇與回答分開，常見成功路徑兩次模型步驟，不承諾所有模型及問題都只有兩次。尚未證實遷移後實機延遲或語意品質改善。
 
 ## 4. 信任邊界與限制
 

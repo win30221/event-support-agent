@@ -15,6 +15,7 @@ from model_client import model_step
 
 
 REVIEW_SCHEMA = {
+    "title": "ActivityReview",
     "type": "object",
     "properties": {
         "decision": {"type": "string", "enum": ["keep", "revise"]},

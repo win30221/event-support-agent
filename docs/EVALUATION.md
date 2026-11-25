@@ -4,6 +4,8 @@
 
 ## 1. 已確認的基準
 
+下列回歸及檢索數據為遷移前 Pydantic Graph 的歷史基準。LangGraph 新分支新增 SDK、非作用欄位、具體修復回饋及證據去重測試；新框架 CI、本機 PostgreSQL 19 及實機模型結果尚待驗證，不把歷史成績當成新版本成績。
+
 既有純檢索基準為 Ubuntu / Python 3.11；公告及評測語料未變更。完整回歸加入 PostgreSQL 服務及資料庫整合測試。下表保留既有歷史結果，不代表已在 PostgreSQL 19 重跑；目前 CI workflow 仍指定 `postgres:16`，本機安裝與測試說明改採 PostgreSQL 19（此文件更新未修改 CI）。
 
 | 項目 | 結果 |

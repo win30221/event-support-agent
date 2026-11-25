@@ -40,7 +40,7 @@ Hybrid：以 Ollama /api/embed（bge-m3）向量化檔期、文件、發布日�
 
 所有模型請求皆由 registry 驗證參數、型別與列舉，不接受額外欄位。edition 支援 current、previous、context、unavailable 或已知 ID；無法解析不替換檔期。
 
-兩個模型供應商都從原生 tool_calls 取得工具名稱及參數。只有通過 ToolRegistry 驗證的呼叫才會執行，文字中的 JSON 不會觸發工具。
+兩個模型供應商透過 LangChain bind_tools 取得原生 tool_calls，主機核准後由 LangGraph ToolNode 執行。只有通過 ToolRegistry 驗證的呼叫才會執行，文字中的 JSON 不會觸發工具。
 
 | 工具 | 參數 | 回傳 |
 | --- | --- | --- |
@@ -79,7 +79,7 @@ Hybrid：以 Ollama /api/embed（bge-m3）向量化檔期、文件、發布日�
 }
 ```
 
-action 可為 retrieve（missing 說明必要的新證據）；否則 answer。各需求分開驗證。
+action 可為 retrieve（missing 說明必要的新證據）；否則 answer。answer 時 missing 不具執行作用，由主機正規化為空，不為無作用欄位重跑模型；各需求分開驗證。Pydantic BaseModel 檢查回答欄位型別，引用及業務條件仍由本輪證據驗證。
 
 | status | 語意 |
 | --- | --- |

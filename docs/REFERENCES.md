@@ -6,10 +6,15 @@
 
 | 官方來源 | 狀態及對應設計 |
 | --- | --- |
-| [Pydantic Graph](https://ai.pydantic.dev/graph/) | 採用；agent.py GraphBuilder、節點及 TurnState，依 requirements 的 2.66.0 |
+| [LangGraph Graph API](https://docs.langchain.com/oss/python/langgraph/graph-api) | 採用；StateGraph、MessagesState、條件路由，依 requirements 的 1.2.24 |
+| [LangGraph Workflows and agents](https://docs.langchain.com/oss/python/langgraph/workflows-agents) | 採用；ToolNode 與自訂受控流程 |
+| [LangChain ChatOllama](https://docs.langchain.com/oss/python/integrations/chat/ollama) | 採用；原生 Ollama SDK、工具及結構化輸出 |
+| [ChatOllama API](https://reference.langchain.com/python/langchain-ollama/chat_models/ChatOllama) | 採用；client_kwargs、num_ctx、reasoning、with_structured_output |
+| [LangGraph fault tolerance](https://docs.langchain.com/oss/python/langgraph/fault-tolerance) | 採用；暫時性模型請求錯誤有限 RetryPolicy |
+| [Pydantic models](https://docs.pydantic.dev/latest/concepts/models/) | 採用；回答資料契約驗證 |
 | [OpenAI Function Calling](https://platform.openai.com/docs/guides/function-calling) | 採用介接原則；model_client.py、backend.py、tool_selection.py |
 | [OpenAI Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs) | 採用結構化回答與審查契約；answering.py、answer_quality.py |
-| [Ollama Tool Calling](https://docs.ollama.com/capabilities/tool-calling) | 透過 /v1/chat/completions 傳送 tools，以 tool_calls 及工具結果進行多輪查詢 |
+| [Ollama Tool Calling](https://docs.ollama.com/capabilities/tool-calling) | 透過 ChatOllama 原生 /api/chat 與 ChatOpenAI 傳送 tools，以 tool_calls 及工具結果進行多輪查詢 |
 | [Ollama Structured Outputs](https://docs.ollama.com/capabilities/structured-outputs) | 採用 JSON Schema 生成；host 仍需驗證 |
 | [Ollama Embed API](https://docs.ollama.com/api/embed) | 採用 /api/embed；vector_search.py |
 | [Psycopg 3 基本用法](https://www.psycopg.org/psycopg3/docs/basic/usage.html) | 採用連線、交易 context manager 及參數化 SQL |
@@ -30,7 +35,7 @@
 | [AWS Bedrock Agents actions](https://docs.aws.amazon.com/bedrock/latest/userguide/agents-action-add.html) | 參考應用端掌握工具執行，未採用 Bedrock |
 | [Intercom Fin AI Engine](https://www.intercom.com/help/en/articles/9929230-the-fin-ai-engine) | 參考客服依需求取得知識及個人資料；未使用 Fin |
 | [Intercom Fin Procedures](https://www.intercom.com/help/en/articles/12495167-fin-procedures-explained) | 參考條件流程及失敗處理 |
-| [Pydantic AI](https://ai.pydantic.dev/) | 評估完整 agent 框架；目前只採用 Pydantic Graph，保留既有模型介接 |
+| [Pydantic AI](https://ai.pydantic.dev/) | 歷史比較來源；現行不採用 Pydantic AI 或 Pydantic Graph |
 | [Streamlit st.write](https://docs.streamlit.io/develop/api-reference/write-magic/st.write) | 採用既有 Markdown 渲染 |
 | [CommonMark 0.31.2](https://spec.commonmark.org/0.31.2/) | 參考段落與清單格式；不代表 UI 完全等同 CommonMark |
 | [Python unittest](https://docs.python.org/3/library/unittest.html) | 採用標準庫測試及 discovery |
