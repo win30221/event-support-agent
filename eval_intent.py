@@ -46,12 +46,18 @@ def print_result(result):
     print(json.dumps(result, ensure_ascii=False, indent=2), flush=True)
 
 
-def load_cases(case_id=None):
-    cases = json.loads(Path(__file__).with_name("intent_cases.json").read_text(encoding="utf-8"))
+CASE_FILES = {"baseline": "intent_cases.json", "holdout": "intent_holdout_cases.json"}
+
+
+def load_cases(case_id=None, *, suite="baseline"):
+    filename = CASE_FILES[suite]
+    cases = json.loads(Path(__file__).with_name(filename).read_text(encoding="utf-8"))
+    if not cases:
+        raise ValueError(f"題庫為空：{filename}。")
     if case_id is not None:
         cases = [c for c in cases if c["id"] == case_id]
         if not cases:
-            raise ValueError(f"找不到案例：{case_id}；請查看 intent_cases.json。")
+            raise ValueError(f"找不到案例：{case_id}；請查看 {filename}。")
     return cases
 
 
@@ -82,7 +88,11 @@ async def evaluate_cases(cases, provider, repeat):
 
 async def main(args):
     if args.cases or args.case is not None:
-        report = await evaluate_cases(load_cases(args.case), args.provider, args.repeat)
+        cases = load_cases(args.case, suite=args.suite)
+        print(f"第一層題庫：{CASE_FILES[args.suite]}，{len(cases)} 題，重跑 {args.repeat} 次。", flush=True)
+        report = await evaluate_cases(cases, args.provider, args.repeat)
+        report["suite"] = args.suite
+        report["case_file"] = CASE_FILES[args.suite]
         if args.report:
             path = Path(args.report)
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -114,15 +124,17 @@ if __name__ == "__main__":
     parser.add_argument("--provider", choices=("ollama", "openai"), default="ollama")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--question", help="單題分類；不指定則進入互動模式")
-    mode.add_argument("--cases", action="store_true", help="執行 intent_cases.json 標記題集")
-    mode.add_argument("--case", help="只執行指定案例 ID")
+    mode.add_argument("--cases", action="store_true", help="執行所選標記題集（預設 baseline）")
+    mode.add_argument("--case", help="只執行所選題集中的指定案例 ID")
+    parser.add_argument("--suite", choices=tuple(CASE_FILES), default="baseline",
+                        help="baseline：原 36 題；holdout：新增 20 題，不含原題集")
     parser.add_argument("--repeat", type=int, default=1, help="標記題集重跑次數")
     parser.add_argument("--report", help="標記題集的本機 JSON 結果路徑")
     args = parser.parse_args()
     if args.repeat < 1:
         parser.error("--repeat 必須為正整數。")
-    if (args.repeat != 1 or args.report) and not (args.cases or args.case is not None):
-        parser.error("--repeat 與 --report 需搭配 --cases 或 --case。")
+    if (args.repeat != 1 or args.report or args.suite != "baseline") and not (args.cases or args.case is not None):
+        parser.error("--repeat、--report 與非預設 --suite 需搭配 --cases 或 --case。")
     try:
         raise SystemExit(asyncio.run(main(args)))
     except (RuntimeError, ValueError, OSError) as error:

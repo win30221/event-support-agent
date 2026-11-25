@@ -159,3 +159,15 @@ macOS/Linux：`./.venv/bin/python eval_intent.py`。逐題輸入，空白行離�
 離線單元測試不需要模型、PostgreSQL 或 Streamlit，只驗證共用入口、契約、標記資料、第一層與 Audit 輸入邊界和評測統計。真實模型驗收另外執行。報告分開統計 contract_valid、count_match、type_sequence_match、span_match、exact_match，並記錄模型設定、Prompt 雜湊、原始輸出、耗時及供應商資訊；連線錯誤計入失敗，未知呼叫數保留 null。任何嚴格比對不符回傳非零。多輪題的歷史僅在題集中明確提供；標點或等價切分須人工複核，不能只看總分。固定同一模型、設定及題集比較版本，再以未見問句驗證泛化。
 
 **階段門檻**：第一層離線測試通過後，逐題核對分類與拆分；代表性案例可用 --repeat 3 確認一致性，並加入未見問句人工檢查。未確認結果前不進入第二層修改。第一層通過不代表整體回歸或語意品質通過。
+
+### 新題泛化驗收（20 題）
+
+原 36 題已於 Qwen3:8b 的一次實機驗收達到 36/36（Prompt SHA-256：162ce182352501066f1e84c52d70a2a0ee3c4b7c9eb769f11ce637ac85e2469b）。保留原題庫作為回歸基準；目前同一 Prompt 不需要再次執行這 36 題。獨立 `intent_holdout_cases.json` 有 20 個新問句及預期答案，涵蓋五類意圖、服務主題邊界、知識與結論、同句複合需求及歷史指涉。新題沒有加入 Prompt，預期答案與理由仍只供主機比對。
+
+```powershell
+.\.venv\Scripts\python.exe eval_intent.py --cases --suite holdout --report reports/intent-holdout.json
+```
+
+macOS/Linux：`./.venv/bin/python eval_intent.py --cases --suite holdout --report reports/intent-holdout.json`。此指令只執行新題庫一次；執行時會顯示選用題庫與題數，結果 JSON 記錄 suite、case_file。若某題失敗，可用 `--case holdout-boundary-match --suite holdout`（將 ID 換成報告中的 case）單獨重測，不用重跑已通過案例。若沒有任何 --suite，既有 --cases 及 --case 繼續使用 baseline；不修改原分類器或輸出契約。若 Prompt 或模型設定後續改變，仍需要重新考慮舊案例回歸風險。
+
+新題尚未經真實模型驗收，不能預先宣稱通過；一次全部通過代表此批新題成功，不等於任意問句或多次試驗都穩定。由維護者核對標記及語意等價拆分後，再決定是否結束第一層。

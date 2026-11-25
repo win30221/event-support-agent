@@ -1,0 +1,258 @@
+[
+  {
+    "id": "holdout-expiry-policy",
+    "question": "活動點數到期後是直接作廢，還是會轉到下一期？",
+    "expected": [
+      {
+        "type": "knowledge",
+        "request": "活動點數到期後是直接作廢，還是會轉到下一期？"
+      }
+    ],
+    "rationale": "詢問一般點數到期政策，不要求套用本人紀錄。"
+  },
+  {
+    "id": "holdout-term-definition",
+    "question": "活動公告裡提到的有效對局是什麼意思？",
+    "expected": [
+      {
+        "type": "knowledge",
+        "request": "活動公告裡提到的有效對局是什麼意思？"
+      }
+    ],
+    "rationale": "了解公告所使用的概念，不要求判斷某次對局。"
+  },
+  {
+    "id": "holdout-registration-location",
+    "question": "如果想參加活動，要先在哪個頁面完成登記？",
+    "expected": [
+      {
+        "type": "knowledge",
+        "request": "如果想參加活動，要先在哪個頁面完成登記？"
+      }
+    ],
+    "rationale": "雖然有假設語氣，但要求一般操作方法，不是判斷資格。"
+  },
+  {
+    "id": "holdout-claim-history",
+    "question": "上個檔期，我有沒有成功領取過任何獎勵？",
+    "expected": [
+      {
+        "type": "query",
+        "request": "上個檔期，我有沒有成功領取過任何獎勵？"
+      }
+    ],
+    "rationale": "取得已存在的個人領獎紀錄，不要求推導原因。"
+  },
+  {
+    "id": "holdout-stock-status",
+    "question": "活動商城的限量獎勵目前還有庫存嗎？",
+    "expected": [
+      {
+        "type": "query",
+        "request": "活動商城的限量獎勵目前還有庫存嗎？"
+      }
+    ],
+    "rationale": "取得商品現有狀態，不因工具是否支援庫存而改變分類。"
+  },
+  {
+    "id": "holdout-another-player-history",
+    "question": "公會會長這期領了哪些活動獎勵？",
+    "expected": [
+      {
+        "type": "query",
+        "request": "公會會長這期領了哪些活動獎勵？"
+      }
+    ],
+    "rationale": "要求讀取他人的既有紀錄；權限由後續核對。"
+  },
+  {
+    "id": "holdout-boundary-match",
+    "question": "假設我在活動截止前開始對局、截止後才結束，這一場能計入嗎？",
+    "expected": [
+      {
+        "type": "analysis",
+        "request": "假設我在活動截止前開始對局、截止後才結束，這一場能計入嗎？"
+      }
+    ],
+    "rationale": "將活動規則套用至具體假設，要求是否計入的結論。"
+  },
+  {
+    "id": "holdout-relative-difficulty",
+    "question": "哪一個檔期的活動比較容易完成全部獎勵？請根據各自的達標條件判斷。",
+    "expected": [
+      {
+        "type": "analysis",
+        "request": "哪一個檔期的活動比較容易完成全部獎勵？請根據各自的達標條件判斷。"
+      }
+    ],
+    "rationale": "以規則比較推導相對難度；後句是同一判斷的依據。"
+  },
+  {
+    "id": "holdout-missing-inventory",
+    "question": "我領過獎勵卻在背包看不到，可能是哪個步驟出錯？",
+    "expected": [
+      {
+        "type": "analysis",
+        "request": "我領過獎勵卻在背包看不到，可能是哪個步驟出錯？"
+      }
+    ],
+    "rationale": "具體異常診斷，不是一般領獎方法。"
+  },
+  {
+    "id": "holdout-hypothetical-total",
+    "question": "假設每場給十五點、今天最多計四場，打滿後總共能拿多少點？",
+    "expected": [
+      {
+        "type": "analysis",
+        "request": "假設每場給十五點、今天最多計四場，打滿後總共能拿多少點？"
+      }
+    ],
+    "rationale": "依已給定的假設計算衍生結果，不必先查個人紀錄。"
+  },
+  {
+    "id": "holdout-undo-redemption",
+    "question": "我剛剛選錯獎勵了，麻煩撤銷這筆兌換。",
+    "expected": [
+      {
+        "type": "operation",
+        "request": "我剛剛選錯獎勵了，麻煩撤銷這筆兌換。"
+      }
+    ],
+    "rationale": "要求代為變更狀態；前半句是原因，不另拆。"
+  },
+  {
+    "id": "holdout-register-for-me",
+    "question": "我的活動報名還沒完成，可以直接代我報名嗎？",
+    "expected": [
+      {
+        "type": "operation",
+        "request": "我的活動報名還沒完成，可以直接代我報名嗎？"
+      }
+    ],
+    "rationale": "委婉要求執行報名，不是查詢狀態或詢問規則。"
+  },
+  {
+    "id": "holdout-bank-points",
+    "question": "我想知道銀行信用卡的紅利點數何時到期。",
+    "expected": [
+      {
+        "type": "other",
+        "request": "我想知道銀行信用卡的紅利點數何時到期。"
+      }
+    ],
+    "rationale": "雖有點數及期限等用語，但主題與遊戲活動客服無關。"
+  },
+  {
+    "id": "holdout-telecom-comparison",
+    "question": "比較一下兩家電信公司的吃到飽方案。",
+    "expected": [
+      {
+        "type": "other",
+        "request": "比較一下兩家電信公司的吃到飽方案。"
+      }
+    ],
+    "rationale": "雖要求比較，主題仍與活動客服無關。"
+  },
+  {
+    "id": "holdout-store-hours",
+    "question": "幫我查隔壁超市今天的營業時間。",
+    "expected": [
+      {
+        "type": "other",
+        "request": "幫我查隔壁超市今天的營業時間。"
+      }
+    ],
+    "rationale": "雖然是查詢，主題仍與活動客服無關。"
+  },
+  {
+    "id": "holdout-rule-and-judgment",
+    "question": "活動有哪些領獎限制？如果我昨天完成任務、今天才領取，還符合資格嗎？",
+    "expected": [
+      {
+        "type": "knowledge",
+        "request": "活動有哪些領獎限制？"
+      },
+      {
+        "type": "analysis",
+        "request": "如果我昨天完成任務、今天才領取，還符合資格嗎？"
+      }
+    ],
+    "rationale": "明確要求一般規則與套用規則後的結論兩個結果，不能合併成單一分析。"
+  },
+  {
+    "id": "holdout-history-and-cancel",
+    "question": "我上期有領到獎勵嗎？請把這期的活動報名取消。",
+    "expected": [
+      {
+        "type": "query",
+        "request": "我上期有領到獎勵嗎？"
+      },
+      {
+        "type": "operation",
+        "request": "請把這期的活動報名取消。"
+      }
+    ],
+    "rationale": "查詢上期紀錄與執行本期取消是兩個獨立結果。"
+  },
+  {
+    "id": "holdout-three-mixed",
+    "question": "我的帳號目前參加狀態是什麼？活動結束後如何領獎？順便幫我查附近診所的掛號時間。",
+    "expected": [
+      {
+        "type": "query",
+        "request": "我的帳號目前參加狀態是什麼？"
+      },
+      {
+        "type": "knowledge",
+        "request": "活動結束後如何領獎？"
+      },
+      {
+        "type": "other",
+        "request": "順便幫我查附近診所的掛號時間。"
+      }
+    ],
+    "rationale": "三個可獨立交付的結果，範圍外的第三項不影響前兩項。"
+  },
+  {
+    "id": "holdout-followup-operation",
+    "question": "那就麻煩你替我辦理。",
+    "history": [
+      {
+        "role": "user",
+        "content": "我想知道活動報名能否取消，以及如何取消。"
+      },
+      {
+        "role": "assistant",
+        "content": "你是想了解取消報名的方式，還是希望客服代為取消報名？"
+      }
+    ],
+    "expected": [
+      {
+        "type": "operation",
+        "request": "那就麻煩你替我辦理。"
+      }
+    ],
+    "rationale": "承接取消活動報名的話題，這一輪是代辦，不是再次詢問知識。"
+  },
+  {
+    "id": "holdout-followup-condition",
+    "question": "這樣我還有資格嗎？",
+    "history": [
+      {
+        "role": "user",
+        "content": "假設我在活動開始前就送出報名，但系統顯示活動開始後才登記。"
+      },
+      {
+        "role": "assistant",
+        "content": "要依活動的報名條件確認這種情況是否符合資格。"
+      }
+    ],
+    "expected": [
+      {
+        "type": "analysis",
+        "request": "這樣我還有資格嗎？"
+      }
+    ],
+    "rationale": "承接具體的假設條件，要求資格結論。"
+  }
+]

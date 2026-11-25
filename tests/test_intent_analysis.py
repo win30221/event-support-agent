@@ -3,9 +3,10 @@ import asyncio
 import json
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
-from eval_intent import classify, compare, evaluate_cases, load_cases, matches
+from eval_intent import classify, compare, evaluate_cases, load_cases, main, matches
 from intent_analysis import INTENT_PROMPT, INTENT_SCHEMA, SimpleIntentPlan, anchor_intents
 from task_runtime import IntentRuntime
 
@@ -136,3 +137,35 @@ class IntentAnalysisTests(unittest.TestCase):
         self.assertIsNone(report["results"][1]["model_calls"])
         self.assertEqual([c.args for c in classify_mock.call_args_list],
                          [(case["question"], "ollama", []), (case["question"], "ollama", [])])
+
+    def test_holdout_cases_are_distinct_valid_and_not_in_prompt(self):
+        baseline, holdout = load_cases(), load_cases(suite="holdout")
+        self.assertEqual(len(baseline), 36)
+        self.assertEqual(len(holdout), 20)
+        self.assertEqual(len({c["id"] for c in holdout}), len(holdout))
+        self.assertEqual(len({c["question"] for c in holdout}), len(holdout))
+        self.assertFalse({c["id"] for c in baseline} & {c["id"] for c in holdout})
+        self.assertFalse({c["question"] for c in baseline} & {c["question"] for c in holdout})
+        self.assertEqual({i["type"] for c in holdout for i in c["expected"]},
+                         {"knowledge", "query", "analysis", "operation", "other"})
+        for case in holdout:
+            with self.subTest(case=case["id"]):
+                self.assertNotIn(case["question"], INTENT_PROMPT)
+                plan = SimpleIntentPlan.model_validate({"intents": case["expected"]})
+                self.assertTrue(matches({"intents": anchor_intents(plan, case["question"])},
+                                        case["expected"]))
+                self.assertTrue(case["rationale"])
+        self.assertEqual(load_cases(holdout[0]["id"], suite="holdout"), [holdout[0]])
+        with self.assertRaises(ValueError):
+            load_cases(holdout[0]["id"])
+        with self.assertRaises(ValueError):
+            load_cases(baseline[0]["id"], suite="holdout")
+
+    def test_holdout_main_evaluates_only_new_suite(self):
+        # Mock 驗證 CLI 選擇題集，不呼叫真實 LLM 或重跑已通過的題目。
+        args = SimpleNamespace(cases=True, case=None, suite="holdout",
+                               provider="ollama", repeat=1, report=None, question=None)
+        evaluator = AsyncMock(return_value={"summary": {"total": 20, "exact_match": 20}})
+        with patch("eval_intent.evaluate_cases", evaluator), patch("builtins.print"):
+            self.assertEqual(asyncio.run(main(args)), 0)
+        evaluator.assert_awaited_once_with(load_cases(suite="holdout"), "ollama", 1)
