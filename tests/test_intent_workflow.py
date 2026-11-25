@@ -11,6 +11,7 @@ from evidence import source_alias
 from guide import CATALOG, published_passages, shop_catalog
 from task_business import materialize_plan, inspect_slots, scoped_evidence
 from task_contracts import TaskProposal, record
+from intent_analysis import CAPABILITIES, SimpleIntentPlan, anchor_intents
 from request_context import RequestContext
 from tests.test_bounded_agent import call, select, rules, scripted, packet
 from tests.test_guide import OfflineTests
@@ -29,7 +30,15 @@ def task(kind, goal, *, account="none", product="", editions=("current",), depen
 
 
 def plan(*tasks):
-    return output(tasks=list(tasks))
+    """Script the two separate model stages without bypassing the new contracts."""
+    intents, bindings = [], []
+    for i, t in enumerate(tasks, 1):
+        kind = t["kind"]
+        category = next(k for k, kinds in CAPABILITIES.items() if kind in kinds)
+        intents.append({"type": category, "request": t["goal"]})
+        bindings.append({"task_id": f"T{i}", "kind": kind, "editions": t["editions"],
+                         "product": t["product"], "account": t["account"]})
+    return (output(intents=intents), output(decision="accept", issues=[], bindings=bindings))
 
 
 def assess(*decisions):
@@ -41,9 +50,8 @@ def decision(tid, status="ready", ids=(), needs=(), reason="已核對"):
             "needs": list(needs), "reason": reason}
 
 
-def verify(*ids, coverage="complete", issues=(), verdicts=None):
-    return output(coverage=coverage, coverage_issues=list(issues),
-                  verdicts=verdicts if verdicts is not None else [
+def verify(*ids, verdicts=None):
+    return output(verdicts=verdicts if verdicts is not None else [
                       {"task_id": tid, "verdict": "pass", "issues": []} for tid in ids])
 
 
@@ -54,6 +62,7 @@ def draft(tid, text, keys):
 class IntentWorkflowTests(OfflineTests):
     def ask(self, question, *responses, history=()):
         events = []
+        responses = [step for response in responses for step in (response if isinstance(response, tuple) else (response,))]
         model = scripted(*responses)
         reply, trace = asyncio.run(answer("A", "ollama", list(history), question, model,
                                         lambda t, d: events.append((t, d))))
@@ -65,7 +74,7 @@ class IntentWorkflowTests(OfflineTests):
         for goal in ("贈送星星幣", "代為兌換獎品", "修改活動紀錄"):
             with self.subTest(goal=goal):
                 reply, trace, checks, _ = self.ask(goal, plan(task("operation", goal, account="self")),
-                                                   verify())
+                                                   verify("T1"))
                 self.assertEqual(trace, [])
                 self.assertEqual(checks["子問題"][0]["判定"], "unsupported")
                 self.assertEqual(checks["需求覆蓋"], "complete")
@@ -102,9 +111,9 @@ class IntentWorkflowTests(OfflineTests):
         q = "我有多少星星幣？幫我加二十枚"
         with patch("guide.read_progress", return_value=(date.fromisoformat("2026-11-21"), 73, 2, True)):
             reply, trace, checks, _ = self.ask(q,
-                plan(task("balance", "本人餘額", account="self"), task("operation", "增加餘額", account="self")),
+                plan(task("balance", "我有多少星星幣？", account="self"), task("operation", "幫我加二十枚", account="self")),
                 select(call("get_my_event_progress", edition="current")),
-                assess(decision("T1")), verify("T1"))
+                assess(decision("T1")), verify("T1", "T2"))
         self.assertEqual([x["工具"] for x in trace], ["get_my_event_progress"])
         self.assertEqual([p["判定"] for p in checks["子問題"]], ["supported", "unsupported"])
         self.assertIn("73 枚", reply)
@@ -148,8 +157,8 @@ class IntentWorkflowTests(OfflineTests):
 
     def test_verifier_coverage_repairs_drift_from_operation_to_query(self):
         q = "幫我增加星星幣"
-        reply, trace, checks, _ = self.ask(q, plan(task("other", "其他需求")),
-            verify(coverage="incomplete", issues=["原問要求業務操作"]),
+        reply, trace, checks, _ = self.ask(q, output(intents=[{"type": "other", "request": q}]),
+            output(decision="revise", issues=["原問要求業務操作"], bindings=[]),
             plan(task("operation", q, account="self")), verify())
         self.assertEqual(trace, [])
         self.assertEqual(checks["子問題"][0]["判定"], "unsupported")
@@ -175,7 +184,7 @@ class IntentWorkflowTests(OfflineTests):
             select(call("list_shop_items", edition="current"), rules("未知規則")),
             assess(decision("T1"), decision("T2", "needs_retrieval", needs=[n])),
             select(rules("未知規則")), assess(decision("T2", "needs_retrieval", needs=[n])),
-            verify("T1"))
+            verify("T1", "T2"))
         self.assertEqual([p["判定"] for p in checks["子問題"]], ["supported", "no_evidence"])
         self.assertEqual(len(trace), 2)
         for i in shop_catalog()["items"]:
@@ -187,6 +196,26 @@ class IntentWorkflowTests(OfflineTests):
             assess(decision("T1", ids=["unknown-source"])), verify())
         self.assertEqual(checks["子問題"][0]["判定"], "rejected")
         self.assertIn(ANSWER_VERIFICATION_FAILED, reply)
+
+    def test_fabricated_intent_text_is_rejected(self):
+        question = "新手怎麼玩這個活動？"
+        invalid = SimpleIntentPlan.model_validate({"intents": [
+            {"type": "knowledge", "request": question},
+            {"type": "query", "request": "顯示玩家活動餘額"}]})
+        with self.assertRaises(ValueError):
+            anchor_intents(invalid, question)
+
+    def test_non_applicable_product_is_discarded_before_lookup(self):
+        q = "這個活動怎麼玩？"
+        keys = [p["段落ID"] for p in published_passages(CURRENT) if p["文件ID"] == "launch"]
+        reply, trace, checks, events = self.ask(q,
+            plan(task("overview", q, product="星夜祭")),
+            select(rules(mode="overview")), assess(decision("T1", ids=keys)),
+            output(drafts=[draft("T1", "從大廳參加並完成冒險、到商店兌換。", keys)]),
+            verify("T1"))
+        self.assertEqual([x["工具"] for x in trace], ["find_rules"])
+        self.assertEqual(checks["子問題"][0]["判定"], "supported")
+        self.assertTrue(any(t == "Python 捨棄非適用需求欄位" for t, _ in events))
 
     def test_invalid_dependency_is_rejected(self):
         context = RequestContext.build("測試", [])

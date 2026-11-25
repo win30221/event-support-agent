@@ -48,3 +48,6 @@
 | [Anthropic Writing effective tools](https://www.anthropic.com/research/writing-tools-for-agents) | 參考工具邊界、相關回傳資料、簡潔識別碼；實機改善待驗證 |
 | [Anthropic Demystifying evals](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents) | 分階段重播、重複試驗與人工語意驗收 |
 | [ALCE](https://arxiv.org/abs/2305.14627) | 分開答案正確性及來源品質；不以 ID 存在性聲稱語意證明 |
+
+- [Streamlit components v2](https://docs.streamlit.io/develop/api-reference/custom-components/st.components.v2.component)：採用既有 UI component 介面及固定事件 ID。
+- [MDN Web Audio best practices](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API/Best_practices)：AudioContext 使用者手勢啟用、音效開關；不保證背景自動播放。

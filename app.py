@@ -4,12 +4,14 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from uuid import uuid4
 
 import streamlit as st
 
 from agent import answer
 from guide import CATALOG
 from starter_questions import render_starter_questions
+from reply_notification import render_reply_notification
 
 
 TOOL_LABELS = {
@@ -213,6 +215,13 @@ if job is not None and job.done():
         result = {"role": "assistant", "content": reply, "trace": trace}
     turns.append(result)
     del jobs[key]
+    # 只在新結果被收進聊天時產生事件，重繪歷史不會重播。
+    st.session_state["reply_notification_event"] = {
+        "id": uuid4().hex, "error": result["role"] == "error"
+    }
+
+with st.sidebar:
+    render_reply_notification(st, st.session_state.get("reply_notification_event"))
 
 if not turns and key not in jobs:
     st.markdown("#### 先試試這些問題")

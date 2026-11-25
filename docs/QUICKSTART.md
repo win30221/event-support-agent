@@ -206,7 +206,11 @@ export OPENAI_MODEL=gpt-4o-mini
 
 ## 新分支測試
 
-既有基準環境可停止 Streamlit 後執行 git fetch origin，再以 git switch --track origin/refactor/intent-task-workflow 首次切換；已建立本地分支時改用 git switch refactor/intent-task-workflow 與 git pull --ff-only。先檢查 git status，不覆蓋未提交修改。從原終端以既有 DSN、模型及檢索設定啟動 Streamlit。不需重建資料庫。工程檢視應出現 Python Intent Workflow、意圖分析、需求清單、證據充足性評估及獨立語意驗證（終止需求不需查詢）。
+既有基準環境可停止 Streamlit 後執行 git fetch origin，再以 git switch --track origin/refactor/intent-task-simple 首次切換；已建立本地分支時改用 git switch refactor/intent-task-simple 與 git pull --ff-only。先檢查 git status，不覆蓋未提交修改。從原終端以既有 DSN、模型及檢索設定啟動 Streamlit。不需重建資料庫。工程檢視應出現 Python Intent Workflow、意圖分析、需求清單、證據充足性評估及獨立語意驗證（終止需求不需查詢）。
+
+### 回覆音效
+
+左側「啟用回覆音效並試聽」需先點一次，讓瀏覽器解鎖 Web Audio；同頁重新執行不需再按。成功／失敗提示音由瀏覽器生成，無額外依賴。若無聲音，核對分頁靜音、網站播放權限及裝置音量，再重新啟用。背景分頁可能延遲，關閉頁面不會收到提醒。
 
 ## 6. 環境變數
 
