@@ -111,19 +111,28 @@ class IntentRuntime(TurnRuntime):
                      "錯誤": str(error)[:600]})}
         return None
 
+    def intent_packet(self, feedback):
+        return {"玩家原問": self.question, "服務上下文": self.context.public_summary(),
+                "能力": "公開公告、公開商城、本人活動紀錄及運算；無寫入或其他帳號工具。",
+                "修正回饋": feedback}
+
+    async def classify_intents(self, packet):
+        # 正式工作流及獨立評測共用同一份 Prompt、Schema、輸入及原問錨定。
+        intents = await self.ask(SIMPLE_PROMPT, packet, SIMPLE_SCHEMA, SimpleIntentPlan,
+                                 "精簡意圖分析", lambda p: anchor_intents(p, self.question))
+        if intents is not None:
+            self.observe("Python 原問需求錨定", {"需求": intents})
+        return intents
+
     async def intent(self, state):
         self.node(state, "intent")
-        packet = {"玩家原問": self.question, "服務上下文": self.context.public_summary(),
-                  "能力": "公開公告、公開商城、本人活動紀錄及運算；無寫入或其他帳號工具。",
-                  "修正回饋": state["feedback"]}
+        packet = self.intent_packet(state["feedback"])
         # 語意規劃最多一次重提案；結構錯誤由 ask 各自有限修復。
         # 未通過 precision/recall 審查前不得執行任何資料工具。
         for attempt in range(2):
-            intents = await self.ask(SIMPLE_PROMPT, packet, SIMPLE_SCHEMA, SimpleIntentPlan,
-                                     "精簡意圖分析", lambda p: anchor_intents(p, self.question))
+            intents = await self.classify_intents(packet)
             if intents is None:
                 break
-            self.observe("Python 原問需求錨定", {"需求": intents})
             from intent_analysis import CAPABILITIES
             audit_packet = {**packet, "需求": intents,
                 "允許業務能力": {k: sorted(v) for k, v in CAPABILITIES.items()}}

@@ -51,3 +51,7 @@
 
 - [Streamlit components v2](https://docs.streamlit.io/develop/api-reference/custom-components/st.components.v2.component)：採用既有 UI component 介面及固定事件 ID。
 - [MDN Web Audio best practices](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API/Best_practices)：AudioContext 使用者手勢啟用、音效開關；不保證背景自動播放。
+
+
+- [Google Dialogflow CX — Intents](https://docs.cloud.google.com/dialogflow/cx/docs/concept/intent) 與 [General agent design best practices](https://docs.cloud.google.com/dialogflow/cx/docs/concept/agent-design)：2026-11-25 查閱；參考分類邊界、正反對照與避免相似意圖，將概念用於現有 LLM Prompt；未導入 Dialogflow NLU 或訓練模型。
+- [Anthropic — Building effective agents / Routing](https://www.anthropic.com/research/building-effective-agents)：2026-11-25 查閱；路由需具備可區隔、可可靠分類的類別，先獨立驗證第一層再評估是否改架構。

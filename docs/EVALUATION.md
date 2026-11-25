@@ -134,3 +134,18 @@ macOS/Linux 將 Python 路徑改為 `./.venv/bin/python`。先固定模型、資
 ```
 
 人工語意門檻：對照每題 reference，確認事實正確、必要限制完整、沒有捏造資料、拒答及部分回答合理；三次重跑均通過才能認定該案例驗收。比較模型與 Reasoning 時記錄延遲、Token、任務成功率與失敗原因，不能把安全降級當作成功。未執行真實模型或人工審查時，不可宣稱新版已達語意品質門檻。
+
+
+## 第一層意圖獨立驗收
+
+依玩家最終目的分類（knowledge / query / analysis / operation / other），不因查詢手段、資料不足或執行權限改變意圖。分類與業務核定仍是不同階段。只改第一層 Prompt；既有 Schema、Audit、工具、證據、Renderer 與 Verifier 不變。
+
+啟動 Ollama 並使用原有模型設定，在專案根目錄執行：
+
+```powershell
+.\.venv\Scripts\python.exe eval_intent.py
+```
+
+macOS/Linux：`./.venv/bin/python eval_intent.py`。逐題輸入，空白行離開；各題獨立，不需要 PostgreSQL 或 Streamlit。工具與後續節點不執行。輸出 type、原問片段、契約是否有效、模型呼叫及耗時。格式錯誤維持既有最多一次修正；契約有效不表示分類正確。
+
+單題可加 `--question "你的問題"`；`--cases` 逐一執行 intent_cases.json，輸出期望及嚴格比對結果，任何不符回傳非零。多輪題的歷史僅在題集中明確提供；原問片段的標點或切分差異須人工複核。固定同一模型、設定及題集比較版本，另外使用未出現在 Prompt 的新問句驗證泛化。離線測試 `python -m unittest tests.test_intent_analysis -v` 只驗證共用入口、契約及標記資料；實機分類成效須另跑。

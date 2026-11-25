@@ -18,6 +18,10 @@
 
 本實驗分支採用精簡意圖：先回傳五類 type 與原問 request，再做意圖覆蓋與業務綁定審查，工具前確認必要欄位。仍需實機驗收。
 
+## 第一層意圖測試
+
+先以 `python eval_intent.py` 逐題測試五種意圖；不執行 Audit 或任何資料工具，不需資料庫。使用既有虛擬環境及模型設定，詳見 [EVALUATION](docs/EVALUATION.md#第一層意圖獨立驗收)。
+
 ## 操作展示
 
 本機 qwen3:8b 對話：活動玩法 → 商城價格 → 本人餘額 → 要求客服贈送星星幣。
@@ -52,7 +56,10 @@ Ollama 與 OpenAI 由 LangChain 共用工具契約，ChatOllama 使用 Ollama SD
 app.py                 # Streamlit 入口
 agent.py               # Graph 節點
 agent_runtime.py       # 共用工具、證據、基準工作流
+intent_analysis.py    # 五類意圖與原問錨定、業務綁定
 task_contracts.py      # 意圖、證據評估、生成與驗證契約
+eval_intent.py         # 獨立執行正式第一層分類
+intent_cases.json      # 第一層標記題集
 task_business.py       # 主機能力、必要欄位及結構化呈現
 task_runtime.py        # 新的逐需求 LangGraph 工作流
 task_cases.json        # 新分支的實機業務案例

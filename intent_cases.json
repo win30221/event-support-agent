@@ -1,0 +1,260 @@
+[
+  {
+    "id": "overview",
+    "question": "新手怎麼玩這個活動？",
+    "expected": [
+      {
+        "type": "knowledge",
+        "request": "新手怎麼玩這個活動？"
+      }
+    ]
+  },
+  {
+    "id": "public-limit",
+    "question": "每日最多可以獲得多少活動點數？",
+    "expected": [
+      {
+        "type": "knowledge",
+        "request": "每日最多可以獲得多少活動點數？"
+      }
+    ]
+  },
+  {
+    "id": "public-why",
+    "question": "為什麼活動規則有每日次數限制？",
+    "expected": [
+      {
+        "type": "knowledge",
+        "request": "為什麼活動規則有每日次數限制？"
+      }
+    ]
+  },
+  {
+    "id": "public-dates",
+    "question": "上一期活動什麼時候結束？",
+    "expected": [
+      {
+        "type": "knowledge",
+        "request": "上一期活動什麼時候結束？"
+      }
+    ]
+  },
+  {
+    "id": "how-to",
+    "question": "外觀兌換完要去哪裡裝備？",
+    "expected": [
+      {
+        "type": "knowledge",
+        "request": "外觀兌換完要去哪裡裝備？"
+      }
+    ]
+  },
+  {
+    "id": "balance",
+    "question": "我有幾個星星幣?",
+    "expected": [
+      {
+        "type": "query",
+        "request": "我有幾個星星幣?"
+      }
+    ]
+  },
+  {
+    "id": "catalog",
+    "question": "那商城裡的物品價格各是多少?",
+    "expected": [
+      {
+        "type": "query",
+        "request": "那商城裡的物品價格各是多少?"
+      }
+    ]
+  },
+  {
+    "id": "unknown-existence",
+    "question": "商城裡有沒有月亮造型的帽子？",
+    "expected": [
+      {
+        "type": "query",
+        "request": "商城裡有沒有月亮造型的帽子？"
+      }
+    ]
+  },
+  {
+    "id": "other-account",
+    "question": "幫我查 B 玩家的餘額",
+    "expected": [
+      {
+        "type": "query",
+        "request": "幫我查 B 玩家的餘額"
+      }
+    ]
+  },
+  {
+    "id": "missing-slot",
+    "question": "幫我查一下我的活動紀錄。",
+    "expected": [
+      {
+        "type": "query",
+        "request": "幫我查一下我的活動紀錄。"
+      }
+    ]
+  },
+  {
+    "id": "diagnosis",
+    "question": "為什麼我換不到七龍珠模型？",
+    "expected": [
+      {
+        "type": "analysis",
+        "request": "為什麼我換不到七龍珠模型？"
+      }
+    ]
+  },
+  {
+    "id": "diagnosis-missing-reward",
+    "question": "昨天報名後玩了兩場卻沒有拿到點數，是哪裡出問題？",
+    "expected": [
+      {
+        "type": "analysis",
+        "request": "昨天報名後玩了兩場卻沒有拿到點數，是哪裡出問題？"
+      }
+    ]
+  },
+  {
+    "id": "gap",
+    "question": "距離兌換名片框還差幾枚點數？",
+    "expected": [
+      {
+        "type": "analysis",
+        "request": "距離兌換名片框還差幾枚點數？"
+      }
+    ]
+  },
+  {
+    "id": "eligibility",
+    "question": "如果今天已經打過兩場，再玩一場還能拿獎勵嗎？",
+    "expected": [
+      {
+        "type": "analysis",
+        "request": "如果今天已經打過兩場，再玩一場還能拿獎勵嗎？"
+      }
+    ]
+  },
+  {
+    "id": "compare",
+    "question": "比較這兩期活動的玩法和獎勵差異。",
+    "expected": [
+      {
+        "type": "analysis",
+        "request": "比較這兩期活動的玩法和獎勵差異。"
+      }
+    ]
+  },
+  {
+    "id": "grant",
+    "question": "直接幫我補發二十枚星星幣。",
+    "expected": [
+      {
+        "type": "operation",
+        "request": "直接幫我補發二十枚星星幣。"
+      }
+    ]
+  },
+  {
+    "id": "operation-purpose",
+    "question": "我想換披風，幫我把點數扣掉完成兌換。",
+    "expected": [
+      {
+        "type": "operation",
+        "request": "我想換披風，幫我把點數扣掉完成兌換。"
+      }
+    ]
+  },
+  {
+    "id": "unrelated",
+    "question": "教我怎麼換汽車輪胎。",
+    "expected": [
+      {
+        "type": "other",
+        "request": "教我怎麼換汽車輪胎。"
+      }
+    ]
+  },
+  {
+    "id": "unclear",
+    "question": "那個呢？",
+    "expected": [
+      {
+        "type": "other",
+        "request": "那個呢？"
+      }
+    ]
+  },
+  {
+    "id": "followup",
+    "question": "那上期呢？",
+    "history": [
+      {
+        "role": "user",
+        "content": "本期活動商城各品項價格是多少？"
+      },
+      {
+        "role": "assistant",
+        "content": "本期商城有五件商品。"
+      }
+    ],
+    "expected": [
+      {
+        "type": "query",
+        "request": "那上期呢？"
+      }
+    ]
+  },
+  {
+    "id": "followup-analysis",
+    "question": "那我還差多少？",
+    "history": [
+      {
+        "role": "user",
+        "content": "我想知道兌換披風的價格。"
+      },
+      {
+        "role": "assistant",
+        "content": "需要依商城價格與本人餘額比較。"
+      }
+    ],
+    "expected": [
+      {
+        "type": "analysis",
+        "request": "那我還差多少？"
+      }
+    ]
+  },
+  {
+    "id": "independent-query-operation",
+    "question": "我的點數有多少？再幫我發十枚。",
+    "expected": [
+      {
+        "type": "query",
+        "request": "我的點數有多少？"
+      },
+      {
+        "type": "operation",
+        "request": "再幫我發十枚。"
+      }
+    ]
+  },
+  {
+    "id": "independent-knowledge-query",
+    "question": "活動怎麼報名？商城有哪些商品？",
+    "expected": [
+      {
+        "type": "knowledge",
+        "request": "活動怎麼報名？"
+      },
+      {
+        "type": "query",
+        "request": "商城有哪些商品？"
+      }
+    ]
+  }
+]

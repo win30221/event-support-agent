@@ -276,3 +276,8 @@ export EVENT_SUPPORT_AGENT_PG_DSN='postgresql://postgres:event-support-agent-dem
 逐行確認成功；測試後切回 demo DSN 並重做第 4 節的餘額查詢，再依第 4A 或 4B 啟動客服。此處是本機 PostgreSQL 19 測試流程，既有 CI 服務設定仍使用 PostgreSQL 16；完整實機重播與歷史基準見 [EVALUATION](EVALUATION.md)。
 
 Ollama 請選用支援 tool calling 的模型。兩個供應商的工具選擇都使用原生呼叫。
+
+
+## 單獨測試第一層意圖
+
+完成 Python 套件安裝並啟動 Ollama 後，即可執行 `.\.venv\Scripts\python.exe eval_intent.py`（macOS/Linux：`./.venv/bin/python eval_intent.py`）。不需先啟動 PostgreSQL 或 Streamlit。逐題輸入，空白行結束。完整題集加 `--cases`，詳見 [EVALUATION](EVALUATION.md#第一層意圖獨立驗收)。
