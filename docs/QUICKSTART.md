@@ -219,7 +219,7 @@ ChatOllama 直接透過 Ollama SDK 的原生 /api/chat。舊 OLLAMA_BASE_URL 末
 | EVENT_SUPPORT_AGENT_EMBED_MODEL | bge-m3 |
 | EVENT_SUPPORT_AGENT_EMBED_URL | http://localhost:11434（不加 /v1） |
 | EVENT_SUPPORT_AGENT_STOP_GATE | auto；off 關額外矛盾停止檢查，不取消原有預算 |
-| EVENT_SUPPORT_AGENT_ANSWER_REVIEW | auto；off 用於對照 |
+| EVENT_SUPPORT_AGENT_ANSWER_REVIEW | off；auto 啟用額外一次品質審查作對照 |
 | EVENT_SUPPORT_AGENT_OLLAMA_TIMEOUT_SECONDS | 120；非負整數秒，0 為無 SDK HTTP timeout |
 | EVENT_SUPPORT_AGENT_OLLAMA_NUM_CTX | 未設定；選用正整數 context size |
 | EVENT_SUPPORT_AGENT_OLLAMA_REASONING | 未設定；選用 true/false 或模型支援的 low/medium/high |

@@ -30,7 +30,7 @@ published_passages 依 as_of 選已發布有效公告；段落 ID 為檔期/文�
 | overview | 該期開幕公告完整章節 |
 | compare | 該期全部有效公告；跨期各自查詢 |
 | search | BM25/hybrid 聚焦檢索；Agent 額外附開幕背景 |
-| eligibility | 開幕公告及相關細節，配合獨立本人進度工具 |
+| eligibility（歷史檢索評測用） | 舊模式僅保留在 guide.search_rules；不再向模型公開，模型以 search 查詢具體條件 |
 
 BM25：NFKC/casefold，中文相鄰雙字、ASCII 代碼完整保留；同檔期候選內 k1=1.2、b=0.75，預設聚焦取前三個正分段落。原問與改寫若不同，各自檢索再以 RRF（1/(60+rank)）融合，最多六個細節候選，並附必要背景。只有背景不代表找到特定政策。
 
@@ -73,13 +73,13 @@ Hybrid：以 Ollama /api/embed（bge-m3）向量化檔期、文件、發布日�
       "question": "獨立玩家需求",
       "status": "supported",
       "answer": "回答正文",
-      "citations": [{"id": "本輪段落ID", "quote": "連續原文摘錄"}]
+      "source_ids": ["E0123456789ab"]
     }
   ]
 }
 ```
 
-action 可為 retrieve（missing 說明必要的新證據）；否則 answer。answer 時 missing 不具執行作用，由主機正規化為空，不為無作用欄位重跑模型；各需求分開驗證。Pydantic BaseModel 檢查回答欄位型別，引用及業務條件仍由本輪證據驗證。
+action 可為 retrieve（missing 說明必要的新證據）；否則 answer。answer 時 missing 不具執行作用，由主機正規化為空，不為無作用欄位重跑模型；各需求分開驗證。Pydantic BaseModel 產生 JSON Schema 並獨立檢查每個需求。短 ID 為完整段落 ID 的雜湊別名，須存在本輪主機對照；原文由主機生成，未知來源或錯誤結構只拒絕相關需求。來源存在不等於答案語意正確。
 
 | status | 語意 |
 | --- | --- |
@@ -90,8 +90,10 @@ action 可為 retrieve（missing 說明必要的新證據）；否則 answer。a
 | account_limit | 超出本人查詢權限 |
 | service_help | 服務範圍引導 |
 
-非 supported 的正文和引用留空，由 Python 產生對應訊息。已確認 not_found 被錯標 no_evidence 時，僅在本輪完整有效查無引用、原問和子問題均明示對象等條件下恢復為 supported；採用工具原文，不採用模型推測。條件條款保留原文。沒有獨立 capability_limit，唯讀能力辨識待評估。
+非 supported 的正文和引用留空，由 Python 產生對應訊息。已確認 not_found 被錯標 no_evidence 時，僅在本輪有效查無來源 ID、原問和子問題均明示對象等條件下恢復為 supported；採用工具原文，不採用模型推測。條件條款保留原文。沒有獨立 capability_limit，唯讀能力辨識待評估。
 
 ## 5. 資料更新
 
 新增檔期須 ID 唯一、起訖不重疊；修訂公告沿用文件 ID、新發布日及完整章節。歷史規則可在有效修訂公告中明示前後適用期間，例如 11/13 以前等候 15 分鐘、11/14 起 5 分鐘。商品修改同步品名、別名、價格及用途；公開公告或嵌入模型變動需重建 hybrid 索引，公開資料改動後重啟程式並重新評測；玩家進度以資料庫為準。種子檔僅用於初始化缺少的紀錄，不是執行期資料來源。
+
+同輪相同候選範圍、檢索方式及原始查詢共享一次檢索，保留各改寫查詢的獨立融合。完整來源與商品/玩家資料保留於主機；模型投影不重複傳送原文，保留適用條件與來源狀態。

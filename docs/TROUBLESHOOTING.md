@@ -107,7 +107,9 @@ docker exec -it event-support-agent-pg19 psql -U postgres -d postgres
 2. 跑離線測試及純檢索評測，先隔離是否為程式或資料問題。
 3. 用相同玩家與對話重現，開啟工程檢視。
 4. 確認工具是否正確、參數是否受允許、原始工具結果及適用條件。
-5. 確認結構化回答的 action/status/citations、Stop Gate、審查結果及最終驗證。
+5. 確認結構化回答的 action/status/source_ids、Stop Gate、審查結果及最終驗證。
 6. 比對模型原始輸出與 UI 顯示，確認是否單純呈現問題。
 
 查詢失敗、沒有新證據、商品不存在、權限不足、服務不具操作能力是不同原因。不要以更多檢索或無限補查當成通用解法。若向量索引或嵌入服務暫時不可用，可切回 BM25；玩家查詢仍依賴 PostgreSQL。工程紀錄只能使用模擬或已遮罩資料分享。
+
+新版引用不再要求模型逐字複製：若短 ID 不存在，僅拒絕受影響的需求。優先檢查 `Python 回答上下文` 來源對照及 `Python 子問題驗證失敗`；可將工程 Log 另存於本機，使用 eval_answer.py 固定證據重播，勿重跑整個 RAG 來診斷回答契約。詳見 EVALUATION。

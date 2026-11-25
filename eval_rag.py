@@ -134,7 +134,10 @@ def turn_metrics(events, trace, elapsed):
                 "Python 工具驗證失敗", "Python 重用工具結果") for t, _ in events),
             "tool_successes": len(trace),
             "stop_rechecks": sum(t == "Python 停止檢查" for t, _ in events),
-            "elapsed_seconds": round(elapsed, 3)}
+            "elapsed_seconds": round(elapsed, 3),
+            "provider_timing": [{k: m[k] for k in ("total_duration", "load_duration",
+                "prompt_eval_duration", "eval_duration", "prompt_eval_count", "eval_count") if k in m}
+                for m in metadata]}
 
 
 def report_metadata(provider):
@@ -149,7 +152,10 @@ def report_metadata(provider):
                                 else os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
             "retrieval": os.getenv("EVENT_SUPPORT_AGENT_RETRIEVAL", "bm25"),
             "tool_selection": "native", "agent_framework": "langgraph",
-            "answer_review": os.getenv("EVENT_SUPPORT_AGENT_ANSWER_REVIEW", "auto"),
+            "answer_review": os.getenv("EVENT_SUPPORT_AGENT_ANSWER_REVIEW", "off"),
+            "ollama_num_ctx": os.getenv("EVENT_SUPPORT_AGENT_OLLAMA_NUM_CTX"),
+            "ollama_reasoning": os.getenv("EVENT_SUPPORT_AGENT_OLLAMA_REASONING"),
+            "ollama_timeout": os.getenv("EVENT_SUPPORT_AGENT_OLLAMA_TIMEOUT_SECONDS", "120"),
             "stop_gate": os.getenv("EVENT_SUPPORT_AGENT_STOP_GATE", "auto"),
             "semantic_review": "not_run"}
 
@@ -192,6 +198,40 @@ async def replay(case, provider, report_turns=None):
     return coverage
 
 
+def structural_gate(case, turns, coverage):
+    """Deterministic live acceptance only; semantic correctness needs separate review."""
+    from answering import ANSWER_VERIFICATION_FAILED
+    if not turns:
+        return ["no turns"]
+    final = turns[-1]
+    issues = []
+    checks = final["checks"][-1]["子問題"] if final["checks"] else []
+    statuses = {part["判定"] for part in checks}
+    names = {tool["name"] for tool in final["tools"]}
+    editions = {tool["arguments"]["edition"] for tool in final["tools"] if "edition" in tool["arguments"]}
+    if not checks or any(ANSWER_VERIFICATION_FAILED in t["reply"] for t in turns) or "rejected" in statuses:
+        issues.append("answer rejected or missing validation")
+    if not editions <= set(case["editions"]):
+        issues.append("unexpected edition")
+    if coverage["missing_retrieval"] or coverage["missing_answer"]:
+        issues.append("required evidence missing")
+    if case["mode"] == "outside-account":
+        if any(tool["name"] == "get_my_event_progress" for turn in turns for tool in turn["tools"]):
+            issues.append("private lookup outside account")
+        if "account_limit" not in statuses:
+            issues.append("missing account boundary")
+    elif case["mode"] == "unanswerable" or case["id"] == "unrecorded-days":
+        if "no_evidence" not in statuses or "supported" in statuses:
+            issues.append("missing evidence limitation")
+    elif "supported" not in statuses:
+        issues.append("answerable case not supported")
+    if case.get("progress") and "get_my_event_progress" not in names:
+        issues.append("required personal lookup missing")
+    if case["mode"] == "shop" and "list_shop_items" not in names:
+        issues.append("required catalogue lookup missing")
+    return issues
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--case", help="用案例 ID 查看來源與驗收要點")
@@ -199,7 +239,13 @@ def main():
     parser.add_argument("--live", choices=("ollama", "openai"), help="透過指定模型重播所選情境")
     parser.add_argument("--strict", action="store_true", help="實機重播時必要來源未被採用則回傳非零結束碼；不等於語意驗收")
     parser.add_argument("--report", type=Path, help="實機重播結果輸出 JSON；含模擬玩家問答與引用")
+    parser.add_argument("--gate", action="store_true", help="實機結構性驗收；所有選定試驗通過才回傳 0，仍需人工語意驗收")
+    parser.add_argument("--repeat", type=int, default=1, help="每個案例重跑次數")
     args = parser.parse_args()
+    if args.repeat < 1 or args.repeat > 20:
+        parser.error("--repeat 必須為 1 至 20")
+    if (args.gate or args.repeat != 1) and not args.live:
+        parser.error("--gate/--repeat 需要 --live")
     if args.report and not args.live:
         parser.error("--report 需要搭配 --live")
     cases = json.loads(Path(__file__).with_name("rag_cases.json").read_text(encoding="utf-8"))
@@ -214,12 +260,16 @@ def main():
     if args.live:
         reports, details = [], []
         for case in cases:
-            turns = []
-            result = asyncio.run(replay(case, args.live, report_turns=turns))
-            reports.append(result)
-            details.append({"case": case["id"], "player": case.get("player", "A"),
-                            "expected_editions": case["editions"], "reference": case["reference"],
-                            "coverage": result, "turns": turns})
+            for trial in range(1, args.repeat + 1):
+                turns = []
+                result = asyncio.run(replay(case, args.live, report_turns=turns))
+                reports.append(result)
+                issues = structural_gate(case, turns, result)
+                details.append({"case": case["id"], "trial": trial, "player": case.get("player", "A"),
+                                "expected_editions": case["editions"], "reference": case["reference"],
+                                "coverage": result, "turns": turns, "gate_issues": issues,
+                                "semantic_review": "not_run"})
+                print("結構驗收", "PASS" if not issues else "FAIL: " + "; ".join(issues))
         if args.report:
             args.report.parent.mkdir(parents=True, exist_ok=True)
             args.report.write_text(json.dumps({"run": report_metadata(args.live), "cases": details},
@@ -229,6 +279,10 @@ def main():
         summary("實機可用檢索證據", [(set(r["required"]), set(r["usable"])) for r in labelled])
         summary("實機回答採用證據", [(set(r["required"]), set(r["adopted"])) for r in labelled])
         print(f"無指定必要段落、需另行人工驗收：{len(reports) - len(labelled)} 題")
+        print("結構驗收通過", sum(not d["gate_issues"] for d in details), "/", len(details))
+        print("語意驗收尚未執行：請逐題對照 reference，不將 PASS 視為語意正確。")
+        if args.gate and any(d["gate_issues"] for d in details):
+            raise SystemExit(1)
         if args.strict and any(r["missing_answer"] or r["missing_retrieval"] for r in labelled):
             raise SystemExit(1)
     else:

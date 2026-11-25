@@ -46,15 +46,17 @@ guide.py               # 公告 BM25、商城、進度契約
 database.py            # 共用 PostgreSQL 連線
 player_progress.py     # 初始化與唯讀玩家進度
 vector_search.py       # pgvector 索引與混合檢索
-answering.py           # 回答與引用驗證
+answering.py           # Pydantic 回答契約與來源驗證
+evidence.py            # 可信證據的模型投影與短 ID
 answer_quality.py      # 有界品質審查
 starter_questions.py   # 快速提問 UI
 events.json            # 公開活動公告及商城
 player_progress_seed.json # 玩家初始示範資料
 rag_cases.json         # 27 個評測情境
-eval_rag.py            # 評測及實機重播
+eval_rag.py            # 檢索評測、實機重播及結構驗收
+eval_answer.py         # 固定 Log 證據，單獨重播回答階段
 requirements.txt
-tests/                 # 11 個測試模組
+tests/                 # 回歸測試模組
 docs/                  # 技術文件及展示資產
 AGENTS.md              # 開發規範
 ```
@@ -71,3 +73,7 @@ AGENTS.md              # 開發規範
 | [REFERENCES](docs/REFERENCES.md) | 官方參考來源、採用與研究範圍 |
 | [TROUBLESHOOTING](docs/TROUBLESHOOTING.md) | 常見錯誤及排查方式 |
 | [AGENTS](AGENTS.md) | 後續開發規範 |
+
+## 回答品質與實機驗收
+
+模型只回傳本輪短來源 ID，由程式取得原文；未知 ID 或壞格式只拒絕受影響的獨立需求。共用工具的查詢模式精簡為 overview/search/compare；同輪重複子查詢共享檢索。預設關閉額外品質審查，以離線及實機評測比較。CI 不代表語意驗收，詳見 [EVALUATION](docs/EVALUATION.md)。

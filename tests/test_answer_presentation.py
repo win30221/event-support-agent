@@ -22,16 +22,17 @@ class AnswerPresentationTests(unittest.TestCase):
                                  evidence, lambda title, data: events.append((title, data)))
         return result, dict(events)["Python 檢查回答依據"]
 
-    def test_answer_and_review_use_same_markdown_contract_without_schema_shape_change(self):
+    def test_answer_and_review_share_the_pydantic_source_id_contract(self):
         for schema in (ANSWER_SCHEMA, REVIEW_SCHEMA):
-            part = schema["properties"]["results"]["items"]
-            self.assertIs(part, PART)
-            self.assertEqual(set(part["properties"]), {"question", "status", "answer", "citations"})
+            ref = schema["properties"]["results"]["items"]["$ref"].split("/")[-1]
+            part = schema["$defs"][ref]
+            self.assertEqual(set(part["properties"]), {"question", "status", "answer", "source_ids"})
             self.assertEqual(set(part["required"]), set(part["properties"]))
             self.assertEqual(part["properties"]["answer"]["type"], "string")
             self.assertIn(ANSWER_MARKDOWN_GUIDANCE, part["properties"]["answer"]["description"])
-        self.assertIn("每個清單項目各自另起一行", ANSWER_MARKDOWN_GUIDANCE)
-        self.assertIn("簡短問答", ANSWER_MARKDOWN_GUIDANCE)
+            self.assertEqual(part["properties"]["source_ids"]["items"]["type"], "string")
+        self.assertIn("每項另起一行", ANSWER_MARKDOWN_GUIDANCE)
+
 
     def test_markdown_and_literal_values_are_preserved_without_rewriting(self):
         cases = [

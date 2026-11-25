@@ -161,7 +161,7 @@ def rank_passages(query, passages, limit=3):
 
 
 def search_rules(query, edition="本期", mode="search", catalog=CATALOG, *, retriever=None,
-                 alternate_queries=(), include_overview=False):
+                 alternate_queries=(), include_overview=False, retrieve_once=None):
     """Rank details inside one edition; optionally attach its canonical activity context.
 
     The raw retrieval benchmark can still measure lexical/hybrid ranking alone.
@@ -197,7 +197,10 @@ def search_rules(query, edition="本期", mode="search", catalog=CATALOG, *, ret
         raise ValueError("EVENT_SUPPORT_AGENT_RETRIEVAL 可使用 bm25 或 hybrid。")
 
     queries = list(dict.fromkeys(text.strip() for text in (query, *alternate_queries) if text.strip()))
-    rankings = [retrieve(text) for text in queries]
+    # 相同原問常被多個改寫工具帶入；同一請求共享相同候選範圍的檢索。
+    scope = (method, tuple(p['段落ID'] for p in candidates))
+    rankings = [retrieve_once((scope, text), lambda text=text: retrieve(text))
+                if retrieve_once is not None else retrieve(text) for text in queries]
     if len(rankings) == 1:
         return required + rankings[0]
     # Reciprocal rank fusion: scores from different queries or retrievers

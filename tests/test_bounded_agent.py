@@ -13,6 +13,7 @@ from answer_quality import REVIEW_SCHEMA
 from answering import ANSWER_SCHEMA, ANSWER_VERIFICATION_FAILED, DIRECT_REPLIES, UNRESOLVED
 from backend import ToolRegistry, calculate
 from guide import CATALOG, progress, published_passages, shop_catalog
+from evidence import source_alias
 from model_client import completion
 from request_context import RequestContext
 from tests.test_guide import OfflineTests
@@ -31,20 +32,27 @@ def select(*calls):
 
 
 def rules(query="", mode="search", edition="current"):
-    return call("find_rules", edition=edition, query=query, mode=mode)
+    # Retrieval fixtures retain the historical eligibility label; live tools expose search.
+    return call("find_rules", edition=edition, query=query, mode="search" if mode == "eligibility" else mode)
 
 
 def response(*parts, action="answer", missing=""):
     return {"content": json.dumps({"action": action, "missing": missing, "results": list(parts)}, ensure_ascii=False)}
 
 
+def fixture_id(key):
+    # Fixtures may refer to a canonical ID or a short ID read from the actual packet.
+    import re
+    return key if re.fullmatch(r"E[0-9a-f]{12}", key) else source_alias(key)
+
+
 def supported(question, text, *citations):
     return {"question": question, "status": "supported", "answer": text,
-            "citations": [{"id": key, "quote": quote} for key, quote in citations]}
+            "source_ids": [fixture_id(key) for key, _ in citations]}
 
 
 def abstain(question, status="no_evidence"):
-    return {"question": question, "status": status, "answer": "", "citations": []}
+    return {"question": question, "status": status, "answer": "", "source_ids": []}
 
 
 def original(key):
@@ -165,7 +173,7 @@ class BoundedAgentTests(OfflineTests):
         q = "本期有跨服贈送嗎？"
         part = abstain(q)
         part["answer"] = "未經驗證的敘述"
-        part["citations"] = [{"id": "unknown", "quote": "假的"}]
+        part["source_ids"] = ["unknown"]
         text, trace, events, model = self.run_case(q, select(rules("跨服贈送")), response(part))
         self.assertEqual(text, DIRECT_REPLIES["no_evidence"])
         self.assertEqual(model.call_count, 2)
@@ -199,8 +207,8 @@ class BoundedAgentTests(OfflineTests):
 
         def finish(provider, messages, tools, **kwargs):
             rows = evidence_rows(messages)
-            self.assertTrue({p["段落ID"] for p in launch} <= set(rows))
-            self.assertTrue(all(rows[p["段落ID"]]["檢索角色"] == "activity_context" for p in launch))
+            self.assertTrue({source_alias(p["段落ID"]) for p in launch} <= set(rows))
+            self.assertTrue(all(rows[source_alias(p["段落ID"])]["檢索角色"] == "activity_context" for p in launch))
             self.assertTrue(packet(messages)["可用資料工具"])
             return response(supported(question, "\n".join(p["原文"] for p in launch),
                                       *((p["段落ID"], p["原文"]) for p in launch)))
@@ -412,7 +420,7 @@ class BoundedAgentTests(OfflineTests):
         q = "本期總共玩了幾天？"
         text, trace, _, model = self.run_case(q, select(call("get_my_event_progress", edition="current")),
             response(abstain(q)))
-        record = packet(model.call_args.args[1])["工具結果"][0]["本人紀錄"]
+        record = json.loads(evidence_rows(model.call_args.args[1])[source_alias(f"{CURRENT}/my-progress")]["原文"])
         self.assertNotIn("累計天數", record)
         self.assertEqual(len(trace), 1)
         self.assertEqual(text, DIRECT_REPLIES["no_evidence"])
@@ -555,9 +563,9 @@ class FixtureReplayTests(OfflineTests):
 
                 def finalize(provider, messages, tools, **kwargs):
                     rows = evidence_rows(messages)
-                    self.assertLessEqual(set(case["sources"]), set(rows), case["id"])
+                    self.assertLessEqual({source_alias(key) for key in case["sources"]}, set(rows), case["id"])
                     if case["sources"]:
-                        refs = [(key, rows[key]["原文"]) for key in case["sources"]]
+                        refs = [(key, rows[source_alias(key)]["原文"]) for key in case["sources"]]
                         return response(supported(q, "\n".join(v for _, v in refs), *refs))
                     if mode == "outside-account":
                         return response(abstain(q, "account_limit"))
@@ -570,9 +578,9 @@ class FixtureReplayTests(OfflineTests):
                 def accept_review(provider, messages, tools, **kwargs):
                     self.assertEqual(kwargs.get("response_schema"), REVIEW_SCHEMA)
                     draft = packet(messages)["回答草稿"]
-                    adopted = {cite["id"] for part in draft["results"] if part["status"] == "supported"
-                               for cite in part["citations"]}
-                    self.assertLessEqual(set(case["sources"]), adopted)
+                    adopted = {key for part in draft["results"] if part["status"] == "supported"
+                               for key in part["source_ids"]}
+                    self.assertLessEqual({source_alias(key) for key in case["sources"]}, adopted)
                     return {"content": json.dumps({"decision": "keep", "reason": "測試草稿已含參考來源",
                                                     "missing_ids": [], "results": []}, ensure_ascii=False)}
 

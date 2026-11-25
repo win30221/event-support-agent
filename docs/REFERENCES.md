@@ -42,3 +42,9 @@
 | [Docker 安裝文件](https://docs.docker.com/get-docker/) | 本機 hybrid 環境建置 |
 
 參考來源的概念不能代替自己的實驗證據。日後新增決策時應記錄來源、查閱日期、適用版本、採用範圍、實際程式模組及驗收結果。
+
+| 研究來源 | 設計採用範圍 |
+| --- | --- |
+| [Anthropic Writing effective tools](https://www.anthropic.com/research/writing-tools-for-agents) | 參考工具邊界、相關回傳資料、簡潔識別碼；實機改善待驗證 |
+| [Anthropic Demystifying evals](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents) | 分階段重播、重複試驗與人工語意驗收 |
+| [ALCE](https://arxiv.org/abs/2305.14627) | 分開答案正確性及來源品質；不以 ID 存在性聲稱語意證明 |

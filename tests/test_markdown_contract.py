@@ -28,7 +28,7 @@ class MarkdownContractTests(OfflineTests):
         self.assertEqual(kwargs["response_schema"], schema)
         self.assertIn(ANSWER_MARKDOWN_GUIDANCE, messages[0]["content"])
         self.assertIn(ANSWER_MARKDOWN_GUIDANCE,
-            schema["properties"]["results"]["items"]["properties"]["answer"]["description"])
+            schema["$defs"][schema["properties"]["results"]["items"]["$ref"].split("/")[-1]]["properties"]["answer"]["description"])
 
     def test_initial_and_revised_markdown_through_existing_graph(self):
         q = "請說明活動的操作步驟。"

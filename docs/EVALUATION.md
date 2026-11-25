@@ -4,7 +4,7 @@
 
 ## 1. 已確認的基準
 
-下列回歸及檢索數據為遷移前 Pydantic Graph 的歷史基準。LangGraph 新分支新增 SDK、非作用欄位、具體修復回饋及證據去重測試；新框架 CI、本機 PostgreSQL 19 及實機模型結果尚待驗證，不把歷史成績當成新版本成績。
+下列回歸及檢索數據為遷移前 Pydantic Graph 的歷史基準。LangGraph 新分支新增 SDK、非作用欄位、具體修復回饋及證據去重測試；第一版 LangGraph CI（c0082a4）已通過；本輪變更、本機 PostgreSQL 19 及實機模型仍待驗證，不把歷史成績當成新版本成績。
 
 既有純檢索基準為 Ubuntu / Python 3.11；公告及評測語料未變更。完整回歸加入 PostgreSQL 服務及資料庫整合測試。下表保留既有歷史結果，不代表已在 PostgreSQL 19 重跑；目前 CI workflow 仍指定 `postgres:16`，本機安裝與測試說明改採 PostgreSQL 19（此文件更新未修改 CI）。
 
@@ -102,3 +102,24 @@ macOS/Linux 可用 EVENT_SUPPORT_AGENT_LIVE_OLLAMA=1 ./.venv/bin/python -m unitt
 目前支援唯讀客服查詢，不具備實際發放、兌換或退款能力。能力範圍辨識、審查的相關性與延遲，以及繁體中文呈現仍待改善。完整混合檢索與真實模型語意評測尚未完成；安全降級不代表回答完全正確。
 
 原生工具選擇的腳本測試涵蓋空回應、補查、Stop Gate 與帳號限制。模型是否選對工具仍須以實際 Ollama 模型驗收。
+
+## 7. 分階段實機品質門檻
+
+使用本機現存的完整工程 Log（勿提交私人資料）。先用固定證據比較 legacy（舊 quote 契約）、ids（新 ID 契約、保留完整證據欄位）、compact（精簡證據）。這三組為逐步設計比較，不是只變更單一欄位的嚴格因果實驗。legacy 只適用包含舊 quote schema 的 Log。
+
+```powershell
+.\.venv\Scripts\python.exe eval_answer.py --log path/to/turn.json --provider ollama --variant legacy --repeat 3 --report reports/legacy.json
+.\.venv\Scripts\python.exe eval_answer.py --log path/to/turn.json --provider ollama --variant ids --repeat 3 --report reports/ids.json
+.\.venv\Scripts\python.exe eval_answer.py --log path/to/turn.json --provider ollama --variant compact --repeat 3 --report reports/compact.json
+```
+
+macOS/Linux 將 Python 路徑改為 `./.venv/bin/python`。先固定模型、資料、硬體與設定，再逐次比較 EVENT_SUPPORT_AGENT_OLLAMA_REASONING=false、其他模型或 OpenAI；使用 `ollama ps` 記錄 CPU/GPU、模型與 Context。報告包含實際 Token、供應商時間與回答，無須再次選工具或做 RAG。
+
+端到端結構門檻：每個選定案例、每次重跑均不能拒絕應回答的問題、遺漏必要標記來源、超出檔期或本人查詢範圍；應拒答案例需正確標示限制。以下命令失敗回傳非零，不等同完整語意證明。
+
+```powershell
+.\.venv\Scripts\python.exe eval_rag.py --live ollama --case first-night --gate --repeat 3 --report reports/first-night.json
+.\.venv\Scripts\python.exe eval_rag.py --live ollama --gate --repeat 3 --report reports/full.json
+```
+
+人工語意門檻：對照每題 reference，確認事實正確、必要限制完整、沒有捏造資料、拒答及部分回答合理；三次重跑均通過才能認定該案例驗收。比較模型與 Reasoning 時記錄延遲、Token、任務成功率與失敗原因，不能把安全降級當作成功。未執行真實模型或人工審查時，不可宣稱新版已達語意品質門檻。

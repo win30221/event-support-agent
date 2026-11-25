@@ -132,6 +132,34 @@ class GuideTests(OfflineTests):
         rewritten = [{**corpus[0], "原文": "修訂的規章"}, *corpus[1:]]
         self.assertNotEqual(edition_hash(corpus), edition_hash(rewritten))
 
+    def test_search_and_legacy_eligibility_return_the_same_passages(self):
+        cases = json.loads((Path(__file__).resolve().parents[1] / "rag_cases.json").read_text(encoding="utf-8"))
+        for case in cases:
+            for edition in case["editions"]:
+                with self.subTest(case=case["id"], edition=edition):
+                    query = case.get("retrieval_query", case["question"])
+                    old = search_rules(query, edition, "eligibility", include_overview=True)
+                    new = search_rules(query, edition, "search", include_overview=True)
+                    self.assertEqual([p["段落ID"] for p in old], [p["段落ID"] for p in new])
+
+    def test_request_memo_shares_repeated_query_without_losing_distinct_queries(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from backend import ToolRegistry
+        from guide import rank_passages
+        from request_context import RequestContext
+        registry = ToolRegistry("A")
+        ctx = RequestContext.build("活動怎麼參加", [])
+        args = [registry.validate("find_rules", {"edition": "current", "query": q, "mode": "search"}, ctx, {})
+                for q in ("報名", "冒險")]
+        with patch("guide.rank_passages", wraps=rank_passages) as rank:
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                rows = list(pool.map(lambda a: registry.execute("find_rules", a), args))
+        self.assertEqual(rank.call_count, 3)
+        self.assertTrue(all(rows))
+        modes = next(d for d in registry.definitions() if d["function"]["name"] == "find_rules")
+        self.assertEqual(set(modes["function"]["parameters"]["properties"]["mode"]["enum"]),
+                         {"overview", "search", "compare"})
+
     def test_player_and_edition_isolation(self):
         self.assertEqual([progress(p)["今日已計入場次"] for p in "ABC"], [2, 3, 0])
         self.assertFalse(progress("C")["已參加本期"])

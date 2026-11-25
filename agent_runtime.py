@@ -12,10 +12,11 @@ from langchain_core.tools import StructuredTool
 from langgraph.graph import MessagesState
 from langgraph.prebuilt import ToolNode
 
-from answering import (ANSWER_PROMPT, ANSWER_SCHEMA, ANSWER_MARKDOWN_GUIDANCE,
+from answering import (ANSWER_PROMPT, ANSWER_SCHEMA,
                        ANSWER_VERIFICATION_FAILED, decode_response, render_response)
 from answer_quality import review_answer
 from backend import ToolRegistry, compact_json, evidence_for
+from evidence import model_sources, source_map
 from model_client import model_step
 from request_context import RequestContext
 from tool_selection import AGENT_PROMPT, MAX_TOOL_CALLS, MAX_TOOL_ROUNDS, normalized_calls
@@ -56,26 +57,13 @@ class SupportState(MessagesState, total=False):
     result: str
 
 
-def dedupe_source(source, seen):
-    """Only send each evidence paragraph once, while preserving lookup status and IDs."""
-    rows = source.get("段落", [])
-    fresh = [row for row in rows if row["段落ID"] not in seen]
-    # Update while iterating as well as across tool groups.
-    unique = []
-    for row in fresh:
-        if row["段落ID"] not in seen:
-            unique.append(row)
-            seen.add(row["段落ID"])
-    out = {**source, "段落": unique}
-    omitted = [row["段落ID"] for row in rows if row not in unique]
-    if omitted:
-        out["已回傳段落ID"] = list(dict.fromkeys(omitted))
-    return out
-
-
-def evidence_packet(sources):
-    seen = set()
-    return [dedupe_source(source, seen) for source in sources]
+def build_answer_packet(context, question, sources, errors, trace, can_retrieve, definitions, *, compact=True):
+    return {"服務上下文": context, "玩家原問": question,
+            "工具結果": model_sources(sources, aliases=True, compact=compact), "工具錯誤": errors,
+            "允許補查": can_retrieve,
+            "可用資料工具": [{"name": t["function"]["name"], "description": t["function"]["description"]}
+                            for t in definitions],
+            "已執行查詢": [{"工具": t["工具"], "參數": t["參數"]} for t in trace]}
 
 
 def raw_arguments(call):
@@ -262,7 +250,7 @@ class TurnRuntime:
             elif not plan.get("reused") and payload.get("狀態") == "invalid_arguments":
                 errors.append(payload)
                 self.observe("Python 工具驗證失敗", payload)
-            compact = dedupe_source(payload, seen) if "段落" in payload else payload
+            compact = model_sources([payload], seen=seen)[0] if "段落" in payload else payload
             additions.append(ToolMessage(content=compact_json(compact), tool_call_id=cid, name=name))
         updates = {"messages": additions, "dispatch_messages": [], "sources": sources,
                    "trace": trace, "errors": errors, "evidence": evidence, "cache": cache,
@@ -280,14 +268,11 @@ class TurnRuntime:
         self.node(state, "assess")
         can_retrieve = (state["round_number"] < MAX_TOOL_ROUNDS and state["attempts"] < MAX_TOOL_CALLS
                         and (state["round_number"] == 1 or state["progress"]))
-        packet = {"服務上下文": self.context.public_summary(), "玩家原問": self.question,
-                  "工具結果": evidence_packet(state["sources"]), "工具錯誤": state["errors"],
-                  "允許補查": can_retrieve,
-                  "可用資料工具": [{"name": t["function"]["name"],
-                                   "description": t["function"]["description"]} for t in self.definitions],
-                  "已執行查詢": [{"工具": t["工具"], "參數": t["參數"]} for t in state["trace"]]}
-        prompt = ANSWER_PROMPT + "\n" + ANSWER_MARKDOWN_GUIDANCE
-        messages = [{"role": "system", "content": prompt}, *self.conversation,
+        packet = build_answer_packet(self.context.public_summary(), self.question, state["sources"],
+                                     state["errors"], state["trace"], can_retrieve, self.definitions)
+        self.observe("Python 回答上下文", {"來源對照": source_map(state["evidence"]),
+                     "證據數": len(state["evidence"]), "模型資料字元數": len(compact_json(packet))})
+        messages = [{"role": "system", "content": ANSWER_PROMPT}, *self.conversation[:-1],
                     {"role": "user", "content": compact_json(packet)}]
         data, candidates, repair_available = None, [], state["repair_available"]
         for retry in range(2):
@@ -362,6 +347,6 @@ class TurnRuntime:
             return {"result": ANSWER_VERIFICATION_FAILED}
         if state["review_allowed"] and data["action"] == "answer":
             data = await review_answer(self.provider, data, state["evidence"], state["packet"],
-                                       self.conversation, self.complete, self.observe)
+                                       self.conversation, self.complete, self.observe, sources=state["sources"])
         return {"data": data, "result": render_response(
             data, state["evidence"], self.observe, unresolved=state["unresolved"])}

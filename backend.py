@@ -7,6 +7,8 @@ import re
 from dataclasses import dataclass
 from decimal import Decimal, DecimalException
 from functools import partial
+from concurrent.futures import Future
+from threading import Lock
 from typing import Callable
 
 from guide import CATALOG, mentions_identifier, progress, search_rules, shop_catalog, shop_item
@@ -62,15 +64,36 @@ def calculate(expression):
         raise ValueError("運算式無效。") from error
 
 
+class QueryMemo:
+    """Request-scoped single-flight cache for identical retrieval subqueries."""
+    def __init__(self):
+        self.lock = Lock()
+        self.pending = {}
+
+    def get(self, key, compute):
+        with self.lock:
+            leader = key not in self.pending
+            future = self.pending.setdefault(key, Future())
+        if leader:
+            try:
+                future.set_result(compute())
+            except BaseException as error:
+                future.set_exception(error)
+                with self.lock:
+                    self.pending.pop(key, None)
+        return future.result()
+
+
 # 工具登錄表同時定義模型可見契約及後端處理器；帳號綁定於建立時的 player。
 class ToolRegistry:
     """A new registry per player request. No tool accepts an account ID."""
 
     def __init__(self, player):
+        self.retrieval = QueryMemo()
         self._tools = {tool.name: tool for tool in (
-            Tool("find_rules", "查公開活動公告。overview 取開幕公告完整流程；search 取同一期基礎公告及相關細節；compare 取單期全部有效公告供跨期整體比較；eligibility 取入門、計次、兌換前提及相關條款。跨期分別查詢。",
+            Tool("find_rules", "查單期公開公告。overview：核心參加、玩法及兌換流程；search：具體規則、條件或代碼，包含核心背景與相關細節；compare：單期全部有效公告，供完整盤點。跨期分別查詢。只選符合資料需求的一種模式。",
                  {"edition": EDITION, "query": {"type": "string", "description": "搜尋文字；保留明示對象、日期、條件及代碼。"},
-                  "mode": {"type": "string", "enum": ["search", "overview", "compare", "eligibility"]}},
+                  "mode": {"type": "string", "enum": ["search", "overview", "compare"]}},
                  search_rules),
             Tool("list_shop_items", "讀單期完整公開商城清單、各商品名稱、價格與用途。不依個人餘額過濾。",
                  {"edition": EDITION}, shop_catalog),
@@ -114,7 +137,7 @@ class ToolRegistry:
         if name == "find_shop_item" and not context.grounded_product(args["name"], args["edition"]):
             raise ValueError("商品參數無法從玩家原問或可信上下文核對；請重新選擇資料或確認指涉。")
         if name == "find_rules":
-            if args["mode"] in ("search", "eligibility") and not args["query"]:
+            if args["mode"] == "search" and not args["query"]:
                 raise ValueError("特定規則檢索需要非空查詢。")
             if args["mode"] in ("overview", "compare"):
                 args["query"] = ""  # These modes ignore query text.
@@ -144,7 +167,8 @@ class ToolRegistry:
         if name == "find_rules":
             if args["mode"] not in tool.properties["mode"]["enum"]:
                 raise ValueError("公告模式不符。")
-            return tool.handler(**args, alternate_queries=alternates, include_overview=True)
+            return tool.handler(**args, alternate_queries=alternates, include_overview=True,
+                                retrieve_once=self.retrieval.get)
         return tool.handler(**args)
 
 

@@ -30,10 +30,10 @@ LangGraph StateGraph / MessagesState 管理每輪狀態與訊息；獨立節點�
 1. Select：首次、補查及空回應重試均從同一 registry 取得工具定義，透過 ChatOpenAI/ChatOllama.bind_tools 使用原生 tool_calls。
 2. Prepare tools：主機檢查名稱、參數、檔期、可信指涉、計算依據與預算；相同正規化參數在本輪共用結果。ToolNode 只接收已核准的唯一呼叫。
 3. ToolNode：並行執行獨立唯讀工具；需要既有證據的運算不得使用尚未完成的同批結果。
-4. Collect：按原呼叫順序合併結果、查詢紀錄、適用條件及證據；模型上下文去重，保留合法 tool_call_id 對應。
-5. Assess：以 with_structured_output(method="json_schema") 獨立生成回答；Pydantic 驗證欄位型別與狀態，保留逐需求引用驗證。answer 時捨棄無作用的 missing，retrieve 必須提供原因。
+4. Collect：按原呼叫順序合併結果、查詢紀錄、適用條件及證據；模型上下文去重及投影，保留完整主機資料與合法 tool_call_id 對應。
+5. Assess：以 with_structured_output(method="json_schema") 獨立生成回答；Pydantic 產生 Schema 並驗證欄位；模型僅回傳短 source_ids，各需求獨立驗證並回填真實原文。answer 時捨棄無作用的 missing，retrieve 必須提供原因。
 6. Stop Gate：依證據與預算決定補查或停止，維持既有矛盾拒答有限複查。格式修復回饋實際驗證原因及原草稿。
-7. Finalize：可選的一次品質審查；修訂失敗保留可驗證草稿，依子問題產生回答與參考資料。
+7. Finalize：預設關閉、可選的一次品質審查；修訂失敗保留可驗證草稿，依子問題產生回答與參考資料。
 
 | 上限 | 數值 |
 | --- | ---: |
@@ -49,8 +49,10 @@ Select 對暫時性傳輸錯誤使用 RetryPolicy（至多 2 次嘗試）；其�
 
 ## 4. 信任邊界與限制
 
-工具均唯讀或純運算；進度工具不接受任意帳號 ID。demo 帳號由 UI 選擇，不是正式登入驗證。RAG 不包含玩家資料，公開與本人紀錄各有來源。PostgreSQL 的 player_event_progress 與 event_support_agent_embeddings 分表；demo 共用 DSN，尚未配置獨立最小權限角色。商品查無是查詢事實，不等於查明交易失敗原因。計算來源 ID 有驗證，但並未保證每個運算元都語意受支持。引用驗證是本輪 ID、逐字摘錄與狀態核對，非完整語意證明。
+工具均唯讀或純運算；進度工具不接受任意帳號 ID。demo 帳號由 UI 選擇，不是正式登入驗證。RAG 不包含玩家資料，公開與本人紀錄各有來源。PostgreSQL 的 player_event_progress 與 event_support_agent_embeddings 分表；demo 共用 DSN，尚未配置獨立最小權限角色。商品查無是查詢事實，不等於查明交易失敗原因。計算來源 ID 有驗證，但並未保證每個運算元都語意受支持。引用驗證是本輪短 ID 對照、主機原文與狀態核對，非完整語意證明。
 
-品質審查觸發條件為重複需求、未引用同文件章節或未採用的工具組；候選不等於必要證據，可能有過度審查問題。保留 auto/off 作實測比較，不以單一案例修改流程。
+品質審查觸發條件為重複需求、未引用同文件章節或未採用的工具組；候選不等於必要證據，可能有過度審查問題。預設 off，保留 auto 作實測比較，不以單一案例修改流程。
 
 工程檢視顯示 Graph 節點、模型請求/回傳、用量、工具、證據與停止原因。正式系統需補認證、授權、日誌遮罩及保留政策。正文透過共用 Markdown 指引與 Streamlit 渲染；沒有新增排版模型呼叫或正規表示式重排。
+
+模型選工具時使用完整來源 ID（供 calculate 引用）；回答及審查階段使用本輪短 ID，由主機對照完整 ID。短 ID 只有本輪證據集合中存在才有效。完整工具資料留存工程紀錄；模型只取得必要原文、狀態、檔期、日期及條件。單一子問題格式或來源錯誤不會抹除其他有效子問題。

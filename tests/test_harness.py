@@ -10,6 +10,7 @@ from unittest.mock import patch
 from agent import MAX_TOOL_ROUNDS, answer
 from answering import DIRECT_REPLIES
 from guide import CATALOG
+from evidence import source_alias
 from tests.test_bounded_agent import (abstain, call, evidence_rows, select, original, packet,
                                 response, rules, scripted, supported)
 from tests.test_answer_quality import review
@@ -37,8 +38,7 @@ class HarnessTests(OfflineTests):
     def contradictory(self, question):
         p = abstain(question)
         p["answer"] = "未經證實的推論；請勿直接顯示。"
-        p["citations"] = [{"id": f"{CURRENT}/launch/兌換",
-                           "quote": original(f"{CURRENT}/launch/兌換")}]
+        p["source_ids"] = [source_alias(f"{CURRENT}/launch/兌換")]
         return p
 
     def test_lifecycle_and_no_extra_model_call_for_supported_balance(self):
@@ -66,7 +66,7 @@ class HarnessTests(OfflineTests):
                     # normalization must still render the host's lookup fact.
                     p = abstain(q)
                     p["answer"] = "不可靠內容：已扣款。"
-                    p["citations"] = [{"id": row["段落ID"], "quote": row["原文"]}]
+                    p["source_ids"] = [row["段落ID"]]
                     return response(p)
                 reply, trace, events = self.ask(q,
                     select(rules(name, "eligibility"), call("get_my_event_progress", edition="current")),
@@ -104,7 +104,7 @@ class HarnessTests(OfflineTests):
     def test_invalid_citations_and_clean_abstentions_do_not_trigger(self):
         q = "有跨服贈送手續費嗎？"
         bad = self.contradictory(q)
-        bad["citations"][0]["id"] = "invented"
+        bad["source_ids"][0] = "invented"
         for p in (bad, abstain(q)):
             with self.subTest(part=p):
                 reply, trace, events = self.ask(q, select(rules(mode="overview")), response(p))
@@ -156,7 +156,7 @@ class HarnessTests(OfflineTests):
         q = "我今天已計入幾場？"
         def run(player, count):
             def finish(provider, messages, tools, **kwargs):
-                row = evidence_rows(messages)[f"{CURRENT}/my-progress"]
+                row = evidence_rows(messages)[source_alias(f"{CURRENT}/my-progress")]
                 self.assertIn(f'"今日已計入場次": {count}', row["原文"])
                 return response(supported(q, f"{count} 場",
                                 (row["段落ID"], f'"今日已計入場次": {count}')))

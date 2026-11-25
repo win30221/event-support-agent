@@ -16,7 +16,7 @@ from backend import ToolRegistry, evidence_for
 from guide import CATALOG, shop_catalog
 from request_context import RequestContext
 from tests.test_bounded_agent import (abstain, call, evidence_rows, select, original, response,
-                                rules, scripted, supported)
+                                rules, scripted, supported, fixture_id)
 from tests.test_guide import OfflineTests
 
 CURRENT, PREVIOUS = CATALOG.current, CATALOG.previous
@@ -24,7 +24,7 @@ CURRENT, PREVIOUS = CATALOG.current, CATALOG.previous
 
 def mislabeled(question, *rows, status="no_evidence", prose="不應信任模型文字：已扣款。"):
     return {"question": question, "status": status, "answer": prose,
-            "citations": [{"id": row["段落ID"], "quote": row["原文"]} for row in rows]}
+            "source_ids": [fixture_id(row["段落ID"]) for row in rows]}
 
 
 def lookup(name, edition=CURRENT):
@@ -116,17 +116,17 @@ class VerifiedLookupTests(OfflineTests):
         evidence = {row["段落ID"]: row, "rule": rule}
         good = mislabeled(question, row)
         unknown = deepcopy(good)
-        unknown["citations"][0]["id"] = "previous-turn-or-invented"
-        fake_quote = deepcopy(good)
-        fake_quote["citations"][0]["quote"] = "已扣款"
+        unknown["source_ids"][0] = "previous-turn-or-invented"
+        partial = deepcopy(good)
+        partial["source_ids"].append("unknown")
         incomplete = deepcopy(good)
-        incomplete["citations"][0]["quote"] = "商城清單"
+        incomplete["source_ids"][0] = incomplete["source_ids"][0][:-1]
         malformed = deepcopy(good)
-        malformed["citations"] = [None]
+        malformed["source_ids"] = [None]
         mixed = mislabeled(question, row, rule)
         empty = deepcopy(good)
-        empty["citations"] = []
-        for case in (unknown, fake_quote, incomplete, malformed, mixed, empty):
+        empty["source_ids"] = []
+        for case in (unknown, partial, incomplete, malformed, mixed, empty):
             with self.subTest(case=case):
                 part, text, events = self.normalize(case, evidence)
                 self.assertEqual(part["status"], "no_evidence")
@@ -218,10 +218,10 @@ class VerifiedLookupTests(OfflineTests):
         label = "銀河戰車可以換嗎？"
         row = lookup(name)[0]
         evidence = {row["段落ID"]: row}
-        original_data = {"action": "answer", "missing": "", "results": [
+        original_data = decode_response({"action": "answer", "missing": "", "results": [
             supported(label, row["原文"], (row["段落ID"], row["原文"])),
             abstain("其他人的餘額", "account_limit"),
-        ]}
+        ]}, evidence=evidence, original_question=question)
         draft = {"decision": "revise", "reason": "正規化查無結果", "missing_ids": [],
                  "results": [mislabeled(label, row), abstain("其他人的餘額", "account_limit")]}
         revised, _, _ = validate_review(deepcopy(draft), original_data, evidence,

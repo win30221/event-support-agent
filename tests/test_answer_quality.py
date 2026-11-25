@@ -9,6 +9,7 @@ from answer_quality import REVIEW_SCHEMA
 from answering import DIRECT_REPLIES
 from eval_rag import live_source_coverage
 from guide import CATALOG, published_passages
+from evidence import source_alias
 from tests.test_bounded_agent import (abstain, call, select, original, packet, response,
                                 rules, scripted, supported)
 from tests.test_guide import OfflineTests
@@ -19,7 +20,7 @@ CURRENT = CATALOG.current
 
 def review(decision, *parts, missing=(), reason="審查完成"):
     return {"content": json.dumps({"decision": decision, "reason": reason,
-                                   "missing_ids": list(missing), "results": list(parts)}, ensure_ascii=False)}
+                                   "missing_ids": [source_alias(key) for key in missing], "results": list(parts)}, ensure_ascii=False)}
 
 
 class QualityTests(OfflineTests):
@@ -51,7 +52,7 @@ class QualityTests(OfflineTests):
             self.assertEqual(tools, [])
             self.assertEqual(kwargs.get("response_schema"), REVIEW_SCHEMA)
             review_data = packet(messages)
-            self.assertIn(missing, review_data["審查線索"]["同文件未採用"])
+            self.assertIn(source_alias(missing), review_data["審查線索"]["同文件未採用"])
             self.assertTrue(review_data["審查線索"]["重複問題"])
             return review("revise", supported(question, "\n".join(p["原文"] for p in launch),
                           *((p["段落ID"], p["原文"]) for p in launch)), missing=[missing])
