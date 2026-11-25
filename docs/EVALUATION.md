@@ -1,0 +1,100 @@
+# 評測與驗收
+
+[返回 README](../README.md) · [設計決策](DESIGN_DECISIONS.md)
+
+## 1. 已確認的基準
+
+既有純檢索基準為 Ubuntu / Python 3.11；公告及評測語料未變更。完整回歸加入 PostgreSQL 服務及資料庫整合測試。
+
+| 項目 | 結果 |
+| --- | --- |
+| 回歸測試 | 92 個測試方法，89 通過、3 個 opt-in 真實模型測試跳過；0 失敗（含 7 個 PostgreSQL 整合測試全部通過） |
+| 舊 bigram + 舊取段 | 17/22 案例找齊必要段落，平均召回 81.8% |
+| BM25 + 新取段 | 21/22 案例找齊必要段落，平均召回 95.5% |
+| 相同 top 2 的聚焦問題：舊 bigram / BM25 | 均為 16/18，88.9% |
+| Hybrid、全量實機、語意品質 | 未執行完整評測 |
+
+27 個情境中，22 個有必要公告段落標籤，其餘須人工或工具契約驗收。離線 BM25 仍遺漏 ranked-slang 的 2026-11/launch/玩法。新取段的候選策略也有改變，因此不可把 81.8% 到 95.5% 全部歸因於 BM25。Agent 實際會附活動背景，純檢索評測與端到端不同。
+
+## 2. 分層測試
+
+| 測試模組 | 主要保護 |
+| --- | --- |
+| tests/test_player_progress.py | PostgreSQL 初始化、持久化、帳號／檔期隔離、查詢錯誤及日期 |
+| tests/test_guide.py | 檔期、資料、公告檢索、商城及工具基礎 |
+| tests/test_bounded_agent.py | 工具選擇、補查、權限、多輪指涉與 fixture 重播 |
+| tests/test_harness.py | Graph 節點、停止檢查、預算、請求隔離 |
+| tests/test_verified_lookup.py | 查無商品的安全正規化、錯誤引用與保護條件 |
+| tests/test_answer_quality.py | 品質審查、修訂保護與覆蓋指標 |
+| tests/test_answer_presentation.py | 參考資料去重、呈現、原文及拒答保護 |
+| tests/test_markdown_contract.py | 初答與審查共用呈現契約及 Graph 流程 |
+| tests/test_model_timeout.py | 模型傳輸 timeout 設定 |
+| tests/test_starter_questions.py | 快速提問顯示與送出一致 |
+| tests/test_live_agent.py | opt-in 真實 Ollama 工具與證據覆蓋驗收 |
+
+不因測試檔多而刪除保護；以 tests/ 集中管理。離線腳本模型驗證後端控制與流程，不代表模型自身會正確選擇工具。
+
+## 3. 執行指令
+
+下列用 Python 表示已安裝 requirements 的虛擬環境 Python。Windows 可將 python 換為 .\.venv\Scripts\python.exe，macOS/Linux 換為 ./.venv/bin/python。
+
+先準備獨立測試 PostgreSQL，設定 EVENT_SUPPORT_AGENT_PG_DSN 指向空白測試資料庫。整合測試使用獨立 schema；既有腳本回歸依賴未修改的初始示範資料。禁止對正式資料庫執行。
+
+```bash
+python player_progress.py
+python -m unittest discover -s tests -t . -v
+python -m pip check
+python eval_rag.py
+python eval_rag.py --case ranked-slang
+```
+
+先依 [QUICKSTART](QUICKSTART.md) 建好 hybrid 索引，再執行：
+
+```bash
+python eval_rag.py --hybrid
+python eval_rag.py --hybrid --case ranked-slang
+```
+
+Hybrid 離線評測會使用嵌入模型與 pgvector，不使用聊天模型。完整回歸使用真實 PostgreSQL，但不需 Ollama 或 pgvector extension；純 BM25 檢索評測仍不需資料庫連線。
+
+## 4. 真實模型評測
+
+先啟動模型服務及 PostgreSQL，依 QUICKSTART 設定環境變數並初始化玩家進度。聊天檢索模式由 EVENT_SUPPORT_AGENT_RETRIEVAL 指定；--hybrid 與 --live 不可同時使用。
+
+```bash
+python eval_rag.py --case first-night --live ollama --strict --report reports/first-night.json
+python eval_rag.py --live ollama --report reports/ollama.json
+```
+
+OpenAI 使用 --live openai 並設定 API key。完整題集耗時依模型及設備而異，建議先跑代表案例。
+
+Windows PowerShell 啟用 opt-in：
+
+```powershell
+$env:EVENT_SUPPORT_AGENT_LIVE_OLLAMA = "1"
+.\.venv\Scripts\python.exe -m unittest -v tests.test_live_agent.LiveOllamaTests.test_representative_dialogues
+.\.venv\Scripts\python.exe -m unittest -v tests.test_live_agent.LiveOllamaTests.test_explicit_negative_lookup_is_answered_with_verified_evidence
+.\.venv\Scripts\python.exe -m unittest -v tests.test_live_agent.LiveOllamaTests.test_fixture_retrieval_and_account_scope
+Remove-Item Env:EVENT_SUPPORT_AGENT_LIVE_OLLAMA
+```
+
+macOS/Linux 可用 EVENT_SUPPORT_AGENT_LIVE_OLLAMA=1 ./.venv/bin/python -m unittest -v tests.test_live_agent 直接執行三項。--strict 只檢查標記必要來源的檢索及採用是否有缺漏，不是語意驗收。
+
+## 5. 指標與人工驗收
+
+| 指標 | 現況 |
+| --- | --- |
+| 檢索召回及必要來源找齊 | eval_rag.py 自動計算 |
+| 實機可用證據、最終引用採用 | 逐案例分開計算，排除不適用段落 |
+| 模型呼叫、Token、耗時 | JSON report；供應商缺計數保留 null，非 0 |
+| 工具選擇與參數正確率 | 部分測試有斷言；完整比例未建立 |
+| 回答正確性、完整性、相關性、排版 | 對照 reference 人工驗收，尚未有全量語意分數 |
+| 能力邊界、帳號隔離、錯誤前提 | 腳本及部分實機驗收；不可把安全降級算成完全正確 |
+
+每次比較固定程式版本、資料、題集、模型及執行環境。報告提供 UTC 日期、Python/OS、provider、configured_model、檢索模式、工具選擇、審查及 Stop Gate；另人工記錄硬體、模型實際版本與量化及嵌入模型。勿分享含私人資料或 API key 的紀錄。
+
+比較 Review Auto/Off、Stop Gate Auto/Off 時，每次只變更一個設定，兩組都保留完整原始結果與人工判定。不要因單題失敗改整體觸發策略。
+
+## 6. 已知限制
+
+目前支援唯讀客服查詢，不具備實際發放、兌換或退款能力。能力範圍辨識、審查的相關性與延遲，以及繁體中文呈現仍待改善。完整混合檢索與真實模型語意評測尚未完成；安全降級不代表回答完全正確。

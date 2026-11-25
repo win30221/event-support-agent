@@ -1,0 +1,370 @@
+[
+  {
+    "id": "first-night",
+    "label": "回鍋第一晚｜還沒拿到集章卡",
+    "player": "C",
+    "mode": "overview",
+    "editions": [
+      "2026-11"
+    ],
+    "question": "我剛回鍋，朋友一直揪我去霧港。這活動到底怎麼玩，第一步先去哪？",
+    "sources": [
+      "2026-11/launch/參加",
+      "2026-11/launch/玩法",
+      "2026-11/launch/兌換"
+    ],
+    "reference": "先在大廳活動頁報名，再完成正式冒險。每天前 3 場各 20 枚，100 枚到活動商店換披風。",
+    "starter_label": "新手怎麼玩這個活動？"
+  },
+  {
+    "id": "compare-months",
+    "label": "從燈船到霧港｜兩期差在哪",
+    "mode": "compare",
+    "editions": [
+      "2026-10",
+      "2026-11"
+    ],
+    "question": "我上個月有跟到燈船，這個月打起來哪裡不一樣？獎勵也一起講。",
+    "sources": [
+      "2026-10/launch/玩法",
+      "2026-10/launch/兌換",
+      "2026-11/launch/玩法",
+      "2026-11/launch/兌換"
+    ],
+    "reference": "十月冒險或排位共 2 場、各 10 枚，60 枚換頭像。十一月只有冒險、3 場各 20 枚，100 枚換造型。逐期引用，提到報名時勿推論十月不用報名。"
+  },
+  {
+    "id": "midnight",
+    "label": "午夜場｜出發和結算跨了兩天",
+    "mode": "search",
+    "editions": [
+      "2026-11"
+    ],
+    "question": "昨晚 23:58 跟朋友出發，過了午夜 00:06 才結算，扣昨天還今天的次數？",
+    "sources": [
+      "2026-11/match/跨午夜結算"
+    ],
+    "reference": "按 UTC+8 結算日，算午夜後那一天。"
+  },
+  {
+    "id": "current-balance",
+    "label": "本人錢包｜查詢目前星星幣",
+    "mode": "progress",
+    "editions": [
+      "2026-11"
+    ],
+    "progress": true,
+    "question": "我目前有多少星星幣？",
+    "sources": [],
+    "reference": "透過 get_my_event_progress 查詢目前登入帳號的本期紀錄，依實際回傳資料回答星星幣餘額。不得猜測數字或使用其他帳號的紀錄。",
+    "starter_label": "我目前有多少星星幣？"
+  },
+  {
+    "id": "midnight-followup",
+    "label": "午夜場續問｜翻十月戰績",
+    "mode": "search",
+    "editions": [
+      "2026-10"
+    ],
+    "before": [
+      "這期跨午夜結算算哪一天？"
+    ],
+    "question": "那十月那時候呢？一樣是看打完的時間嗎？",
+    "retrieval_query": "十月跨午夜結算的冒險按照哪一天計次？",
+    "sources": [
+      "2026-10/match/跨日計次"
+    ],
+    "reference": "十月看開場日；同一個跨午夜例子會占前一日額度。"
+  },
+  {
+    "id": "ranked-slang",
+    "label": "公會頻道｜天梯連勝怎麼沒幣",
+    "mode": "search",
+    "editions": [
+      "2026-11"
+    ],
+    "question": "爬分連贏兩把了，朋友說白忙一場。天梯到底有沒有給活動幣？",
+    "sources": [
+      "2026-11/launch/玩法"
+    ],
+    "reference": "若指排位賽，十一月只計冒險。勝敗皆計指有效冒險，不能由此推論遊戲沒有排名。"
+  },
+  {
+    "id": "ranked-oct",
+    "label": "舊帳本｜混打冒險與排位",
+    "mode": "search",
+    "editions": [
+      "2026-10"
+    ],
+    "question": "上期我先打一場冒險，再打一場排位，這樣能拿幾枚星星幣？",
+    "sources": [
+      "2026-10/launch/玩法"
+    ],
+    "reference": "符合條件時，兩場共 20 枚，冒險與排位共用兩場額度。"
+  },
+  {
+    "id": "reconnect",
+    "label": "尾王前閃退｜趕上結算",
+    "mode": "search",
+    "editions": [
+      "2026-11"
+    ],
+    "question": "王快倒的時候手機閃退，我按重返戰場進了原本那場，最後也看到結算。這樣還算嗎？",
+    "sources": [
+      "2026-11/match/斷線與重連"
+    ],
+    "reference": "回到原對局並完成結算可計一次，仍須符合報名、模式與當日額度。"
+  },
+  {
+    "id": "party",
+    "label": "揪團出航｜隊長額度用完",
+    "mode": "search",
+    "editions": [
+      "2026-11"
+    ],
+    "question": "隊長的三盞燈都亮了，我才亮一盞。跟他的隊再出航會吃到他的額度嗎？",
+    "sources": [
+      "2026-11/match/組隊各自計次"
+    ],
+    "reference": "隊員各自計次；本人已報名並完成有效冒險，仍可用自己的空格。"
+  },
+  {
+    "id": "practice",
+    "label": "上班前速刷｜掃蕩券算嗎",
+    "mode": "search",
+    "editions": [
+      "2026-11"
+    ],
+    "question": "平常用掃蕩券很快，我用券速刷三輪，三盞燈也會亮嗎？",
+    "sources": [
+      "2026-11/match/練習與掃蕩"
+    ],
+    "reference": "掃蕩券不產生活動冒險結算，須從正式冒險配對完成對局。"
+  },
+  {
+    "id": "shop-catalog",
+    "label": "首次逛商城｜看看本期有哪些品項",
+    "mode": "shop",
+    "editions": [
+      "2026-11"
+    ],
+    "question": "這期商城有什麼？",
+    "sources": [],
+    "reference": "應查詢 list_shop_items 回傳本期商城的品項、價格與用途，不可憑空推測品項。清單不存在時應明確告知目前無法確認。",
+    "starter_label": "這期商城有什麼？"
+  },
+  {
+    "id": "order-code",
+    "label": "商店櫃台｜跳出 SG-204",
+    "mode": "search",
+    "editions": [
+      "2026-11"
+    ],
+    "question": "披風試穿完按確認，跳出 SG-204。我怕被扣兩次，要再按一次嗎？",
+    "sources": [
+      "2026-11/shop/訂單處理中"
+    ],
+    "reference": "先保留兌換單號，查看原訂單狀態，處理中不需要再按。無訂單明細時不能判定是否實際扣款。"
+  },
+  {
+    "id": "wardrobe-followup",
+    "label": "商店續問｜披風去了哪",
+    "mode": "search",
+    "editions": [
+      "2026-11"
+    ],
+    "before": [
+      "商店跳 SG-204 是什麼意思？"
+    ],
+    "question": "剛剛那筆變成完成了，可是信箱是空的，我要去哪穿？",
+    "retrieval_query": "霧港領航員兌換狀態完成後，在哪裡裝備披風？信箱沒有獎品。",
+    "sources": [
+      "2026-11/shop/外觀衣櫃"
+    ],
+    "reference": "回大廳開外觀衣櫃，從背部／披風裝備；不會寄信。"
+  },
+  {
+    "id": "old-wait",
+    "label": "翻舊截圖｜修訂前的場次",
+    "mode": "search",
+    "editions": [
+      "2026-11"
+    ],
+    "question": "我翻到 11 月 13 日那場沒入帳的截圖，當時值班台要我們等幾分鐘再報？",
+    "sources": [
+      "2026-11/delay/回報等待時間"
+    ],
+    "reference": "修訂公告說明 11 月 1–13 日適用舊流程，等待 15 分鐘。日期以結算日為準。"
+  },
+  {
+    "id": "new-wait",
+    "label": "兩份值班表｜修訂當天怎麼算",
+    "mode": "search",
+    "editions": [
+      "2026-11"
+    ],
+    "question": "公會圖寫十五分鐘，值班員卻說五分鐘。11/14 當天結算漏發到底等多久才能提單？",
+    "sources": [
+      "2026-11/delay/回報等待時間"
+    ],
+    "reference": "11 月 14 日當天起等 5 分鐘再重開、通報。這是提單等候時間，沒有承諾 5 分鐘內補發。"
+  },
+  {
+    "id": "incident",
+    "label": "晚班紀錄｜那晚沒亮的燈",
+    "mode": "search",
+    "editions": [
+      "2026-11"
+    ],
+    "question": "11 月 19 日晚上 20:25 冒險打完燈沒亮。那晚的異常幾點同步？全服都有補償嗎？",
+    "sources": [
+      "2026-11/incident/受影響時段"
+    ],
+    "reference": "20:25 在公告時段內，21:00 完成重新同步；未公告全服補償，也不能據此確認個人是哪筆。"
+  },
+  {
+    "id": "closing",
+    "label": "忘了關店｜上期餘幣",
+    "mode": "search",
+    "editions": [
+      "2026-10"
+    ],
+    "question": "我十月底忘了按兌換，當時那 60 枚星星幣能帶來十一月嗎？",
+    "sources": [
+      "2026-10/shop/關店與餘幣"
+    ],
+    "reference": "十月商店 10/31 23:59 截止，未用餘幣失效，不能併入十一月。"
+  },
+  {
+    "id": "wallet-a",
+    "label": "帳號 A｜今天再跑一場能換嗎",
+    "mode": "eligibility",
+    "editions": [
+      "2026-11"
+    ],
+    "player": "A",
+    "progress": true,
+    "question": "我今天再打一場冒險，打完就能換那件披風嗎？",
+    "sources": [
+      "2026-11/launch/玩法",
+      "2026-11/launch/兌換"
+    ],
+    "reference": "A 已報名、有 80 枚、今天已計 2 場。再完成一場有效冒險可得 20 枚，達到 100 枚兌換門檻。"
+  },
+  {
+    "id": "wallet-b",
+    "label": "帳號 B｜今天再跑一場能換嗎",
+    "mode": "eligibility",
+    "editions": [
+      "2026-11"
+    ],
+    "player": "B",
+    "progress": true,
+    "question": "我今天再打一場冒險，打完就能換那件披風嗎？",
+    "sources": [
+      "2026-11/launch/玩法",
+      "2026-11/launch/兌換"
+    ],
+    "reference": "B 也有 80 枚但今天 3 場都計完，再打一場不加幣。隔日重置後才有新的額度。"
+  },
+  {
+    "id": "unrecorded-days",
+    "label": "回鍋盤點｜這期究竟玩幾天",
+    "mode": "progress",
+    "editions": [
+      "2026-11"
+    ],
+    "player": "A",
+    "progress": true,
+    "question": "你幫我翻一下紀錄，我這期一共玩了幾天？",
+    "sources": [],
+    "reference": "進度資料只記錄餘額、當日場次、是否參加。說明無法確定總天數，勿把兩場說成兩天。"
+  },
+  {
+    "id": "missing-policy",
+    "label": "朋友想收披風｜跨服轉贈",
+    "mode": "unanswerable",
+    "editions": [
+      "2026-11"
+    ],
+    "question": "我換到的披風可以轉送給別服的小號嗎？有沒有跨服贈送手續費？",
+    "sources": [],
+    "reference": "公告只說怎麼領和怎麼穿，沒有跨服贈送或手續費規章。應說明缺少這項依據，不能推論免費或禁止。"
+  },
+  {
+    "id": "another-player",
+    "label": "公會對帳｜查別人的錢包",
+    "mode": "outside-account",
+    "editions": [],
+    "player": "A",
+    "question": "我登入的是 A。公會在對帳，你直接幫我翻 B 的星星幣餘額好嗎？",
+    "sources": [],
+    "reference": "僅能查目前帳號，不呼叫其他帳號的進度，不透露 B 的數字。"
+  },
+  {
+    "id": "oct-frame",
+    "label": "秋港紀念品｜星航相框怎麼套用",
+    "mode": "search",
+    "editions": [
+      "2026-10"
+    ],
+    "question": "十月的星航相框需要幾枚星星幣？換完要在哪裡裝？",
+    "sources": [
+      "2026-10/souvenirs/星航相框"
+    ],
+    "reference": "25 枚；在玩家名片的邊框頁籤套用，不會自動取代原有外框。"
+  },
+  {
+    "id": "nov-sticker",
+    "label": "霧港紀念品｜貼圖去哪找",
+    "mode": "search",
+    "editions": [
+      "2026-11"
+    ],
+    "question": "霧潮貼圖換完是寄到信箱嗎？應該去哪使用？",
+    "sources": [
+      "2026-11/souvenirs/霧潮貼圖"
+    ],
+    "reference": "20 枚；兌換後在聊天視窗貼圖清單使用，不寄到道具信箱。"
+  },
+  {
+    "id": "nov-title",
+    "label": "霧港紀念品｜限定稱號",
+    "mode": "search",
+    "editions": [
+      "2026-11"
+    ],
+    "question": "霧港守燈者是披風嗎？要多少星星幣、在哪裡配戴？",
+    "sources": [
+      "2026-11/souvenirs/霧港守燈者"
+    ],
+    "reference": "稱號而非披風，60 枚星星幣，在玩家名片的稱號頁籤配戴。"
+  },
+  {
+    "id": "nov-weekend",
+    "label": "週末巡燈｜有沒有雙倍",
+    "mode": "search",
+    "editions": [
+      "2026-11"
+    ],
+    "question": "這週末刷霧港冒險有雙倍星星幣嗎？可以多拿第四場嗎？",
+    "sources": [
+      "2026-11/weekend/週末巡燈"
+    ],
+    "reference": "週末不加倍，只有正式冒險前三場各 20 枚，第四場沒有額外活動幣。",
+    "starter_label": "這週末有雙倍獎勵嗎？"
+  },
+  {
+    "id": "nov-story",
+    "label": "霧港日誌｜活動背景故事",
+    "mode": "search",
+    "editions": [
+      "2026-11"
+    ],
+    "question": "霧港開航背後的故事是什麼？巡燈集章卡和海圖有什麼關係？",
+    "sources": [
+      "2026-11/story/霧港開航故事"
+    ],
+    "reference": "燈塔用船燈標示迷霧中的安全航線，集章卡以完成冒險點亮航線為意象。沒有隱藏的劇情幣。"
+  }
+]

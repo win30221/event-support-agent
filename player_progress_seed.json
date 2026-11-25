@@ -1,0 +1,26 @@
+[
+  {
+    "edition": "2026-11",
+    "player": "A",
+    "recorded_on": "2026-11-21",
+    "coins": 80,
+    "rounds": 2,
+    "joined": true
+  },
+  {
+    "edition": "2026-11",
+    "player": "B",
+    "recorded_on": "2026-11-21",
+    "coins": 80,
+    "rounds": 3,
+    "joined": true
+  },
+  {
+    "edition": "2026-11",
+    "player": "C",
+    "recorded_on": "2026-11-21",
+    "coins": 0,
+    "rounds": 0,
+    "joined": false
+  }
+]
