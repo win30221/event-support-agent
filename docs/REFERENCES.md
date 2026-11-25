@@ -57,3 +57,6 @@
 - [Anthropic — Building effective agents / Routing](https://www.anthropic.com/research/building-effective-agents)：2026-11-25 查閱；路由需具備可區隔、可可靠分類的類別，先獨立驗證第一層再評估是否改架構。
 
 - [Claude Platform — Prompting best practices](https://platform.claude.com/docs/en/prompt-library/library)：2026-11-25 查閱；參考範例相關性、多樣性與清楚結構，將對照範例與分類定義分開，獨立測試題不提供模型。不代表已證實本地小模型準確率改善。
+
+- [AWS Amazon Lex V2 — Primary and Fallback modes for assisted NLU / Writing effective intent and slot descriptions](https://docs.aws.amazon.com/lexv2/latest/dg/assisted-nlu-modes.html)：2026-11-26 核對；參考 LLM 意圖描述明確目的、對象、邊界、避免重疊及測試不同措辭。採用於 INTENT_PROMPT 的 knowledge/analysis 邊界；不導入 Lex、額外分類器或信心分數。
+- [Google Dialogflow CX — Intents / Default negative intent](https://docs.cloud.google.com/dialogflow/cx/docs/concept/intent) 與 [Avoid similar intents](https://docs.cloud.google.com/dialogflow/cx/docs/concept/agent-design)：2026-11-26 核對；參考服務範圍外辨識和避免類別重疊。專案採用同一次 LLM 呼叫內先主題辨識、後目的分類的提示設計，並非 Dialogflow 的訓練式 NLU 或官方固定演算法。成效須以原 36 題及未見問句實測。
