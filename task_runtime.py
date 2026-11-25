@@ -2,6 +2,10 @@
 from __future__ import annotations
 
 from langchain_core.messages import HumanMessage
+from intent_analysis import (INTENT_PROMPT as SIMPLE_PROMPT, INTENT_SCHEMA as SIMPLE_SCHEMA,
+                             AUDIT_PROMPT, AUDIT_SCHEMA, VERIFY_PROMPT as ANSWER_VERIFY_PROMPT,
+                             VERIFY_SCHEMA, SimpleIntentPlan, IntentAudit, AnswerVerification,
+                             anchor_intents, bind_intents)
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import RetryPolicy
 from pydantic import ValidationError
@@ -11,13 +15,12 @@ from answering import (ANSWER_VERIFICATION_FAILED, answer_references, validate_p
 from backend import compact_json
 from evidence import model_sources, source_alias, source_map
 from model_client import TransientModelError, model_step
-from task_business import (inspect_slots, materialize_plan, model_task_states,
+from task_business import (inspect_slots, model_task_states,
                            overview_clauses, permits_tool, scoped_evidence,
                            matching_item, terminal_message)
 from task_contracts import (
     ASSESSMENT_PROMPT, ASSESSMENT_SCHEMA, DRAFT_PROMPT, DRAFT_SCHEMA,
-    INTENT_PROMPT, INTENT_SCHEMA, VERIFY_PROMPT, VERIFICATION_SCHEMA,
-    DraftBundle, EvidenceAssessment, IntentPlan, VerificationResult, TERMINAL, record,
+    DraftBundle, EvidenceAssessment, TERMINAL, record,
 )
 from tool_selection import MAX_TOOL_CALLS, MAX_TOOL_ROUNDS
 
@@ -35,7 +38,7 @@ def indexed(items, expected):
     """Every requested task has exactly one result; IDs are assigned by the host."""
     by_id = {item.task_id: item for item in items}
     if len(by_id) != len(items) or set(by_id) != set(expected):
-        raise ValueError("回傳需求 ID 缺漏、重複或未知。")
+        raise ValueError(f"需求 ID 不符：預期 {sorted(expected)}，收到 {sorted(by_id)}；每個 ID 恰好一項。")
     return by_id
 
 
@@ -56,7 +59,7 @@ class IntentRuntime(TurnRuntime):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.observe("Python Intent Workflow", {"模式": "intent-task", "語意驗證": "on",
+        self.observe("Python Intent Workflow", {"模式": "intent-task-simple", "語意驗證": "on",
                      "說明": "LLM 提案；主機維護需求狀態、必要欄位及停止條件。"})
 
     def initial_state(self):
@@ -111,18 +114,41 @@ class IntentRuntime(TurnRuntime):
     async def intent(self, state):
         self.node(state, "intent")
         packet = {"玩家原問": self.question, "服務上下文": self.context.public_summary(),
-                  "能力": "目前只提供公開公告、公開商城、本人活動紀錄及運算；無寫入或其他帳號工具。",
+                  "能力": "公開公告、公開商城、本人活動紀錄及運算；無寫入或其他帳號工具。",
                   "修正回饋": state["feedback"]}
-        plan = await self.ask(INTENT_PROMPT, packet, INTENT_SCHEMA, IntentPlan, "意圖分析",
-                              lambda p: materialize_plan(p.tasks, self.context))
-        if plan is None:
-            return {"tasks": [], "task_states": {}, "coverage": "failed", "next_step": "finalize"}
-        tasks, records = plan
-        self.observe("Python 需求清單", {"需求": tasks, "狀態": records})
-        # Replanning cannot reset tool/repair budgets. Existing evidence is re-scoped.
-        next_step = "verify" if not any(r["status"] not in TERMINAL for r in records.values()) else (
-            "select" if self.can_query(state) else "assess")
-        return {"tasks": tasks, "task_states": records, "coverage": "unknown", "next_step": next_step}
+        # 語意規劃最多一次重提案；結構錯誤由 ask 各自有限修復。
+        # 未通過 precision/recall 審查前不得執行任何資料工具。
+        for attempt in range(2):
+            intents = await self.ask(SIMPLE_PROMPT, packet, SIMPLE_SCHEMA, SimpleIntentPlan,
+                                     "精簡意圖分析", lambda p: anchor_intents(p, self.question))
+            if intents is None:
+                break
+            self.observe("Python 原問需求錨定", {"需求": intents})
+            from intent_analysis import CAPABILITIES
+            audit_packet = {**packet, "需求": intents,
+                "允許業務能力": {k: sorted(v) for k, v in CAPABILITIES.items()}}
+            def checked(audit):
+                return audit, bind_intents(audit, intents, self.context, self.observe)
+            reviewed = await self.ask(AUDIT_PROMPT, audit_packet, AUDIT_SCHEMA, IntentAudit,
+                                      "意圖與業務範圍驗證", checked)
+            if reviewed is None:
+                break
+            audit, plan = reviewed
+            self.observe("Python 意圖驗證", {"判定": audit.decision, "原因": audit.issues})
+            if plan is None:
+                packet["修正回饋"] = {"意圖缺失": audit.issues}
+                continue
+            tasks, records = plan
+            self.observe("Python 需求清單", {"需求": tasks, "狀態": records})
+            next_step = "verify" if not any(r["status"] not in TERMINAL for r in records.values()) else (
+                "select" if self.can_query(state) else "assess")
+            return {"tasks": tasks, "task_states": records, "coverage": "complete", "next_step": next_step}
+        return {"tasks": [], "task_states": {}, "coverage": "failed", "next_step": "finalize"}
+
+    async def prepare_tools(self, state: IntentState):
+        # LangGraph uses the node annotation as its input schema. The inherited
+        # SupportState annotation otherwise hides tasks/task_states from validate_call.
+        return await super().prepare_tools(state)
 
     def route_next(self, state):
         return state["next_step"]
@@ -296,47 +322,51 @@ class IntentRuntime(TurnRuntime):
     async def verify(self, state):
         self.node(state, "verify")
         records = dict(state["task_states"])
-        draft_ids = [t["id"] for t in state["tasks"] if records[t["id"]]["status"] == "draft"]
+        ids = [t["id"] for t in state["tasks"]]
         packet = self.packet(state)
-        packet["待驗證需求"] = draft_ids
-        def checked(result):
-            return result, indexed(result.verdicts, draft_ids)
-        verified = await self.ask(VERIFY_PROMPT, packet, VERIFICATION_SCHEMA, VerificationResult,
-                                  "獨立語意驗證", checked)
-        if verified is None:
-            for tid in draft_ids:
-                records[tid] = record("rejected", reason="未取得有效語意驗證。")
+        packet["待驗證需求"] = ids
+        # 所有需求都要有 verdict，包括終止限制回覆；不存在「空待驗證清單」
+        # 但模型被要求審查七個任務的矛盾。
+        verdicts = await self.ask(ANSWER_VERIFY_PROMPT, packet, VERIFY_SCHEMA, AnswerVerification,
+                                  "回答語意驗證", lambda p: indexed(p.verdicts, ids))
+        if verdicts is None:
+            for tid, r in records.items():
+                if r["status"] in ("draft", "ready", "completed"):
+                    records[tid] = record("rejected", reason="未取得有效語意驗證。")
+                elif r["status"] not in ("unsupported", "account_limit"):
+                    records[tid] = record("rejected", reason="限制回覆未通過語意驗證。")
             return {"task_states": records, "coverage": "failed", "next_step": "finalize"}
-        result, verdicts = verified
-        self.observe("Python 語意驗證結果", result.model_dump())
-        if result.coverage != "complete" or result.coverage_issues:
-            if not state["replanned"]:
-                return {"feedback": {"需求覆蓋缺失": result.coverage_issues}, "replanned": True,
-                        "coverage": "incomplete", "next_step": "intent"}
-            # Coverage is not a reason to silently show potentially mis-scoped drafts.
-            for tid, value in records.items():
-                if value["status"] in ("draft", "completed", "ready"):
-                    records[tid] = record("rejected", reason="原問需求覆蓋未通過。")
-            return {"task_states": records, "coverage": "incomplete", "next_step": "finalize"}
+        self.observe("Python 語意驗證結果", {"verdicts": [v.model_dump() for v in verdicts.values()]})
+        # 終止狀態錯誤通常是意圖/能力選錯，而非缺少證據。只允許一次重規劃。
+        # 先前已完成的業務證據仍存在；預算不重置。
+        terminal_issues = {tid: v.issues for tid, v in verdicts.items()
+                           if records[tid]["status"] in TERMINAL
+                           and records[tid]["status"] != "completed"
+                           and (v.verdict != "pass" or v.issues)}
+        if terminal_issues and not state["replanned"]:
+            return {"feedback": {"限制回覆修正": terminal_issues}, "replanned": True,
+                    "coverage": "incomplete", "next_step": "intent"}
         repair, feedback = [], {}
-        for tid in draft_ids:
-            verdict, r = verdicts[tid], records[tid]
-            if verdict.verdict == "pass" and not verdict.issues:
-                records[tid] = record("completed", response_type=r["response_type"],
-                                      answer=r["answer"], source_ids=r["source_ids"])
-            elif not state["verification_repair"] and verdict.issues and (
-                    r["response_type"] == "knowledge" or verdict.verdict == "insufficient"):
-                # One targeted semantic correction; assessment may request genuinely missing data.
+        for tid, r in records.items():
+            v = verdicts[tid]
+            if v.verdict == "pass" and not v.issues:
+                if r["status"] == "draft":
+                    records[tid] = record("completed", response_type=r["response_type"],
+                                          answer=r["answer"], source_ids=r["source_ids"])
+                continue
+            if r["status"] in ("draft", "completed") and not state["verification_repair"] and v.issues and (
+                    r["response_type"] == "knowledge" or v.verdict == "insufficient"):
                 records[tid] = record("pending", reason="待修正具體語意缺失")
                 repair.append(tid)
-                feedback[tid] = verdict.issues
-            else:
-                records[tid] = record("no_evidence" if verdict.verdict == "insufficient" else "rejected",
-                                      reason="; ".join(verdict.issues))
+                feedback[tid] = v.issues
+            elif r["status"] not in ("unsupported", "account_limit"):
+                records[tid] = record("no_evidence" if v.verdict == "insufficient" else "rejected",
+                                      reason="; ".join(v.issues))
         if repair:
             return {"task_states": records, "feedback": {"語意修正": feedback},
-                    "verification_repair": True, "coverage": "complete", "next_step": "assess"}
-        return {"task_states": records, "coverage": "complete", "next_step": "finalize"}
+                    "verification_repair": True, "next_step": "assess"}
+        return {"task_states": records, "coverage": "incomplete" if terminal_issues else "complete",
+                "next_step": "finalize"}
 
     async def finalize(self, state):
         self.node(state, "finalize")
@@ -360,6 +390,9 @@ class IntentRuntime(TurnRuntime):
                 status, text, cites = "no_evidence", terminal_message(record("no_evidence")), []
             checks.append({"任務ID": task["id"], "問題": task["goal"], "判定": status, "採用段落": cites})
             texts.append(f"**{task['goal']}**\n\n{text}" if len(state["tasks"]) > 1 else text)
+        # 同一限制不要因多個無效任務重複輸出；未核定需求不顯示模型自行創造的標題。
+        if state["coverage"] != "complete" and checks and not any(c["判定"] == "supported" for c in checks):
+            texts = [terminal_message(record("rejected"))]
         if state["coverage"] != "complete":
             texts.append("目前未能確認已涵蓋您的完整需求，請補充或重新詢問。")
         self.observe("Python 檢查回答依據", {"子問題": checks, "參考資料": answer_references(checks, state["evidence"]),
@@ -373,9 +406,9 @@ def build_intent_graph(runtime):
     graph = StateGraph(IntentState)
     retry = RetryPolicy(max_attempts=2, retry_on=TransientModelError)
     for name in ("intent", "select", "assess", "generate", "verify"):
-        graph.add_node(name, getattr(runtime, name), retry_policy=retry)
+        graph.add_node(name, getattr(runtime, name), retry_policy=retry, input_schema=IntentState)
     for name in ("prepare_tools", "collect", "finalize"):
-        graph.add_node(name, getattr(runtime, name))
+        graph.add_node(name, getattr(runtime, name), input_schema=IntentState)
     graph.add_node("tools", runtime.tool_node)
     graph.add_edge(START, "intent")
     graph.add_conditional_edges("intent", runtime.route_next,

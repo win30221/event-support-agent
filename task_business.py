@@ -45,6 +45,9 @@ def materialize_plan(proposals, context):
                 initial = initial or record("clarify", reason="需確認單一檔期。")
             if kind in PRODUCT_KINDS and not task["product"]:
                 initial = initial or record("clarify", reason="需確認商品。")
+            # 商品槽位只屬於指定商品及相關診斷/資格，不影響公開總覽、清單或本人餘額。
+            if kind not in PRODUCT_KINDS | {"eligibility", "diagnosis"}:
+                task["product"] = ""
             if task["product"] and any(not context.grounded_product(task["product"], e) for e in editions):
                 initial = initial or record("clarify", reason="商品指涉無法核對。")
         task["editions"] = editions
