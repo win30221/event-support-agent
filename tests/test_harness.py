@@ -7,7 +7,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
 
-from agent import MAX_TOOL_ROUNDS, answer
+from agent import MAX_TOOL_ROUNDS, legacy_answer as answer
 from answering import DIRECT_REPLIES
 from guide import CATALOG
 from evidence import source_alias

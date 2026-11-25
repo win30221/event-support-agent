@@ -8,7 +8,7 @@ from langchain_core.messages import AIMessage
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from agent import MAX_TOOL_CALLS, MAX_TOOL_ROUNDS, answer
+from agent import MAX_TOOL_CALLS, MAX_TOOL_ROUNDS, legacy_answer as answer
 from answer_quality import REVIEW_SCHEMA
 from answering import ANSWER_SCHEMA, ANSWER_VERIFICATION_FAILED, DIRECT_REPLIES, UNRESOLVED
 from backend import ToolRegistry, calculate

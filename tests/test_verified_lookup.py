@@ -9,7 +9,7 @@ import os
 from copy import deepcopy
 from unittest.mock import patch
 
-from agent import answer
+from agent import legacy_answer as answer
 from answer_quality import validate_review
 from answering import DIRECT_REPLIES, decode_response, render_response
 from backend import ToolRegistry, evidence_for

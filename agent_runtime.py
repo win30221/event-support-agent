@@ -103,6 +103,8 @@ class TurnRuntime:
             try:
                 result = await asyncio.to_thread(self.registry.execute, name, args)
                 source, refs, withheld = evidence_for(name, args, result, self.question)
+                # 保留實際核准查詢對象及範圍，供逐需求槽位比對；不是模型自行填寫的事實。
+                source["查詢參數"] = dict(args)
                 return compact_json(source), {"source": source, "raw": result,
                                                "refs": refs, "withheld": withheld}
             except Exception as error:
@@ -162,6 +164,9 @@ class TurnRuntime:
         return {"round_number": number, "calls": calls, "messages": additions,
                 "selection_retry_used": retried, "errors": errors}
 
+    def validate_call(self, state, name, raw):
+        return self.registry.validate(name, raw, self.context, state["evidence"])
+
     async def prepare_tools(self, state: SupportState):
         self.node(state, "execute")
         calls = state["calls"]
@@ -184,7 +189,7 @@ class TurnRuntime:
                 continue
             attempts += 1
             try:
-                args = self.registry.validate(name, raw, self.context, state["evidence"])
+                args = self.validate_call(state, name, raw)
             except (KeyError, TypeError, ValueError) as error:
                 plan["payload"] = {"工具": name, "狀態": "invalid_arguments", "原因": str(error)}
                 continue

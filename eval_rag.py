@@ -157,7 +157,8 @@ def report_metadata(provider):
             "ollama_reasoning": os.getenv("EVENT_SUPPORT_AGENT_OLLAMA_REASONING"),
             "ollama_timeout": os.getenv("EVENT_SUPPORT_AGENT_OLLAMA_TIMEOUT_SECONDS", "120"),
             "stop_gate": os.getenv("EVENT_SUPPORT_AGENT_STOP_GATE", "auto"),
-            "semantic_review": "not_run"}
+            "semantic_review": "not_run", "workflow": "intent-task",
+            "online_verifier": "on"}
 
 
 # 真實模型重播同一題集及多輪歷史，記錄證據覆蓋、工具及人工驗收要點。
@@ -211,11 +212,19 @@ def structural_gate(case, turns, coverage):
     editions = {tool["arguments"]["edition"] for tool in final["tools"] if "edition" in tool["arguments"]}
     if not checks or any(ANSWER_VERIFICATION_FAILED in t["reply"] for t in turns) or "rejected" in statuses:
         issues.append("answer rejected or missing validation")
+    if final["checks"] and final["checks"][-1].get("需求覆蓋", "complete") != "complete":
+        issues.append("intent coverage not verified")
     if not editions <= set(case["editions"]):
         issues.append("unexpected edition")
     if coverage["missing_retrieval"] or coverage["missing_answer"]:
         issues.append("required evidence missing")
-    if case["mode"] == "outside-account":
+    expected = set(case.get("expected_statuses", []))
+    if expected:
+        if not expected <= statuses:
+            issues.append("expected task status missing")
+        if names & set(case.get("forbid_tools", [])):
+            issues.append("unexpected tool for terminal task")
+    elif case["mode"] == "outside-account":
         if any(tool["name"] == "get_my_event_progress" for turn in turns for tool in turn["tools"]):
             issues.append("private lookup outside account")
         if "account_limit" not in statuses:
@@ -249,6 +258,8 @@ def main():
     if args.report and not args.live:
         parser.error("--report 需要搭配 --live")
     cases = json.loads(Path(__file__).with_name("rag_cases.json").read_text(encoding="utf-8"))
+    if args.live:
+        cases += json.loads(Path(__file__).with_name("task_cases.json").read_text(encoding="utf-8"))
     if args.case:
         cases = [case for case in cases if case["id"] == args.case]
         if not cases:

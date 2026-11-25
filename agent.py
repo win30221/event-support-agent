@@ -34,12 +34,23 @@ def build_graph(runtime):
     return graph.compile()
 
 
-async def answer(player, provider, history, question, complete=completion, observe=ignore_event):
+async def legacy_answer(player, provider, history, question, complete=completion, observe=ignore_event):
     """Preserve the UI/eval API and injected scripted model seam."""
     runtime = TurnRuntime(player, provider, list(history), question, complete, observe)
     # 不預設向外部追蹤服務傳送玩家資料；工程紀錄留在既有觀測介面。
     with tracing_context(enabled=False):
         result = await build_graph(runtime).ainvoke(
             runtime.initial_state(), config={"recursion_limit": 24}
+        )
+    return result["result"], result["trace"]
+
+
+async def answer(player, provider, history, question, complete=completion, observe=ignore_event):
+    """Default: intent-first workflow; legacy_answer remains an explicit baseline."""
+    from task_runtime import IntentRuntime, build_intent_graph
+    runtime = IntentRuntime(player, provider, list(history), question, complete, observe)
+    with tracing_context(enabled=False):
+        result = await build_intent_graph(runtime).ainvoke(
+            runtime.initial_state(), config={"recursion_limit": 64}
         )
     return result["result"], result["trace"]

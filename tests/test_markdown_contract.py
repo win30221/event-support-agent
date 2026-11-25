@@ -7,7 +7,7 @@ import asyncio
 import os
 from unittest.mock import patch
 
-from agent import answer
+from agent import legacy_answer as answer
 from answering import ANSWER_MARKDOWN_GUIDANCE, ANSWER_SCHEMA
 from answer_quality import REVIEW_SCHEMA
 from guide import CATALOG, published_passages
