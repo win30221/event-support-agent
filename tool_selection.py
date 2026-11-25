@@ -2,9 +2,6 @@
 import json
 import re
 
-from backend import compact_json
-from model_client import model_step
-
 
 # 限制單輪查詢成本及循環深度；批次、輪數與累計工具嘗試分別設上限。
 MAX_TOOL_ROUNDS = 3
@@ -38,50 +35,3 @@ def normalized_calls(reply, round_number):
         normalized.append({"id": f"call_{round_number}_{index}", "type": "function",
                            "function": {"name": name, "arguments": args}})
     return normalized
-
-
-# 以同一份工具宣告生成結構化選擇 Schema，避免維護兩套工具契約。
-def tool_request_schema(tools):
-    """One source of truth: derive fallback requests from the actual registry."""
-    variants = []
-    for tool in tools:
-        function = tool["function"]
-        variants.append({"type": "object", "properties": {
-            "name": {"type": "string", "enum": [function["name"]], "description": function["description"]},
-            "arguments": function["parameters"],
-        }, "required": ["name", "arguments"], "additionalProperties": False})
-    return {"type": "object", "properties": {"calls": {"type": "array",
-            "items": {"anyOf": variants}}}, "required": ["calls"], "additionalProperties": False}
-
-
-async def structured_tool_selection(provider, conversation, context, tools, sources, errors,
-                                    reason, complete, observe, round_number, *, recovery=False):
-    schema = tool_request_schema(tools)
-    observe("Python 工具選擇備援" if recovery else "Python 結構化工具選擇",
-            {"原因": reason, "輪次": round_number})
-    messages = [{"role": "system", "content": AGENT_PROMPT
-                 + "\n此次使用 JSON 表達工具請求，不使用原生 tool_calls。"
-                 "依最新問題及已取得資料選擇必要工具；無需查詢時 calls 為空陣列。"
-                 "不得猜測參數。格式：" + compact_json(schema)},
-                *conversation, {"role": "user", "content": compact_json({
-                    "服務上下文": context.public_summary(), "工具結果": sources,
-                    "工具錯誤": errors, "重新選擇原因": reason})}]
-    try:
-        reply = await model_step(provider, messages, [], complete, observe, "結構化工具選擇",
-                                 response_schema=schema)
-        data = json.loads(reply.get("content") or "")
-        if (not isinstance(data, dict) or data.keys() != {"calls"}
-                or not isinstance(data["calls"], list) or len(data["calls"]) > MAX_BATCH):
-            raise ValueError("結構化工具請求格式不符。")
-        for request in data["calls"]:
-            if (not isinstance(request, dict) or request.keys() != {"name", "arguments"}
-                    or not isinstance(request["name"], str) or not isinstance(request["arguments"], dict)):
-                raise ValueError("結構化工具請求參數格式不符。")
-        calls = normalized_calls({"tool_calls": [{"function": request} for request in data["calls"]]}, round_number)
-        if len(calls) != len(data["calls"]):
-            raise ValueError("結構化工具名稱格式不符。")
-        return calls
-    except (TypeError, ValueError) as error:
-        observe("Python 結構化工具選擇失敗", {"原因": str(error)})
-        errors.append({"狀態": "selection_error", "原因": "無法取得合法工具選擇。"})
-        return []

@@ -19,3 +19,5 @@ LLM 理解需求、選擇資料工具及生成回答；Python 管理工具契約
 客服正文使用共用 Markdown 契約，由 Streamlit 顯示；引用、工具原始資料與工程紀錄分開呈現。測試集中在 tests/，以相同題集比較檢索與模型行為。新增功能須維持通用性與模組邊界，不針對單一問題硬編碼。
 
 實際測試方法與已知限制見 [EVALUATION](EVALUATION.md)。
+
+兩個供應商在工具選擇與重試時均使用相容 API 的 tools 與 tool_calls，以同一個 ToolRegistry 驗證及執行。回答與審查另以 JSON Schema 生成。

@@ -14,7 +14,7 @@ from backend import ToolRegistry, compact_json, evidence_for
 from model_client import model_step
 from request_context import RequestContext
 from tool_selection import (AGENT_PROMPT, MAX_TOOL_CALLS, MAX_TOOL_ROUNDS,
-                            normalized_calls, structured_tool_selection)
+                            normalized_calls)
 
 
 STOP_RECHECK_REASON = (
@@ -36,7 +36,6 @@ class TurnState:
     context: RequestContext = field(init=False)
     registry: ToolRegistry = field(init=False)
     tools: list = field(init=False)
-    selection_mode: str = field(init=False)
     stop_mode: str = field(init=False)
     conversation: list = field(init=False)
     selection: list = field(init=False)
@@ -49,9 +48,7 @@ class TurnState:
     round_number: int = 0
     repair_available: bool = True
     previous_answer: dict | None = None
-    selection_fallback_used: bool = False
-    fallback_reason: str | None = None
-    next_reason: str = "首次依玩家問題選擇工具。"
+    selection_retry_used: bool = False
     calls: list = field(default_factory=list)
     progress: bool = False
     can_retrieve: bool = False
@@ -67,56 +64,42 @@ class TurnState:
         self.context = RequestContext.build(self.question, self.history)
         self.registry = ToolRegistry(self.player)
         self.tools = self.registry.definitions()
-        self.selection_mode = os.getenv("EVENT_SUPPORT_AGENT_TOOL_SELECTION",
-            "structured" if self.provider == "ollama" else "native").strip().lower()
         self.stop_mode = os.getenv("EVENT_SUPPORT_AGENT_STOP_GATE", "auto").strip().lower()
-        if self.selection_mode not in ("native", "structured"):
-            raise ValueError("EVENT_SUPPORT_AGENT_TOOL_SELECTION 請填 native 或 structured。")
         if self.stop_mode not in ("auto", "off"):
             raise ValueError("EVENT_SUPPORT_AGENT_STOP_GATE 請填 auto 或 off。")
         self.conversation = [*self.context.history, {"role": "user", "content": self.question}]
         self.selection = [{"role": "system", "content": AGENT_PROMPT + "\n服務上下文："
                            + compact_json(self.context.public_summary())}, *self.conversation]
-        self.observe("Python 工具介接模式", {"服務": self.provider, "模式": self.selection_mode})
+        self.observe("Python 工具介接模式", {"服務": self.provider, "模式": "native"})
         self.observe("Python Agent Harness", {"框架": "pydantic-graph", "停止檢查": self.stop_mode})
 
     def node(self, name):
         self.observe("Python Harness 節點", {"節點": name, "輪次": self.round_number,
                      "工具嘗試": self.attempts, "有效證據數": len(self.evidence)})
 
-    # 模型提出工具請求，原生與結構化模式共用後續驗證；選擇不等於授權。
+    # 模型提出工具請求，兩個供應商共用原生呼叫及後續驗證；選擇不等於授權。
     async def select_tools(self):
         self.round_number += 1
         if self.round_number > MAX_TOOL_ROUNDS:
             raise RuntimeError("Harness 超出工具輪數上限。")
         self.node("select")
         stage = "選擇資料工具" if self.round_number == 1 else "補查資料工具"
-        if self.fallback_reason is not None:
-            self.selection_fallback_used = True
-            self.calls = await self.structured_selection(self.fallback_reason, recovery=True)
-            self.fallback_reason = None
-        elif self.selection_mode == "structured":
-            self.calls = await self.structured_selection(self.next_reason)
-        else:
+        while True:
             selected = await model_step(self.provider, self.selection, self.tools,
                                         self.complete, self.observe, stage)
             self.calls = normalized_calls(selected, self.round_number)
             content = selected.get("content")
-            if not self.calls and (not isinstance(content, str) or not content.strip()):
-                self.observe("Python 模型回傳空工具選擇", {"輪次": self.round_number,
-                             "回傳資訊": selected.get("_provider_meta", {})})
-                if not self.selection_fallback_used:
-                    self.selection_fallback_used = True
-                    self.calls = await self.structured_selection(
-                        "模型未回傳工具呼叫或文字，尚未執行查詢。", recovery=True)
-                else:
-                    self.errors.append({"狀態": "selection_error", "原因": "模型未回傳工具選擇。"})
-
-    async def structured_selection(self, reason, *, recovery=False):
-        return await structured_tool_selection(
-            self.provider, self.conversation, self.context, self.tools, self.sources,
-            self.errors, reason, self.complete, self.observe, self.round_number,
-            recovery=recovery)
+            if self.calls or (isinstance(content, str) and content.strip()):
+                return
+            self.observe("Python 模型回傳空工具選擇", {"輪次": self.round_number,
+                         "回傳資訊": selected.get("_provider_meta", {})})
+            if self.selection_retry_used or self.stop_pending:
+                self.errors.append({"狀態": "selection_error", "原因": "模型未回傳工具選擇。"})
+                return
+            self.selection_retry_used = True
+            stage = "重試資料工具"
+            self.selection.append({"role": "user", "content":
+                "前次沒有回傳工具或文字。需要查詢時請呼叫工具，無需查詢時請以文字說明停止。"})
 
     # 先驗證參數及可信指涉，再查詢；相同正規化參數重用本輪結果。
     async def execute_call(self, call):
@@ -225,7 +208,6 @@ class TurnState:
     # 補查原因屬系統回饋，不得成為新的玩家事實或可引用證據。
     def request_more(self, reason):
         self.previous_answer = self.data
-        self.next_reason = reason
         self.observe("Python 接受補查需求", {"缺少資料": reason,
                      "剩餘工具輪數": MAX_TOOL_ROUNDS - self.round_number})
         self.selection.append({"role": "user", "content": compact_json({
@@ -248,9 +230,9 @@ class TurnState:
             return False
         parts = self.data["results"]
         unqueried = not self.sources and any(p["status"] == "no_evidence" for p in parts)
-        if unqueried and self.can_retrieve and not self.selection_fallback_used:
-            self.fallback_reason = "尚未取得任何資料工具結果，不可將未查詢當成查無依據。"
-            self.previous_answer = self.data
+        if unqueried and self.can_retrieve and not self.selection_retry_used:
+            self.selection_retry_used = True
+            self.request_more("尚未取得任何資料工具結果，不可將未查詢當成查無依據。")
             return True
         if unqueried:
             for part in parts:

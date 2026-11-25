@@ -174,7 +174,6 @@ export OPENAI_MODEL=gpt-4o-mini
 | EVENT_SUPPORT_AGENT_PG_DSN | 無；玩家進度查詢及 hybrid 必填 |
 | EVENT_SUPPORT_AGENT_EMBED_MODEL | bge-m3 |
 | EVENT_SUPPORT_AGENT_EMBED_URL | http://localhost:11434（不加 /v1） |
-| EVENT_SUPPORT_AGENT_TOOL_SELECTION | Ollama structured / OpenAI native；可覆寫 |
 | EVENT_SUPPORT_AGENT_STOP_GATE | auto；off 關額外矛盾停止檢查，不取消原有預算 |
 | EVENT_SUPPORT_AGENT_ANSWER_REVIEW | auto；off 用於對照 |
 | EVENT_SUPPORT_AGENT_OLLAMA_TIMEOUT_SECONDS | 120；非負整數秒，0 為無 Python socket timeout |
@@ -200,3 +199,5 @@ export OPENAI_MODEL=gpt-4o-mini
 ```
 
 macOS/Linux 改用 `./.venv/bin/python`。完整實機重播與 JSON 報告見 [EVALUATION](EVALUATION.md)。
+
+Ollama 請選用支援 tool calling 的模型。兩個供應商的工具選擇都使用原生呼叫。

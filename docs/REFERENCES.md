@@ -8,8 +8,8 @@
 | --- | --- |
 | [Pydantic Graph](https://ai.pydantic.dev/graph/) | 採用；agent.py GraphBuilder、節點及 TurnState，依 requirements 的 2.66.0 |
 | [OpenAI Function Calling](https://platform.openai.com/docs/guides/function-calling) | 採用介接原則；model_client.py、backend.py、tool_selection.py |
-| [OpenAI Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs) | 採用結構化回答與工具請求契約；answering.py、answer_quality.py |
-| [Ollama Tool Calling](https://docs.ollama.com/capabilities/tool-calling) | 採用相容介接及結構化備援；本機預設非原生工具呼叫 |
+| [OpenAI Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs) | 採用結構化回答與審查契約；answering.py、answer_quality.py |
+| [Ollama Tool Calling](https://docs.ollama.com/capabilities/tool-calling) | 透過 /v1/chat/completions 傳送 tools，以 tool_calls 及工具結果進行多輪查詢 |
 | [Ollama Structured Outputs](https://docs.ollama.com/capabilities/structured-outputs) | 採用 JSON Schema 生成；host 仍需驗證 |
 | [Ollama Embed API](https://docs.ollama.com/api/embed) | 採用 /api/embed；vector_search.py |
 | [Psycopg 3 基本用法](https://www.psycopg.org/psycopg3/docs/basic/usage.html) | 採用連線、交易 context manager 及參數化 SQL |

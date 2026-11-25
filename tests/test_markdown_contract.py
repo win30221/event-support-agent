@@ -11,7 +11,7 @@ from agent import answer
 from answering import ANSWER_MARKDOWN_GUIDANCE, ANSWER_SCHEMA
 from answer_quality import REVIEW_SCHEMA
 from guide import CATALOG, published_passages
-from tests.test_bounded_agent import fallback, response, rules, scripted, supported
+from tests.test_bounded_agent import select, response, rules, scripted, supported
 from tests.test_answer_quality import review
 from tests.test_guide import OfflineTests
 
@@ -19,8 +19,7 @@ from tests.test_guide import OfflineTests
 class MarkdownContractTests(OfflineTests):
     def setUp(self):
         super().setUp()
-        env = patch.dict(os.environ, {"EVENT_SUPPORT_AGENT_TOOL_SELECTION": "structured",
-            "EVENT_SUPPORT_AGENT_STOP_GATE": "auto", "EVENT_SUPPORT_AGENT_ANSWER_REVIEW": "auto"})
+        env = patch.dict(os.environ, {"EVENT_SUPPORT_AGENT_STOP_GATE": "auto", "EVENT_SUPPORT_AGENT_ANSWER_REVIEW": "auto"})
         env.start()
         self.addCleanup(env.stop)
 
@@ -46,7 +45,7 @@ class MarkdownContractTests(OfflineTests):
             self.check_contract(messages, tools, kwargs, REVIEW_SCHEMA)
             return review("revise", supported(q, final_text, *cites), missing=[cites[2][0]])
 
-        model = scripted(fallback(rules(mode="overview")), initial, revised)
+        model = scripted(select(rules(mode="overview")), initial, revised)
         events = []
         text, trace = asyncio.run(answer("A", "ollama", [], q, model,
                                     lambda title, data: events.append((title, data))))

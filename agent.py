@@ -13,7 +13,7 @@ from agent_runtime import TurnState
 from model_client import completion, ignore_event
 # Preserve public imports used by the existing regression suite.
 from tool_selection import (AGENT_PROMPT, MAX_BATCH, MAX_TOOL_CALLS, MAX_TOOL_ROUNDS,
-                            normalized_calls, structured_tool_selection, tool_request_schema)
+                            normalized_calls)
 
 
 TurnResult = tuple[str, list]

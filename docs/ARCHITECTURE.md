@@ -13,7 +13,7 @@ LLM 負責理解意圖、選擇工具與生成回答；Python 負責工具權限
 | app.py / starter_questions.py | UI、依玩家與 provider 分隔對話、快速提問、背景執行及工程檢視 |
 | agent.py | Graph 節點、狀態轉移、answer 入口 |
 | agent_runtime.py | 每輪 TurnState、預算、工具、證據快取及降級 |
-| tool_selection.py | 原生/結構化工具選擇共用 Schema |
+| tool_selection.py | 原生工具呼叫正規化 |
 | model_client.py | OpenAI-compatible API、JSON Schema、相容備援、紀錄 |
 | request_context.py | 最近 8 則訊息；上一輪可信工具檔期及商品參照 |
 | backend.py | Tool Registry、參數/帳號驗證、證據轉換及適用條件 |
@@ -26,7 +26,7 @@ LLM 負責理解意圖、選擇工具與生成回答；Python 負責工具權限
 ## 3. Agent 生命週期
 
 1. answer 建立每輪獨立狀態及綁定目前 player 的 registry；歷史文字供指涉，不直接當成本輪事實。
-2. SelectTools 選擇唯讀工具。Ollama 預設 structured；OpenAI 預設 native；兩者使用同一份工具定義。
+2. SelectTools 選擇唯讀工具。兩個供應商在首次選擇、補查、空回應重試及 Stop Gate 複查都傳送同一份 tools，僅接受 tool_calls。
 3. ExecuteTools 驗證名稱、參數、檔期與可信指涉後呼叫本地函式；同一輪相同正規化參數重用結果。
 4. evidence_for 產生本輪引用資料；以原問核對公開條款的適用條件，排除不適用段落。
 5. AssessEvidence 使用本輪證據產生 action/missing/results，格式不符有有限修復機會。
@@ -42,7 +42,7 @@ LLM 負責理解意圖、選擇工具與生成回答；Python 負責工具權限
 | 額外矛盾停止檢查 | 1 次 |
 | 最終審查 | 1 次 |
 
-原生選擇無有效呼叫及文字時可有一次結構化備援；無來源而報 no_evidence 也使用有限備援狀態。常見成功路徑為選擇、回答各一次模型步驟；不保證每輪僅兩次。底層 HTTP 相容備援可能增加傳輸次數，工程事件計數不等同所有 HTTP 請求。
+原生選擇無有效呼叫及文字時可有一次原生重試；無來源而報 no_evidence 也使用有限備援狀態。常見成功路徑為選擇、回答各一次模型步驟；不保證每輪僅兩次。底層 HTTP 相容備援可能增加傳輸次數，工程事件計數不等同所有 HTTP 請求。
 
 ## 4. 信任邊界與限制
 

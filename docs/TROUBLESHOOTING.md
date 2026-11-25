@@ -13,7 +13,7 @@
 | 本機 Vulkan/Flash Attention pipeline 失敗 | 先核對 Ollama 版本、GPU driver、記憶體及日誌；已觀察到部分 Windows 環境可透過 OLLAMA_FLASH_ATTENTION=0 排查，需重啟 Ollama 服務才生效，不是本專案設定或通用解法 |
 | 模型回應逾時 | 核對模型日誌及硬體；必要時提高 EVENT_SUPPORT_AGENT_OLLAMA_TIMEOUT_SECONDS（如 600），預設 120；0 代表 Python socket 無 timeout，不建議預設使用 |
 | OpenAI API key 缺失或 401 | 在啟動程序同一終端設定正確 OPENAI_API_KEY；確認模型存取權、額度；勿將 key 寫入 repo |
-| 原生工具呼叫空內容 | Ollama 預設 structured；native 有一次有限結構化備援。查看 provider meta，勿自動增加無限重試 |
+| 原生工具呼叫空內容 | 兩個供應商共用一次原生工具選擇重試機會。查看 provider meta，勿自動增加無限重試 |
 | JSON 回答不符合契約 | 查看格式驗證事件；既有流程只有有限修復機會，非 supported 正文不直接採用 |
 | ImportError psycopg | 執行 python -m pip install -r requirements.txt（兩種檢索模式皆需 psycopg） |
 | PostgreSQL 連線失敗 | docker ps -a、docker start event-support-agent-pg、docker exec event-support-agent-pg pg_isready -U postgres -d event_support_agent；核對 DSN 及主機 port |

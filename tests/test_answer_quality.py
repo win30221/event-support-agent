@@ -9,7 +9,7 @@ from answer_quality import REVIEW_SCHEMA
 from answering import DIRECT_REPLIES
 from eval_rag import live_source_coverage
 from guide import CATALOG, published_passages
-from tests.test_bounded_agent import (abstain, call, fallback, original, packet, response,
+from tests.test_bounded_agent import (abstain, call, select, original, packet, response,
                                 rules, scripted, supported)
 from tests.test_guide import OfflineTests
 
@@ -25,8 +25,7 @@ def review(decision, *parts, missing=(), reason="審查完成"):
 class QualityTests(OfflineTests):
     def setUp(self):
         super().setUp()
-        config = patch.dict(os.environ, {"EVENT_SUPPORT_AGENT_TOOL_SELECTION": "structured",
-                                         "EVENT_SUPPORT_AGENT_ANSWER_REVIEW": "auto"})
+        config = patch.dict(os.environ, {"EVENT_SUPPORT_AGENT_ANSWER_REVIEW": "auto"})
         config.start()
         self.addCleanup(config.stop)
 
@@ -57,7 +56,7 @@ class QualityTests(OfflineTests):
             return review("revise", supported(question, "\n".join(p["原文"] for p in launch),
                           *((p["段落ID"], p["原文"]) for p in launch)), missing=[missing])
 
-        text, trace, events, model = self.ask(question, fallback(rules("玩法")), draft, revise)
+        text, trace, events, model = self.ask(question, select(rules("玩法")), draft, revise)
         self.assertEqual(len(trace), 1)
         self.assertTrue(all(p["原文"] in text for p in launch))
         self.assertNotIn(original(first[-1]), text)
@@ -71,7 +70,7 @@ class QualityTests(OfflineTests):
         question = "十一月排位有計算嗎？"
         key = f"{CURRENT}/launch/玩法"
         draft = response(supported(question, "排位不計。", (key, "排位不計")))
-        text, trace, events, _ = self.ask(question, fallback(rules("排位")), draft,
+        text, trace, events, _ = self.ask(question, select(rules("排位")), draft,
                                          review("keep", reason="其他章節不影響所問排位規則"))
         self.assertIn("排位不計。", text)
         self.assertNotIn("披風", text)
@@ -80,7 +79,7 @@ class QualityTests(OfflineTests):
 
     def test_complete_single_evidence_answer_does_not_review(self):
         question = "我的星星幣有多少？"
-        text, trace, events, _ = self.ask(question, fallback(call("get_my_event_progress", edition="current")),
+        text, trace, events, _ = self.ask(question, select(call("get_my_event_progress", edition="current")),
             response(supported(question, "80 枚星星幣", (f"{CURRENT}/my-progress", '"星星幣": 80'))))
         self.assertIn("80 枚星星幣", text)
         self.assertNotIn("Python 啟動回答品質審查", dict(events))
@@ -96,7 +95,7 @@ class QualityTests(OfflineTests):
         ]
         for bad in bad_reviews:
             with self.subTest(bad=bad):
-                text, trace, events, _ = self.ask(question, fallback(rules(mode="overview")), draft, bad)
+                text, trace, events, _ = self.ask(question, select(rules(mode="overview")), draft, bad)
                 self.assertIn(original(key), text)
                 self.assertNotIn("錯誤內容", text)
                 self.assertEqual(dict(events)["Python 回答品質審查結果"]["判定"], "review_failed")
@@ -113,7 +112,7 @@ class QualityTests(OfflineTests):
                             [balance, policy, supported(q3, "80 枚", (record_id, '"星星幣": 80'))]):
             with self.subTest(replacement=replacement):
                 text, trace, events, _ = self.ask(question,
-                    fallback(rules(mode="overview"), call("get_my_event_progress", edition="current")),
+                    select(rules(mode="overview"), call("get_my_event_progress", edition="current")),
                     draft, review("revise", *replacement))
                 self.assertIn("80 枚星星幣", text)
                 self.assertIn(DIRECT_REPLIES["account_limit"], text)
@@ -124,7 +123,7 @@ class QualityTests(OfflineTests):
         key = f"{CURRENT}/launch/玩法"
         def unavailable(*args, **kwargs):
             raise TimeoutError("review unavailable")
-        text, trace, events, _ = self.ask(question, fallback(rules(mode="overview")),
+        text, trace, events, _ = self.ask(question, select(rules(mode="overview")),
             response(supported(question, original(key), (key, original(key)))), unavailable)
         self.assertIn(original(key), text)
         self.assertEqual(dict(events)["Python 回答品質審查結果"]["判定"], "review_failed")

@@ -15,7 +15,7 @@ from answering import DIRECT_REPLIES, decode_response, render_response
 from backend import ToolRegistry, evidence_for
 from guide import CATALOG, shop_catalog
 from request_context import RequestContext
-from tests.test_bounded_agent import (abstain, call, evidence_rows, fallback, original, response,
+from tests.test_bounded_agent import (abstain, call, evidence_rows, select, original, response,
                                 rules, scripted, supported)
 from tests.test_guide import OfflineTests
 
@@ -40,8 +40,7 @@ def lookup(name, edition=CURRENT):
 class VerifiedLookupTests(OfflineTests):
     def setUp(self):
         super().setUp()
-        config = patch.dict(os.environ, {"EVENT_SUPPORT_AGENT_TOOL_SELECTION": "structured",
-                                         "EVENT_SUPPORT_AGENT_ANSWER_REVIEW": "auto"})
+        config = patch.dict(os.environ, {"EVENT_SUPPORT_AGENT_ANSWER_REVIEW": "auto"})
         config.start()
         self.addCleanup(config.stop)
 
@@ -79,7 +78,7 @@ class VerifiedLookupTests(OfflineTests):
             self.assertTrue(all(row["資料狀態"] == "not_found" for row in rows))
             return response(mislabeled(question, *rows, prose="特斯拉不存在；擅自聲稱已扣款。"))
 
-        text, trace, events = self.ask(question, fallback(
+        text, trace, events = self.ask(question, select(
             call("find_shop_item", edition=CURRENT, name="特斯拉"),
             call("find_shop_item", edition=PREVIOUS, name="特斯拉")), finish, history=history)
         self.assertEqual(len(trace), 2)
@@ -181,7 +180,7 @@ class VerifiedLookupTests(OfflineTests):
                             supported("我的餘額", "80 枚星星幣",
                                       (f"{CURRENT}/my-progress", '"星星幣": 80')))
 
-        text, trace, events = self.ask(question, fallback(
+        text, trace, events = self.ask(question, select(
             call("find_shop_item", edition="current", name=name),
             call("get_my_event_progress", edition="current")), finish)
         self.assertEqual(len(trace), 2)
@@ -197,9 +196,9 @@ class VerifiedLookupTests(OfflineTests):
             raise RuntimeError("database unavailable")
         with patch.object(ToolRegistry, "execute", unavailable):
             text, trace, events = self.ask(question,
-                fallback(call("find_shop_item", edition="current", name=name)),
+                select(call("find_shop_item", edition="current", name=name)),
                 response(mislabeled(question, stale)),
-                fallback(), response(mislabeled(question, stale)))
+                select(), response(mislabeled(question, stale)))
         self.assertEqual(trace, [])
         self.assertEqual(text, DIRECT_REPLIES["unavailable"])
         self.assertNotIn("商城清單查無", text)

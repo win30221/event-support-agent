@@ -8,7 +8,7 @@ from io import BytesIO
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from agent import MAX_TOOL_CALLS, MAX_TOOL_ROUNDS, answer, tool_request_schema
+from agent import MAX_TOOL_CALLS, MAX_TOOL_ROUNDS, answer
 from answer_quality import REVIEW_SCHEMA
 from answering import ANSWER_SCHEMA, ANSWER_VERIFICATION_FAILED, DIRECT_REPLIES, UNRESOLVED
 from backend import ToolRegistry, calculate
@@ -72,16 +72,10 @@ def scripted(*replies):
     return Mock(side_effect=respond)
 
 
-def fallback(*calls):
-    return {"content": json.dumps({"calls": [
-        {"name": c["function"]["name"], "arguments": json.loads(c["function"]["arguments"])}
-        for c in calls]}, ensure_ascii=False)}
-
-
 class BoundedAgentTests(OfflineTests):
     def setUp(self):
         super().setUp()
-        config = patch.dict(os.environ, {"EVENT_SUPPORT_AGENT_TOOL_SELECTION": "native", "EVENT_SUPPORT_AGENT_ANSWER_REVIEW": "off"})
+        config = patch.dict(os.environ, {"EVENT_SUPPORT_AGENT_ANSWER_REVIEW": "off"})
         config.start()
         self.addCleanup(config.stop)
 
@@ -97,8 +91,7 @@ class BoundedAgentTests(OfflineTests):
                 self.assertNotIn("response_schema", invocation.kwargs)
                 self.assertNotIn("submit_answer", [t["function"]["name"] for t in tools])
             else:
-                self.assertIn(invocation.kwargs.get("response_schema"),
-                              (ANSWER_SCHEMA, tool_request_schema(ToolRegistry(player).definitions())))
+                self.assertEqual(invocation.kwargs.get("response_schema"), ANSWER_SCHEMA)
         return text, trace, events, model
 
     def test_overview_two_model_calls_and_complete_sources(self):
@@ -118,20 +111,36 @@ class BoundedAgentTests(OfflineTests):
         q = "這個活動要怎麼玩?"
         rows = [p for p in published_passages(CURRENT) if p["文件ID"] == "launch"]
         text, trace, events, model = self.run_case(q, {"role": "assistant", "content": ""},
-            fallback(rules(mode="overview")),
+            select(rules(mode="overview")),
             response(supported(q, "\n".join(p["原文"] for p in rows),
                                *((p["段落ID"], p["原文"]) for p in rows))))
         self.assertEqual([call["參數"]["mode"] for call in trace], ["overview"])
         self.assertTrue(all(p["原文"] in text for p in rows))
         self.assertEqual(model.call_count, 3)
-        self.assertIn("Python 工具選擇備援", [title for title, _ in events])
+        self.assertIn("送出模型請求 · 重試資料工具", [title for title, _ in events])
+
+    def test_both_providers_ignore_text_tool_requests_and_retry_natively(self):
+        question = "查詢目前可兌換的商品"
+        fake = {"content": json.dumps({"calls": [{"name": "list_shop_items",
+                                                 "arguments": {"edition": "current"}}]})}
+        for provider in ("ollama", "openai"):
+            with self.subTest(provider=provider), patch.dict(os.environ, {
+                    "EVENT_SUPPORT_AGENT_TOOL_SELECTION": "structured"}):
+                model = scripted(fake, response(abstain(question)), select(), response(abstain(question)))
+                text, trace = asyncio.run(answer("A", provider, [], question, model))
+                self.assertEqual(text, DIRECT_REPLIES["unavailable"])
+                self.assertEqual(trace, [])
+                for i in (0, 2):
+                    invocation = model.call_args_list[i]
+                    self.assertEqual(invocation.args[2], ToolRegistry("A").definitions())
+                    self.assertEqual(invocation.kwargs, {})
 
     def test_unqueried_abstention_is_not_evidence_of_missing_policy(self):
         q = "目前活動有哪些獎勵？"
         bad = abstain(q)
         bad["answer"] = "尚無活動資料，請到其他網站。"
         text, trace, events, model = self.run_case(q, {"content": "不呼叫工具"},
-            response(bad), fallback(), response(bad))
+            response(bad), select(), response(bad))
         self.assertEqual(trace, [])
         self.assertEqual(text, DIRECT_REPLIES["unavailable"])
         self.assertNotIn("尚無活動資料", text)
@@ -140,14 +149,14 @@ class BoundedAgentTests(OfflineTests):
 
     def test_empty_selection_and_empty_fallback_never_invent_data(self):
         q = "本期活動規則？"
-        text, trace, events, _ = self.run_case(q, {"content": ""}, fallback(),
+        text, trace, events, _ = self.run_case(q, {"content": ""}, select(),
             response(abstain(q)))
         self.assertEqual(trace, [])
         self.assertEqual(text, DIRECT_REPLIES["unavailable"])
 
     def test_empty_selection_does_not_force_private_lookup_for_greeting(self):
         q = "早安"
-        text, trace, _, _ = self.run_case(q, {"content": ""}, fallback(),
+        text, trace, _, _ = self.run_case(q, {"content": ""}, select(),
             response(abstain(q, "service_help")))
         self.assertEqual(trace, [])
         self.assertEqual(text, DIRECT_REPLIES["service_help"])
@@ -165,7 +174,7 @@ class BoundedAgentTests(OfflineTests):
 
     def test_fallback_uses_same_account_guard(self):
         text, trace, _, _ = self.run_case("查別人餘額", {"content": ""},
-            fallback(call("get_my_event_progress", edition="current", player="B")),
+            select(call("get_my_event_progress", edition="current", player="B")),
             response(abstain("他人資料", "account_limit")))
         self.assertEqual(trace, [])
         self.assertEqual(text, DIRECT_REPLIES["account_limit"])
@@ -183,7 +192,7 @@ class BoundedAgentTests(OfflineTests):
         self.assertEqual(output["_provider_meta"]["model"], "local")
         self.assertNotIn("private", str(output["_provider_meta"]))
 
-    def test_default_ollama_uses_structured_tool_selection_and_canonical_context(self):
+    def test_default_ollama_uses_native_tool_selection_and_canonical_context(self):
         question = "這個活動要怎麼玩?"
         launch = [p for p in published_passages(CURRENT) if p["文件ID"] == "launch"]
 
@@ -195,29 +204,26 @@ class BoundedAgentTests(OfflineTests):
             return response(supported(question, "\n".join(p["原文"] for p in launch),
                                       *((p["段落ID"], p["原文"]) for p in launch)))
 
-        with patch.dict(os.environ):
-            os.environ.pop("EVENT_SUPPORT_AGENT_TOOL_SELECTION", None)
-            text, trace, events, model = self.run_case(question,
-                fallback(rules("参与方式", "search")), finish)
+        text, trace, events, model = self.run_case(question,
+            select(rules("参与方式", "search")), finish)
         self.assertEqual(model.call_count, 2)
-        self.assertEqual(model.call_args_list[0].args[2], [])
+        self.assertEqual(model.call_args_list[0].args[2], ToolRegistry("A").definitions())
         self.assertEqual(trace[0]["參數"]["mode"], "search")
         self.assertTrue(all(p["原文"] in text for p in launch))
-        self.assertNotIn("Python 工具選擇備援", [title for title, _ in events])
+        self.assertNotIn("送出模型請求 · 重試資料工具", [title for title, _ in events])
 
-    def test_structured_supplement_receives_actual_missing_data_reason(self):
+    def test_native_supplement_receives_actual_missing_data_reason(self):
         question = "我可以換什麼？還想知道活動期限"
         def select_again(provider, messages, tools, **kwargs):
             payload = packet(messages)
-            self.assertEqual(payload["重新選擇原因"], "還需要商城清單")
-            self.assertTrue(payload["工具結果"])
-            return fallback(call("list_shop_items", edition="current"))
+            self.assertEqual(payload["系統補查回饋"], "還需要商城清單")
+            self.assertTrue(any(m["role"] == "tool" for m in messages))
+            return select(call("list_shop_items", edition="current"))
         item = shop_catalog()["items"][0]
-        with patch.dict(os.environ, {"EVENT_SUPPORT_AGENT_TOOL_SELECTION": "structured"}):
-            text, trace, _, _ = self.run_case(question, fallback(rules(mode="overview")),
-                response(action="retrieve", missing="還需要商城清單"),
-                select_again, response(supported("商品", item["name"],
-                   (f"{CURRENT}/shop-items/{item['id']}", item["name"]))))
+        text, trace, _, _ = self.run_case(question, select(rules(mode="overview")),
+            response(action="retrieve", missing="還需要商城清單"),
+            select_again, response(supported("商品", item["name"],
+               (f"{CURRENT}/shop-items/{item['id']}", item["name"]))))
         self.assertEqual([entry["工具"] for entry in trace], ["find_rules", "list_shop_items"])
 
     def test_context_does_not_imply_specific_policy_exists(self):
@@ -231,8 +237,7 @@ class BoundedAgentTests(OfflineTests):
         self.assertTrue(all(p["檔期"] == PREVIOUS and p["文件ID"] == "launch" for p in rows))
         source, _, _ = evidence_for("find_rules", args, rows, q)
         self.assertEqual(source["狀態"], "context_only")
-        with patch.dict(os.environ, {"EVENT_SUPPORT_AGENT_TOOL_SELECTION": "structured"}):
-            text, _, _, _ = self.run_case(q, fallback(rules(q, edition="previous")), response(abstain(q)))
+        text, _, _, _ = self.run_case(q, select(rules(q, edition="previous")), response(abstain(q)))
         self.assertEqual(text, DIRECT_REPLIES["no_evidence"])
 
     def test_duplicate_question_is_rendered_once_with_verified_partial_answer(self):
@@ -530,10 +535,10 @@ class FixtureReplayTests(OfflineTests):
                     return {"content": json.dumps({"decision": "keep", "reason": "測試草稿已含參考來源",
                                                     "missing_ids": [], "results": []}, ensure_ascii=False)}
 
-                model = scripted(fallback(*calls), finalize, accept_review)
+                choice = select(*calls) if calls else {"content": "無需查詢"}
+                model = scripted(choice, finalize, accept_review)
                 events = []
-                with patch.dict(os.environ, {"EVENT_SUPPORT_AGENT_TOOL_SELECTION": "structured",
-                                              "EVENT_SUPPORT_AGENT_ANSWER_REVIEW": "auto"}):
+                with patch.dict(os.environ, {"EVENT_SUPPORT_AGENT_ANSWER_REVIEW": "auto"}):
                     text, trace = asyncio.run(answer(player, "ollama", [], q, model,
                         lambda title, data: events.append((title, data))))
                 self.assertEqual(model.call_count, 2 + sum(title == "Python 啟動回答品質審查" for title, _ in events))

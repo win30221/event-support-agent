@@ -148,7 +148,7 @@ def report_metadata(provider):
             "configured_model": os.getenv("OLLAMA_MODEL", "qwen3:8b") if provider == "ollama"
                                 else os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
             "retrieval": os.getenv("EVENT_SUPPORT_AGENT_RETRIEVAL", "bm25"),
-            "tool_selection": os.getenv("EVENT_SUPPORT_AGENT_TOOL_SELECTION", "structured" if provider == "ollama" else "native"),
+            "tool_selection": "native",
             "answer_review": os.getenv("EVENT_SUPPORT_AGENT_ANSWER_REVIEW", "auto"),
             "stop_gate": os.getenv("EVENT_SUPPORT_AGENT_STOP_GATE", "auto"),
             "semantic_review": "not_run"}

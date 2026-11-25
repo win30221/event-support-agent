@@ -40,6 +40,8 @@ Hybrid：以 Ollama /api/embed（bge-m3）向量化檔期、文件、發布日�
 
 所有模型請求皆由 registry 驗證參數、型別與列舉，不接受額外欄位。edition 支援 current、previous、context、unavailable 或已知 ID；無法解析不替換檔期。
 
+兩個模型供應商都從原生 tool_calls 取得工具名稱及參數。只有通過 ToolRegistry 驗證的呼叫才會執行，文字中的 JSON 不會觸發工具。
+
 | 工具 | 參數 | 回傳 |
 | --- | --- | --- |
 | find_rules | edition, query, mode | 公開有效公告段落；overview/compare 忽略 query |

@@ -24,7 +24,7 @@
 | UI 與觀測 | Streamlit、參考資料、查詢紀錄、互動流程及模型用量 |
 | 品質與評測 | 自動化回歸測試、RAG 檢索評測及真實模型重播；詳見 [EVALUATION](docs/EVALUATION.md) |
 
-Ollama 預設使用結構化工具選擇，OpenAI 預設使用原生 Function Calling；不是 MCP。引用存在性不等同於回答語意完全正確。
+Ollama 與 OpenAI 共用原生 Function Calling；不是 MCP。引用存在性不等同於回答語意完全正確。
 
 ## 從零啟動（含 RAG）
 
