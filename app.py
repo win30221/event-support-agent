@@ -185,7 +185,7 @@ provider = st.sidebar.radio(
 )
 developer_mode = st.sidebar.toggle(
     "顯示工程檢視",
-    value=False,
+    value=True,
     help="顯示查詢紀錄、完整互動流程與複製按鈕。",
 )
 if provider == "openai" and not os.getenv("OPENAI_API_KEY"):

@@ -39,4 +39,4 @@ LLM 理解需求、選擇資料工具及生成回答；Python 管理工具契約
 
 初始契約僅五類意圖與逐字原問片段；主機拒絕重疊或無法錨定的片段，後續審查 precision/recall，核定每個既有 ID 的業務能力與必要資料，不允許增加任務。業務型別不適用商品時捨棄該欄位。語意驗證針對所有需求的實際答覆，包含限制回覆，避免空清單衝突。LangGraph 節點明示 IntentState，避免舊 SupportState 隱藏新增欄位。仍可能誤分類及過度拆分，必須實機比較。
 
-音效屬於 UI，不增加 LLM 呼叫；Streamlit v2 component 使用 Web Audio AudioContext，透過明確點擊啟用，按新回覆事件 ID 去重，不播放歷史。參考 MDN autoplay policy 與 Streamlit components.v2 API。背景分頁及瀏覽器政策可能影響時機，無法保證背景通知。
+音效屬於 UI，不增加 LLM 呼叫；Streamlit v2 component 使用 Web Audio AudioContext，預設開啟，正常使用者手勢解鎖音效並保留手動關閉功能，按新回覆事件 ID 去重，不播放歷史。參考 MDN autoplay policy 與 Streamlit components.v2 API。背景分頁及瀏覽器政策可能影響時機，無法保證背景通知。
