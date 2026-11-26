@@ -208,3 +208,7 @@ $env:EVENT_SUPPORT_AGENT_RETRIEVAL = "hybrid"
 ### 離線重新評分（不消耗 API）
 
 `python -m evaluations.eval_report reports/nvidia-guardrails-hybrid.json --out reports/nvidia-guardrails-hybrid-v2.json --review-template reports/nvidia-guardrails-hybrid-review.json`。V2 保留舊 gate，分開證據、契約、安全、效率、可靠性與人工語意評分；新問句以 --suite holdout 實測。詳細見 [EVALUATION](docs/EVALUATION.md)。
+
+### 證據範圍與不確定性
+
+Single Agent 第一階段統一證據及結論強度、部分條件、未知資訊與補查指引。保留原有 Schema、主機驗證與工具權限，不新增語意審查模型；實際效果以人工語意複核及相同配置的回歸驗證為準。測試順序見 [EVALUATION](docs/EVALUATION.md)。

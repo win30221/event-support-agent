@@ -327,3 +327,18 @@ macOS/Linux 改用 `./.venv/bin/python`。BM25 歷史報告以實際檔名代入
 ```
 
 重複試驗用 --repeat 3；不要混合不同套件、模型、語料與設定的成績。每輪新報告 transport 記錄 chat/embedding adapter attempts、成功/失敗、HTTP 狀態、重試與節流等待；只使用安全欄位，無憑證或正文。SDK 內部未觀測請求不冒充已知；並行等待加總不是牆鐘時間。20 RPM 與原重試預算未改。
+
+## 不確定性指引第一階段：驗收
+
+保留原始 31 題、九題 Holdout、V2 rubric 與舊 gate。新版只調整模型指引與工具描述，沒有新增自動語意 grader；不可將證據覆蓋、契約通過當成語意通過。先執行 `python -m unittest tests.test_single_agent tests.test_eval_report -v` 及 AGENTS.md 的完整離線回歸，再使用相同 NVIDIA 模型、Hybrid、Embedding、20 RPM，另存報告。由於先前已閱讀 Holdout 結果，本輪 Holdout 用於回歸，不代表真正未見泛化。先小批針對不確定性、部分回答及明確否定確認，再視需要重複試驗與新獨立問句。
+
+Windows PowerShell：
+
+```powershell
+$env:EVENT_SUPPORT_AGENT_EMBED_PROVIDER = "nvidia"
+$env:EVENT_SUPPORT_AGENT_RETRIEVAL = "hybrid"
+.\.venv\Scripts\python.exe -m evaluations.eval_rag --live nvidia --case incident --case compare-months --case wallet-a --case missing-policy --case unrecorded-days --case wallet-b --nvidia-rpm 20 --report reports/nvidia-uncertainty-smoke.json
+.\.venv\Scripts\python.exe -m evaluations.eval_report reports/nvidia-uncertainty-smoke.json --out reports/nvidia-uncertainty-smoke-v2.json --review-template reports/nvidia-uncertainty-smoke-review.json
+```
+
+語意複核逐項核對：缺乏支持的主張、適當拒答、過度拒答、必要條件是否保留、是否出現無必要補查。使用現有五項人工評分記錄具體原因；未執行保持 not_run。本次尚未引入主張切分/自動比率計算，不能宣稱 Unsupported Claim Rate 或 Appropriate Abstention 等指標已自動計算。相同案例的單次結果只供診斷；跨版本比較應使用相同測試設定、題集、重複次數並核對完整 Trace。

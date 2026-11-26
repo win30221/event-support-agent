@@ -27,7 +27,9 @@ FINAL_SCHEMA = FinalAnswer.model_json_schema()
 FINAL_SCHEMA["properties"]["results"]["items"] = FINAL_SCHEMA.pop("$defs")["FinalPart"]
 FINAL_DEFINITION = {"type": "function", "function": {
     "name": FINAL_TOOL,
-    "description": "取得必要證據、或已知無法合法查詢後，提交最後回答並結束本輪。只單獨呼叫一次；不執行資料查詢，不與資料工具同批。",
+    "description": ("取得足夠證據或無必要且可取得的新證據後，提交各獨立需求的最後回答。"
+                    "supported 只包含本輪證據支持的主張及必要條件；未知需求用 no_evidence，正文與來源留空。"
+                    "只單獨呼叫一次；不執行資料查詢，不與資料工具同批。"),
     "parameters": FINAL_SCHEMA}}
 
 

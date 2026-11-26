@@ -124,3 +124,11 @@
 - [Google Cloud Agent Evaluation](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/evaluation-agents)：分開最終回答與工具軌跡、執行個體與匯總結果。
 
 本專案選擇本地確定性 grader 與人工 rubric，非導入上述平台或聲稱自動語意證明；版本化證據群組、雜湊及節流紀錄為本專案設計取捨。
+
+## 證據與不確定性（第一階段）
+
+- [OpenAI — Why language models hallucinate](https://openai.com/index/why-language-models-hallucinate/)：區分正確、錯誤與適當拒答，避免鼓勵無證據猜測。
+- [Anthropic — Reduce hallucinations](https://platform.claude.com/docs/en/test-and-evaluate/strengthen-guardrails/reduce-hallucinations)：允許不確定性，核對主張與原文支持。
+- [Anthropic — Implement tool use](https://platform.claude.com/docs/en/agents-and-tools/tool-use/implement-tool-use)：工具描述應說明功能、適用時機與限制。
+- [Google Cloud — Check grounding](https://docs.cloud.google.com/generative-ai-app-builder/docs/check-grounding)：以主張為單位判斷參考資料是否支持。此處僅參考設計原則，不導入外部 grounding API 或聲稱 Python 已能自動驗證語意。
+- [OpenAI — Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)：結構合法不等於內容正確；需另行評測。

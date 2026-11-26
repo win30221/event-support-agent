@@ -384,3 +384,53 @@ class SingleAgentTests(OfflineTests):
         self.assertIn(ANSWER_VERIFICATION_FAILED, text)
         self.assertNotIn("999", text)
         self.assertEqual(len(trace), 1)
+
+
+
+    def test_evidence_scope_guidance_is_shared_with_schema_fallback(self):
+        q = "活動規則有哪些？還有公告沒有說明的資訊呢？"
+        def native(provider, messages, tools):
+            system = messages[0]["content"]
+            self.assertIn("未公告、未提及或搜尋未找到，不等於事實不存在", system)
+            self.assertIn("符合部分資格不代表符合全部資格", system)
+            self.assertIn("無關檔期", system)
+            self.assertIn("主機若指定僅 Schema 回答", system)
+            definitions = {t["function"]["name"]: t["function"] for t in tools}
+            for name, guidance in (
+                ("find_rules", "不證明政策不存在"),
+                ("find_shop_item", "欄位未提供"),
+                ("list_shop_items", "不提供個人交易結果"),
+                ("get_my_event_progress", "實際回傳的欄位"),
+                ("calculate", "不證明全部業務資格"),
+                (FINAL_TOOL, "未知需求用 no_evidence"),
+            ):
+                self.assertIn(guidance, definitions[name]["description"])
+            self.assertEqual(definitions[FINAL_TOOL]["parameters"], FINAL_SCHEMA)
+            return {"content": "未提交終止工具"}
+        def fallback(provider, messages, tools, *, response_schema):
+            self.assertEqual(tools, [])
+            self.assertEqual(response_schema, FINAL_SCHEMA)
+            self.assertIn("未公告或未查到不等於不存在", messages[0]["content"])
+            self.assertIn("正文及來源留空", messages[0]["content"])
+            return structured(abstain(q, "no_evidence"))
+        text, trace, _, _ = self.run_case(q, native, fallback)
+        self.assertEqual(text, DIRECT_REPLIES["no_evidence"])
+        self.assertEqual(trace, [])
+
+    def test_supported_and_unknown_independent_needs_remain_separate(self):
+        q = "霧潮貼圖多少錢？如果不喜歡能退幣嗎？"
+        price_q = "霧潮貼圖多少錢？"
+        unknown_q = "如果不喜歡能退幣嗎？"
+        def finish(provider, messages, tools):
+            return response(
+                supported(price_q, "20 枚星星幣", (f"{CATALOG.current}/shop-items/mist-tide-sticker", "")),
+                abstain(unknown_q, "no_evidence"))
+        text, trace, events, _ = self.run_case(q, select(item("霧潮貼圖")), finish)
+        self.assertIn("20 枚星星幣", text)
+        self.assertIn(unknown_q, text)
+        self.assertIn(DIRECT_REPLIES["no_evidence"], text)
+        self.assertEqual(len(trace), 1)
+        checks = [d for t, d in events if t == "Python 檢查回答依據"]
+        parts = checks[-1]["子問題"]
+        self.assertEqual([p["判定"] for p in parts], ["supported", "no_evidence"])
+        self.assertEqual(parts[1]["採用段落"], [])
