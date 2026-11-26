@@ -20,6 +20,8 @@ from tool_selection import MAX_BATCH, MAX_TOOL_ROUNDS
 
 
 def call(tool_name, /, **args):
+    if tool_name == "get_my_event_progress":
+        args.setdefault("required_item", "")
     return {"id": "provider-call", "type": "function",
             "function": {"name": tool_name, "arguments": json.dumps(args, ensure_ascii=False)}}
 
@@ -667,3 +669,20 @@ class SingleAgentTests(OfflineTests):
             finish)
         self.assertEqual(len(trace), 1)
         self.assertIn("20 枚", text)
+
+
+
+    def test_missing_dependency_field_is_rejected_before_private_dispatch(self):
+        q = "我的餘額是多少？"
+        raw = call("get_my_event_progress", edition="current", account_scope="self")
+        args = json.loads(raw["function"]["arguments"])
+        del args["required_item"]
+        raw["function"]["arguments"] = json.dumps(args)
+        def finish(provider, messages, tools):
+            self.assertEqual(tool_results(messages)[-1]["狀態"], "invalid_arguments")
+            return response(abstain(q))
+        with patch("guide.read_progress") as read:
+            text, trace, _, _ = self.run_case(q, select(raw), finish)
+            read.assert_not_called()
+        self.assertEqual(trace, [])
+        self.assertEqual(text, DIRECT_REPLIES["no_evidence"])

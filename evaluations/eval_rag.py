@@ -322,8 +322,8 @@ def main():
     from model_client import PROVIDERS
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--case", action="append", help="指定案例 ID；可重複指定")
-    parser.add_argument("--suite", choices=("baseline", "holdout"), default="baseline",
-                        help="baseline 保留原 31 題；holdout 為另行凍結的新問句，僅實機")
+    parser.add_argument("--suite", choices=("baseline", "holdout", "generalization"), default="baseline",
+                        help="baseline 31 題；holdout 9 題；generalization 另編泛化題，後兩者僅實機")
     parser.add_argument("--hybrid", action="store_true", help="用已建好的 pgvector 索引額外比較混合檢索")
     parser.add_argument("--live", choices=PROVIDERS, help="透過指定模型重播所選情境")
     parser.add_argument("--strict", action="store_true", help="實機重播時必要來源未被採用則回傳非零結束碼；不等於語意驗收")
@@ -352,10 +352,10 @@ def main():
         parser.error("--gate/--repeat 需要 --live")
     if args.report and not args.live:
         parser.error("--report 需要搭配 --live")
-    if args.suite == "holdout":
+    if args.suite in ("holdout", "generalization"):
         if not args.live:
-            parser.error("--suite holdout 需要 --live")
-        cases = json.loads(Path(__file__).with_name("holdout_cases.json").read_text(encoding="utf-8"))
+            parser.error("--suite " + args.suite + " 需要 --live")
+        cases = json.loads(Path(__file__).with_name(args.suite + "_cases.json").read_text(encoding="utf-8"))
     else:
         cases = json.loads(Path(__file__).with_name("rag_cases.json").read_text(encoding="utf-8"))
         if args.live:

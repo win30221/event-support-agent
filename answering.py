@@ -257,6 +257,10 @@ def render_response(data, evidence, observe, *, unresolved=False, limitations=No
         try:
             text, citations = validate_part(part, evidence)
             detail = {"問題": part["question"], "判定": status, "採用段落": citations}
+            if data.get("claim_contract_version") == 2 and status == "supported":
+                # 記錄真正呈現的主張（含已保留條件），不是模型自行聲稱的驗證結果。
+                # 與引用逐項對照供離線語意審查；不把這個欄位當成語意證明。
+                detail["呈現主張"] = text
         except ValueError as error:
             text = ANSWER_VERIFICATION_FAILED
             detail = {"問題": part["question"], "判定": "rejected", "原因": str(error), "採用段落": []}

@@ -66,10 +66,12 @@ def decode_final(raw, *, evidence, original_question, observe):
             # 舊封套仍走原嚴格驗證（含查無恢復），不採信非 supported 的正文。
             # 新模型只收到新 Schema；保留此路徑供舊回傳相容及回歸，明確記錄使用。
             parts = LegacyFinalAnswer.model_validate(payload).model_dump()["results"]
+            version = 1
             if observe is not None:
                 observe("Python 終止契約版本", {"version": 1, "claims": None})
         else:
             data = FinalAnswer.model_validate(payload)
+            version = 2
             parts = []
             for claim in data.supported:
                 statement, condition = claim.statement.strip(), claim.condition.strip()
@@ -89,9 +91,11 @@ def decode_final(raw, *, evidence, original_question, observe):
     except (TypeError, ValueError) as error:
         raise ValueError("最終回答不是合法 JSON。") from error
     # 主機轉換至同一驗證及 renderer；每個主張仍獨立驗證所有本輪來源與依賴。
-    return decode_response({"action": "answer", "missing": "", "results": parts},
-                           evidence=evidence, original_question=original_question, observe=observe,
-                           expand_dependencies=True, strict_terminal=True)
+    decoded = decode_response({"action": "answer", "missing": "", "results": parts},
+                              evidence=evidence, original_question=original_question, observe=observe,
+                              expand_dependencies=True, strict_terminal=True)
+    decoded["claim_contract_version"] = version
+    return decoded
 
 
 def final_issues(data, evidence):

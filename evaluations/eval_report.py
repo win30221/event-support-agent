@@ -9,6 +9,8 @@ import re
 VERSION = "2.0.0"
 CRITERIA = ("correctness", "completeness", "groundedness", "uncertainty", "relevance")
 RUBRIC = Path(__file__).with_name("rubric_v2.json")
+RUBRIC_V2_1 = Path(__file__).with_name("rubric_v2_1.json")
+SUPPORTED_RUBRICS = ("2.0.0", "2.1.0")
 PUBLIC_TOOLS = {"find_rules", "find_shop_item", "list_shop_items"}
 
 
@@ -27,7 +29,7 @@ def scope(identifier):
 
 
 def validate_rubric(rubric):
-    if rubric.get("version") != VERSION:
+    if rubric.get("version") not in SUPPORTED_RUBRICS:
         raise ValueError("Unsupported rubric version")
     seen = set()
     for case in rubric["cases"]:
@@ -162,6 +164,11 @@ def grade_turn(turn, rule):
         transport = None
     return {"question": turn.get("question"), "reference": rule["reference"],
             "semantic": {key: "not_run" for key in CRITERIA},
+            # 舊報告無主張級呈現資料時保持未知；供人工核對，不自動評為 grounded。
+            "claim_evidence": [{"question": p.get("問題"), "statement": p["呈現主張"],
+                                "sources": p.get("採用段落", [])}
+                               for p in parts if p.get("判定") == "supported" and "呈現主張" in p]
+                              if any("呈現主張" in p for p in parts) else None,
             "evidence": coverage,
             "contract": {"status": "fail" if contract else "pass" if trace_present else "unknown",
                          "issues": contract, "task_issues": task,
@@ -296,7 +303,8 @@ def grade_report(report, rubric=None, review=None):
     expected_trials = report.get("expected_trials")
     complete = (report.get("complete") is True and expected_trials == len(rows)
                 and report.get("completed_trials") == len(rows))
-    return {"evaluation_version": VERSION, "rubric_sha256": rubric_hash, "source_report_sha256": source_hash,
+    return {"evaluation_version": VERSION, "rubric_version": rubric["version"],
+            "rubric_sha256": rubric_hash, "source_report_sha256": source_hash,
             "source_run": report.get("run"), "complete": complete, "expected_trials": expected_trials,
             "reviewer": review.get("reviewer") if review else None, "summary": aggregate(rows), "cases": rows}
 
@@ -321,10 +329,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("report", type=Path)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--rubric", type=Path, default=RUBRIC,
+                        help="Select a frozen rubric explicitly; default preserves the original v2.0.0.")
     parser.add_argument("--review", type=Path)
     parser.add_argument("--review-template", type=Path)
     args = parser.parse_args()
-    result = grade_report(load_json(args.report), review=load_json(args.review) if args.review else None)
+    result = grade_report(load_json(args.report), rubric=load_json(args.rubric),
+                          review=load_json(args.review) if args.review else None)
     write_new(args.out, result)
     if args.review_template:
         write_new(args.review_template, review_template(result))

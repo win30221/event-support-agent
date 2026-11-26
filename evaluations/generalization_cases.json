@@ -1,0 +1,106 @@
+[
+  {
+    "id": "generalization-independent-unknown",
+    "question": "我的星星幣還剩多少？另外商城的飛行掃帚值幾枚？",
+    "mode": "mixed",
+    "editions": [
+      "2026-11"
+    ],
+    "sources": [],
+    "progress": true,
+    "expected_statuses": [
+      "supported"
+    ],
+    "reference": "兩項獨立需求：查本輪本人餘額；精確核對飛行掃帚，查無則不得替換商品或捏造價格。"
+  },
+  {
+    "id": "generalization-dependent-unknown",
+    "question": "假如我想把現在的星星幣拿去換商城的星際飛船模型，請查一下我夠不夠。",
+    "mode": "search",
+    "editions": [
+      "2026-11"
+    ],
+    "sources": [],
+    "expected_statuses": [
+      "supported"
+    ],
+    "forbid_tools": [
+      "get_my_event_progress"
+    ],
+    "reference": "先核對指定商品；商城沒有星際飛船模型，只回答查無及範圍，不需要查本人餘額。"
+  },
+  {
+    "id": "generalization-hypothetical-cap",
+    "question": "假設玩家已完成十一月三場有效冒險，第四場即使贏了也能再拿 20 枚嗎？",
+    "mode": "search",
+    "editions": [
+      "2026-11"
+    ],
+    "sources": [
+      "2026-11/launch/玩法"
+    ],
+    "expected_statuses": [
+      "supported"
+    ],
+    "forbid_tools": [
+      "get_my_event_progress"
+    ],
+    "reference": "前三場才有星星幣，第四場不增加，勝敗皆可但不影響每日上限；假設題不查私人紀錄。"
+  },
+  {
+    "id": "generalization-partial-eligibility",
+    "question": "假設我已存滿 100 枚，可不可以無條件再領一次霧港領航員披風？",
+    "mode": "search",
+    "editions": [
+      "2026-11"
+    ],
+    "sources": [
+      "2026-11/launch/兌換"
+    ],
+    "expected_statuses": [
+      "supported"
+    ],
+    "forbid_tools": [
+      "get_my_event_progress"
+    ],
+    "reference": "100 枚只達價格門檻；每帳號限兌一次，若已兌換則不可再領，不能查或保證個人交易結果。"
+  },
+  {
+    "id": "generalization-cross-edition-facts",
+    "question": "上期和本期星星幣每日上限各多少？十月沒花完的能帶到十一月嗎？",
+    "mode": "search",
+    "editions": [
+      "2026-10",
+      "2026-11"
+    ],
+    "sources": [
+      "2026-10/launch/玩法",
+      "2026-11/launch/玩法",
+      "2026-10/shop/關店與餘幣"
+    ],
+    "expected_statuses": [
+      "supported"
+    ],
+    "forbid_tools": [
+      "get_my_event_progress"
+    ],
+    "reference": "十月每天最多 20 枚、十一月 60 枚；十月餘幣失效，兩期帳本分開，不能跨期使用。"
+  },
+  {
+    "id": "generalization-unknown-refund-and-price",
+    "question": "海圖航線框要多少幣？如果換了不滿意，退款要扣幾枚？",
+    "mode": "search",
+    "editions": [
+      "2026-11"
+    ],
+    "sources": [],
+    "expected_statuses": [
+      "supported",
+      "no_evidence"
+    ],
+    "forbid_tools": [
+      "get_my_event_progress"
+    ],
+    "reference": "海圖航線框價格 35 枚；現有資料沒有退款及扣費規則，不能捏造數字或承諾退款。"
+  }
+]

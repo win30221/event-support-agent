@@ -65,6 +65,44 @@ class EvalReportTests(unittest.TestCase):
                 self.assertEqual(r["turns"][-1]["reference"], case["reference"])
                 self.assertEqual(r["turns"][-1]["editions"], case["editions"])
 
+    def test_new_rubric_preserves_old_cases_and_adds_verified_fact_groups(self):
+        from evaluations.eval_report import RUBRIC_V2_1
+        old, new = load_json(RUBRIC), load_json(RUBRIC_V2_1)
+        validate_rubric(new)
+        self.assertEqual(old["version"], "2.0.0")
+        self.assertEqual(new["version"], "2.1.0")
+        by_id = {r["id"]: r for r in new["cases"]}
+        for c in old["cases"]:
+            n = by_id[c["id"]]
+            self.assertEqual(c["legacy_sources"], n["legacy_sources"])
+            for before, after in zip(c["turns"], n["turns"]):
+                for key in ("question", "reference", "editions", "expected_statuses",
+                            "forbidden_statuses", "required_tools", "forbidden_tools"):
+                    self.assertEqual(before[key], after[key])
+        wallet = by_id["wallet-b"]["turns"][0]
+        price = "2026-11/shop-items/fog-harbor-navigator"
+        ids = {price, "2026-11/launch/玩法", "2026-11/my-progress"}
+        self.assertTrue(all(g["covered"] for g in group_result(wallet["evidence_groups"], ids)))
+        self.assertFalse(all(g["covered"] for g in group_result(wallet["evidence_groups"], ids - {"2026-11/my-progress"})))
+        self.assertFalse(all(g["covered"] for g in group_result(by_id["wallet-a"]["turns"][0]["evidence_groups"], ids)))
+        self.assertFalse(all(g["covered"] for g in group_result(wallet["evidence_groups"],
+            (ids - {price}) | {"2026-10/shop-items/lantern-keeper"})))
+        cases = load_json(RUBRIC.parent / "generalization_cases.json")
+        self.assertEqual({c["id"] for c in cases}, {c["id"] for c in new["cases"] if c["suite"] == "generalization"})
+        for case in cases:
+            r = by_id[case["id"]]
+            self.assertEqual(r["legacy_sources"], case["sources"])
+            self.assertEqual(r["turns"][0]["question"], case["question"])
+            self.assertEqual(r["turns"][0]["reference"], case["reference"])
+
+    def test_claim_review_data_is_not_automatic_semantic_pass(self):
+        old = turn()
+        self.assertIsNone(grade_turn(old, rule())["claim_evidence"])
+        old["checks"][0]["子問題"][0]["呈現主張"] = "已確認的條件與主張"
+        grade = grade_turn(old, rule())
+        self.assertEqual(grade["claim_evidence"][0]["statement"], "已確認的條件與主張")
+        self.assertTrue(all(value == "not_run" for value in grade["semantic"].values()))
+
     def test_retrieval_diagnostics_unknown_and_observed(self):
         from evaluations.eval_report import retrieval_summary
         old = grade_turn(turn(), rule())

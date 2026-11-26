@@ -69,9 +69,37 @@ class FinalContractV2Tests(unittest.TestCase):
         self.assertIn("成立條件", text)
         self.assertIn("每日三場", text)
         self.assertEqual([c["id"] for c in data["results"][0]["citations"]], ["price", "rule"])
+        check = dict(self.events)["Python 檢查回答依據"]
+        self.assertEqual(check["子問題"][0]["呈現主張"], text)
 
     def test_legacy_compatibility_does_not_accept_unverified_abstention_body(self):
         data = self.decode({"results": [{"question": "價格？", "status": "no_evidence",
                                         "answer": "捏造", "source_ids": [source_alias("price")]}]})
         self.assertEqual(data["results"][0]["status"], "rejected")
         self.assertIn(("Python 終止契約版本", {"version": 1, "claims": None}), self.events)
+
+
+
+    def test_provider_adapters_share_the_same_portable_contract(self):
+        from unittest.mock import patch
+        from model_client import bound_model
+        for provider in ("openai", "ollama", "nvidia"):
+            with self.subTest(provider=provider), patch("model_client.model_for") as factory:
+                model = factory.return_value
+                tools = [FINAL_DEFINITION]
+                bound_model(provider, tools, None)
+                if provider == "openai":
+                    model.bind_tools.assert_called_once_with(tools, strict=True)
+                elif provider == "nvidia":
+                    model.bind_tools.assert_called_once_with(tools, tool_choice="auto")
+                else:
+                    model.bind_tools.assert_called_once_with(tools)
+                bound_model(provider, [], FINAL_SCHEMA)
+                if provider == "nvidia":
+                    model.bind.assert_called_once_with(response_format={"type": "json_schema",
+                        "json_schema": {"name": "agent_response", "schema": FINAL_SCHEMA}})
+                else:
+                    options = {"method": "json_schema", "include_raw": True}
+                    if provider == "openai":
+                        options["strict"] = True
+                    model.with_structured_output.assert_called_once_with(FINAL_SCHEMA, **options)
