@@ -268,3 +268,7 @@ macOS/Linux 使用 `./.venv/bin/python`。需先設定 NVIDIA_API_KEY、NVIDIA_M
 ## Embedding provider comparison
 
 For a controlled chat-model comparison fix EVENT_SUPPORT_AGENT_EMBED_PROVIDER explicitly; for a retrieval comparison fix the chat model. The live report records retrieval and effective embedding provider/model. Offline --hybrid uses the explicit environment selection (auto resolves to Ollama without a chat provider). See QUICKSTART for commands. Existing coverage gates and business tools are unchanged. Cloud embedding requests are real API requests even in offline retrieval evaluation.
+
+### 雲端 Embedding 服務失敗與召回率
+
+離線 Hybrid 評測將耗盡暫時性錯誤重試的案例獨立列為執行失敗，保留其他案例的結果及完整 BM25 基準。Hybrid 召回率明確限定於成功完成且具有標記來源的案例；有任何此類錯誤時列出失敗案例 ID，回傳 exit code 1，不將服務失敗視為檢索漏召回，也不將成功子集當作全量成績。固定 Embedding provider/model 後可用 --case 重測失敗案例。

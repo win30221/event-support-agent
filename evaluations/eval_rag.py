@@ -12,6 +12,7 @@ from math import sqrt
 from pathlib import Path
 
 from guide import published_passages, rank_passages, search_rules
+from embedding_client import TransientEmbeddingError
 
 
 def legacy_search(question, passages):
@@ -41,9 +42,19 @@ def offline(case, hybrid=False):
             equal_k.update(p["段落ID"] for p in rank_passages(question, docs, limit=2))
             tool_mode = "search" if mode == "unanswerable" else mode
             new.update(p["段落ID"] for p in search_rules(question, key, tool_mode, retriever="bm25"))
-            if hybrid:
-                combined.update(p["段落ID"] for p in search_rules(question, key, tool_mode, retriever="hybrid"))
+    if hybrid:
+        combined = offline_hybrid(case)
     return old, equal_k, new, combined
+
+
+def offline_hybrid(case):
+    combined = set()
+    if case["mode"] not in ("outside-account", "progress", "shop"):
+        question = case.get("retrieval_query", case["question"])
+        mode = "search" if case["mode"] == "unanswerable" else case["mode"]
+        for key in case["editions"]:
+            combined.update(p["段落ID"] for p in search_rules(question, key, mode, retriever="hybrid"))
+    return combined
 
 
 def summary(label, trials):
@@ -58,35 +69,52 @@ def summary(label, trials):
 def benchmark(cases, detail=False, hybrid=False):
     old_trials, new_trials, old_search, equal_search = [], [], [], []
     hybrid_trials = []
+    hybrid_errors = []
     for case in cases:
         required = set(case["sources"])
-        old, equal_k, new, combined = offline(case, hybrid)
+        old, equal_k, new, combined = offline(case)
+        failed = False
+        if hybrid:
+            try:
+                combined = offline_hybrid(case)
+            except TransientEmbeddingError as error:
+                # 供應商服務失敗不是「沒有找到證據」；不可混入召回率或隱藏。
+                failed = True
+                hybrid_errors.append((case["id"], str(error)))
         if required:
             old_trials.append((required, old))
             new_trials.append((required, new))
             if case["mode"] == "search":
                 old_search.append((required, old))
                 equal_search.append((required, equal_k))
-            if hybrid:
+            if hybrid and not failed:
                 hybrid_trials.append((required, combined))
             missing = sorted(required - (combined if hybrid else new))
             verdict = "已找齊" if not missing else "漏掉 " + "、".join(missing)
         else:
             verdict = "人工核對回答、工具範圍或資料不足處理"
-        print(f"{case['id']:20} {verdict}")
+        if failed:
+            verdict = "Hybrid 執行失敗：" + hybrid_errors[-1][1]
+        print(f"{case['id']:20} {verdict}", flush=True)
         if detail:
             print("玩家提問", case["question"])
             print("離線檔期、模式", case["editions"], case["mode"])
             print("舊版證據", sorted(old))
             print("BM25 方案證據", sorted(new))
             if hybrid:
-                print("混合方案證據", sorted(combined))
+                print("混合方案證據", "未完成檢索" if failed else sorted(combined))
             print("驗收要點", case["reference"])
     summary("同一語料 · 舊 bigram 與舊取段方式", old_trials)
     summary("同一語料 · BM25 與新取段方式", new_trials)
-    summary("同一語料 · pgvector + BM25 與新取段方式", hybrid_trials)
+    summary("同一語料 · pgvector + BM25 與新取段方式（成功完成的有標記案例）", hybrid_trials)
     summary("僅聚焦問題／相同 top 2 · 舊 bigram", old_search)
     summary("僅聚焦問題／相同 top 2 · BM25", equal_search)
+    if hybrid:
+        print(f"Hybrid 完成案例：{len(cases) - len(hybrid_errors)}/{len(cases)}")
+        if hybrid_errors:
+            print("Hybrid 評測不完整，不可直接與完整 BM25 召回率比較。")
+            print("失敗案例：" + "、".join(case_id for case_id, _ in hybrid_errors))
+            raise SystemExit(1)
 
 
 def live_source_coverage(required, events):

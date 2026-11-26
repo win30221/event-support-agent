@@ -110,3 +110,5 @@
 - NVIDIA hosted Nemotron 3.5 Embed API: https://docs.api.nvidia.com/nim/reference/nvidia-nemotron-3_5-embed-1b-infer (passage/query, float, no silent truncation, 2048 native dimensions).
 - OpenAI embeddings: https://platform.openai.com/docs/api-reference/embeddings/create (input, model, float output).
 - pgvector variable-dimensional vector column and exact filtering: https://github.com/pgvector/pgvector#frequently-asked-questions.
+
+- [OpenAI Python SDK — Retries](https://github.com/openai/openai-python#retries)：參考唯讀請求的有限重試及指數退避；本專案針對通用 Embedding transport 自行選擇可重試 HTTP 狀態與上限，不宣稱 NVIDIA 的 HTTP 500 一定可恢復。

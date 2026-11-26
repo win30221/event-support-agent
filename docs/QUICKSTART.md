@@ -370,3 +370,16 @@ queries are sent to the selected cloud embedding API; use demo data only.
 The embedding API consumes its own provider quota even in offline retrieval tests.
 The implementation uses NVIDIA input_type=passage for indexing and query for
 search, truncate=NONE; official hosted API access needs live verification.
+
+### 雲端 Embedding 暫時性錯誤排除
+
+若單題 Hybrid 已成功，後續出現 HTTP 500，先確認同一供應商與模型，重新執行原單題；無須直接重建向量。新版 Embedding 介接對 HTTP 408/429/500/502/503/504 與網路 I/O 錯誤最多嘗試 3 次（含首次），使用指數退避與 jitter；尊重 Retry-After，超過 60 秒直接回報失敗。400/401/403/404 等不重試。警告只包含供應商、狀態及重試資訊，不輸出 API key 或請求正文。完整離線 Hybrid 評測若個別案例耗盡重試，繼續其餘案例，獨立顯示失敗與完成數，最後回傳非零 exit code；成功子集的召回率不是完整評測結果。若索引缺失、憑證或請求參數錯誤，仍直接停止，不偷偷降級 BM25。
+
+Windows PowerShell（永久使用者環境變數，設定後重新開啟 PowerShell）：
+
+```powershell
+[Environment]::SetEnvironmentVariable("EVENT_SUPPORT_AGENT_EMBED_PROVIDER", "auto", "User")
+[Environment]::SetEnvironmentVariable("EVENT_SUPPORT_AGENT_RETRIEVAL", "hybrid", "User")
+```
+
+純檢索評測未選聊天模型，故執行前仍需在目前終端設定 `$env:EVENT_SUPPORT_AGENT_EMBED_PROVIDER = "nvidia"`。實機聊天及 `--live nvidia` 可使用 auto。重試可能消耗額外 API 額度，不代表供應商一定會恢復。

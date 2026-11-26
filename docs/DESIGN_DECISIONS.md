@@ -142,3 +142,7 @@ macOS/Linux 改用 `./.venv/bin/python`。不指定 `--suite` 仍測原 baseline
 ## Multi-provider embedding spaces
 
 Resolve the effective embedding provider/model once per request rather than mutate process-wide environment variables. Keep a manual override so evaluations isolate chat and retrieval changes. Migrate the original Ollama-only table transactionally, preserving existing rows under provider=ollama. Scope exact similarity by provider/model/edition/revision/passage IDs; reject missing data and dimensional mismatch. No automatic fallback that would conceal embedding failures. NVIDIA native 2048 dimensions are retained; approximate indexing is outside this change. No prompt, answer contract, or business authorization changes. Live cloud and PostgreSQL integration requires user-side verification.
+
+### Embedding transport resilience
+
+單題 Hybrid 成功後全量同題曾收到 NVIDIA HTTP 500。此證據只定位至服務請求失敗，無法證明具體供應商根因。唯讀嵌入請求採最多三次嘗試、指數退避加 jitter、有限 Retry-After；不重試非暫時性 HTTP 錯誤、不改模型或檢索排名、不自動降級。離線評測分開供應商執行失敗與證據漏召回，成功子集明確標記，仍以非零退出表示不完整。參考 OpenAI Python SDK 的暫時性錯誤重試做法，具體重試碼及上限為本專案取捨，尚待實機驗證。

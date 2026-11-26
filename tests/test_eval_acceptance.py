@@ -1,8 +1,12 @@
+from contextlib import redirect_stdout
+import io
 import json
 import tempfile
 import unittest
 from pathlib import Path
-from evaluations.eval_rag import save_report, structural_gate, turn_metrics
+from unittest.mock import patch
+from embedding_client import TransientEmbeddingError
+from evaluations.eval_rag import benchmark, save_report, structural_gate, turn_metrics
 
 
 class AcceptanceTests(unittest.TestCase):
@@ -44,3 +48,19 @@ class AcceptanceTests(unittest.TestCase):
         self.assertEqual(metrics["model_request_ms"], 358.0)
         self.assertEqual(metrics["tool_execution_ms"], 2.25)
         self.assertIsNone(turn_metrics([], [], 0.5)["model_request_ms"])
+
+    def test_hybrid_service_failure_is_not_a_retrieval_miss(self):
+        cases = [{"id": "a", "sources": ["doc"], "mode": "search"},
+                 {"id": "b", "sources": ["doc"], "mode": "search"}]
+        baseline = ({"doc"}, {"doc"}, {"doc"}, set())
+        output = io.StringIO()
+        with patch("evaluations.eval_rag.offline", return_value=baseline):
+            with patch("evaluations.eval_rag.offline_hybrid",
+                       side_effect=[TransientEmbeddingError("nvidia embedding HTTP 500 after 3 attempt(s)."), {"doc"}]):
+                with redirect_stdout(output), self.assertRaises(SystemExit) as exit:
+                    benchmark(cases, hybrid=True)
+        self.assertEqual(exit.exception.code, 1)
+        self.assertIn("Hybrid 完成案例：1/2", output.getvalue())
+        self.assertIn("成功完成的有標記案例）：必要段落找齊 1/1", output.getvalue())
+        self.assertIn("Hybrid 執行失敗", output.getvalue())
+        self.assertIn("失敗案例：a", output.getvalue())
