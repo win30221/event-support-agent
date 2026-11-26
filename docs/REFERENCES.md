@@ -60,3 +60,7 @@
 
 - [AWS Amazon Lex V2 — Primary and Fallback modes for assisted NLU / Writing effective intent and slot descriptions](https://docs.aws.amazon.com/lexv2/latest/dg/assisted-nlu-modes.html)：2026-11-26 核對；參考 LLM 意圖描述明確目的、對象、邊界、避免重疊及測試不同措辭。採用於 INTENT_PROMPT 的 knowledge/analysis 邊界；不導入 Lex、額外分類器或信心分數。
 - [Google Dialogflow CX — Intents / Default negative intent](https://docs.cloud.google.com/dialogflow/cx/docs/concept/intent) 與 [Avoid similar intents](https://docs.cloud.google.com/dialogflow/cx/docs/concept/agent-design)：2026-11-26 核對；參考服務範圍外辨識和避免類別重疊。專案採用同一次 LLM 呼叫內先主題辨識、後目的分類的提示設計，並非 Dialogflow 的訓練式 NLU 或官方固定演算法。成效須以原 36 題及未見問句實測。
+
+- [Anthropic Building Effective Agents](https://www.anthropic.com/research/building-effective-agents)：參考 routing、可組合工具工作流；採用既有意圖分派，不聲稱供應商要求固定兩層。
+- [OpenAI Function Calling](https://platform.openai.com/docs/guides/function-calling) 與 [Ollama Tool Calling](https://docs.ollama.com/capabilities/tool-calling)：原生工具定義與多呼叫，主機驗證後執行。候選 task_tool_planning.py 共用 model_step，動態定義 task_id 與允許工具；只驗收提案，不執行。任務 ID、欄位 metadata 是本專案設計，不是供應商固定契約。
+- [Anthropic Demystifying evals for AI agents](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents)：參考多任務評測及避免固定軌跡；首輪工具集合無序比對，限制理由與檢索語意人工複核。尚無本專案真實模型結果。

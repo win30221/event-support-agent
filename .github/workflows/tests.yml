@@ -37,6 +37,7 @@ jobs:
         run: |
           python -m evaluations.eval_intent --help
           python -m evaluations.eval_audit --help
+          python -m evaluations.eval_task_tools --help
           python -m evaluations.eval_rag --help
           python -m evaluations.eval_answer --help
       - run: python -m unittest discover -s tests -t . -v

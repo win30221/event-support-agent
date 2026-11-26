@@ -1,0 +1,779 @@
+[
+  {
+    "id": "single-balance",
+    "group": "single",
+    "question": "我上期剩下多少星星幣？",
+    "intents": [
+      {
+        "type": "query",
+        "request": "我上期剩下多少星星幣？"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "get_my_event_progress",
+            "arguments": {
+              "edition": "2026-10"
+            },
+            "fields": [
+              "balance"
+            ],
+            "account_scope": "self"
+          }
+        ]
+      }
+    ],
+    "rationale": "本人、上期、餘額。"
+  },
+  {
+    "id": "single-participation",
+    "group": "single",
+    "question": "我有成功參加本期活動嗎？",
+    "intents": [
+      {
+        "type": "query",
+        "request": "我有成功參加本期活動嗎？"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "get_my_event_progress",
+            "arguments": {
+              "edition": "2026-11"
+            },
+            "fields": [
+              "participation"
+            ],
+            "account_scope": "self"
+          }
+        ]
+      }
+    ],
+    "rationale": "只需參加狀態。"
+  },
+  {
+    "id": "single-counted",
+    "group": "single",
+    "question": "我今天有幾場被計入活動？",
+    "intents": [
+      {
+        "type": "query",
+        "request": "我今天有幾場被計入活動？"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "get_my_event_progress",
+            "arguments": {
+              "edition": "2026-11"
+            },
+            "fields": [
+              "counted_matches"
+            ],
+            "account_scope": "self"
+          }
+        ]
+      }
+    ],
+    "rationale": "今日已計入場次，不是所有戰績。"
+  },
+  {
+    "id": "single-catalog",
+    "group": "single",
+    "question": "上期商城有哪些商品，各要多少點數？",
+    "intents": [
+      {
+        "type": "query",
+        "request": "上期商城有哪些商品，各要多少點數？"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "list_shop_items",
+            "arguments": {
+              "edition": "2026-10"
+            },
+            "fields": [
+              "name",
+              "price"
+            ]
+          }
+        ]
+      }
+    ],
+    "rationale": "同一商城清單內兩個欄位。"
+  },
+  {
+    "id": "single-item",
+    "group": "single",
+    "question": "本期霧港領航員的價格和用途是什麼？",
+    "intents": [
+      {
+        "type": "query",
+        "request": "本期霧港領航員的價格和用途是什麼？"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_shop_item",
+            "arguments": {
+              "edition": "2026-11",
+              "name": "霧港領航員"
+            },
+            "fields": [
+              "price",
+              "description"
+            ]
+          }
+        ]
+      }
+    ],
+    "rationale": "同一商品的兩個欄位，不需查帳號。"
+  },
+  {
+    "id": "single-unknown-item",
+    "group": "single",
+    "question": "本期商城有七龍珠模型嗎？",
+    "intents": [
+      {
+        "type": "query",
+        "request": "本期商城有七龍珠模型嗎？"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_shop_item",
+            "arguments": {
+              "edition": "2026-11",
+              "name": "七龍珠模型"
+            },
+            "fields": [
+              "existence"
+            ]
+          }
+        ]
+      }
+    ],
+    "rationale": "未知商品先查存在性，不得猜測或換商品。"
+  },
+  {
+    "id": "single-missing-item",
+    "group": "single",
+    "question": "這個商品要多少點數？",
+    "intents": [
+      {
+        "type": "query",
+        "request": "這個商品要多少點數？"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "clarify",
+        "calls": []
+      }
+    ],
+    "rationale": "無可信商品指涉，不可猜測。"
+  },
+  {
+    "id": "single-other-account",
+    "group": "single",
+    "question": "請查 B 玩家的本期活動餘額。",
+    "intents": [
+      {
+        "type": "query",
+        "request": "請查 B 玩家的本期活動餘額。"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "account_limit",
+        "calls": []
+      }
+    ],
+    "rationale": "不得把查他人改成查自己。"
+  },
+  {
+    "id": "single-unknown-edition",
+    "group": "single",
+    "question": "查我 2024-01 那期的活動餘額。",
+    "intents": [
+      {
+        "type": "query",
+        "request": "查我 2024-01 那期的活動餘額。"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "unavailable",
+        "calls": []
+      }
+    ],
+    "rationale": "指定不存在檔期不得偷換。"
+  },
+  {
+    "id": "single-rule",
+    "group": "single",
+    "question": "本期每天最多可以拿多少星星幣？",
+    "intents": [
+      {
+        "type": "knowledge",
+        "request": "本期每天最多可以拿多少星星幣？"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_rules",
+            "arguments": {
+              "edition": "2026-11",
+              "mode": "search"
+            },
+            "query_terms": [
+              "每天|每日|單日",
+              "上限|最多|額度|獲取|獲得|取得|星星幣|點數"
+            ]
+          }
+        ]
+      }
+    ],
+    "rationale": "針對規則檢索；不查本人。"
+  },
+  {
+    "id": "same-balance-editions",
+    "group": "same",
+    "question": "我上期的餘額是多少？本期的餘額又是多少？",
+    "intents": [
+      {
+        "type": "query",
+        "request": "我上期的餘額是多少？"
+      },
+      {
+        "type": "query",
+        "request": "本期的餘額又是多少？"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "get_my_event_progress",
+            "arguments": {
+              "edition": "2026-10"
+            },
+            "fields": [
+              "balance"
+            ],
+            "account_scope": "self"
+          }
+        ]
+      },
+      {
+        "task_id": "T2",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "get_my_event_progress",
+            "arguments": {
+              "edition": "2026-11"
+            },
+            "fields": [
+              "balance"
+            ],
+            "account_scope": "self"
+          }
+        ]
+      }
+    ],
+    "rationale": "相同工具、不同任務與檔期。"
+  },
+  {
+    "id": "same-personal-fields",
+    "group": "same",
+    "question": "我本期還有多少點數？我今天已計入幾場活動？",
+    "intents": [
+      {
+        "type": "query",
+        "request": "我本期還有多少點數？"
+      },
+      {
+        "type": "query",
+        "request": "我今天已計入幾場活動？"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "get_my_event_progress",
+            "arguments": {
+              "edition": "2026-11"
+            },
+            "fields": [
+              "balance"
+            ],
+            "account_scope": "self"
+          }
+        ]
+      },
+      {
+        "task_id": "T2",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "get_my_event_progress",
+            "arguments": {
+              "edition": "2026-11"
+            },
+            "fields": [
+              "counted_matches"
+            ],
+            "account_scope": "self"
+          }
+        ]
+      }
+    ],
+    "rationale": "相同工具和檔期，仍需各自綁定欄位及任務。"
+  },
+  {
+    "id": "same-two-items",
+    "group": "same",
+    "question": "霧港領航員多少點數？海圖航線框有什麼用途？",
+    "intents": [
+      {
+        "type": "query",
+        "request": "霧港領航員多少點數？"
+      },
+      {
+        "type": "query",
+        "request": "海圖航線框有什麼用途？"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_shop_item",
+            "arguments": {
+              "edition": "2026-11",
+              "name": "霧港領航員"
+            },
+            "fields": [
+              "price"
+            ]
+          }
+        ]
+      },
+      {
+        "task_id": "T2",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_shop_item",
+            "arguments": {
+              "edition": "2026-11",
+              "name": "海圖航線框"
+            },
+            "fields": [
+              "description"
+            ]
+          }
+        ]
+      }
+    ],
+    "rationale": "同工具不同商品，不可交叉或合併參數。"
+  },
+  {
+    "id": "same-followup",
+    "group": "same",
+    "question": "那它多少點數？我上期的餘額又是多少？",
+    "intents": [
+      {
+        "type": "query",
+        "request": "那它多少點數？"
+      },
+      {
+        "type": "query",
+        "request": "我上期的餘額又是多少？"
+      }
+    ],
+    "history": [
+      {
+        "role": "user",
+        "content": "上期的守燈人有什麼用途？"
+      },
+      {
+        "role": "assistant",
+        "content": "守燈人是上期限定頭像。",
+        "trace": [
+          {
+            "參數": {
+              "edition": "2026-10"
+            },
+            "商品參照": [
+              "lantern-keeper"
+            ]
+          }
+        ]
+      }
+    ],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_shop_item",
+            "arguments": {
+              "edition": "2026-10",
+              "name": "守燈人"
+            },
+            "fields": [
+              "price"
+            ]
+          }
+        ]
+      },
+      {
+        "task_id": "T2",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "get_my_event_progress",
+            "arguments": {
+              "edition": "2026-10"
+            },
+            "fields": [
+              "balance"
+            ],
+            "account_scope": "self"
+          }
+        ]
+      }
+    ],
+    "rationale": "可信上一輪商品及檔期，第二任務明示上期。"
+  },
+  {
+    "id": "same-supported-unsupported",
+    "group": "same",
+    "question": "我本期餘額還有多少？活動商城的限量商品還剩幾件庫存？",
+    "intents": [
+      {
+        "type": "query",
+        "request": "我本期餘額還有多少？"
+      },
+      {
+        "type": "query",
+        "request": "活動商城的限量商品還剩幾件庫存？"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "get_my_event_progress",
+            "arguments": {
+              "edition": "2026-11"
+            },
+            "fields": [
+              "balance"
+            ],
+            "account_scope": "self"
+          }
+        ]
+      },
+      {
+        "task_id": "T2",
+        "status": "no_evidence",
+        "calls": []
+      }
+    ],
+    "rationale": "有合法本人查詢，不支援庫存；不能把清單當庫存。"
+  },
+  {
+    "id": "mixed-rule-balance-operation",
+    "group": "mixed",
+    "question": "完整介紹本期活動怎麼玩。我上期有多少點數？再幫我補發十點。",
+    "intents": [
+      {
+        "type": "knowledge",
+        "request": "完整介紹本期活動怎麼玩。"
+      },
+      {
+        "type": "query",
+        "request": "我上期有多少點數？"
+      },
+      {
+        "type": "operation",
+        "request": "再幫我補發十點。"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_rules",
+            "arguments": {
+              "edition": "2026-11",
+              "mode": "overview"
+            },
+            "query_terms": []
+          }
+        ]
+      },
+      {
+        "task_id": "T2",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "get_my_event_progress",
+            "arguments": {
+              "edition": "2026-10"
+            },
+            "fields": [
+              "balance"
+            ],
+            "account_scope": "self"
+          }
+        ]
+      },
+      {
+        "task_id": "T3",
+        "status": "unsupported",
+        "calls": []
+      }
+    ],
+    "rationale": "兩個合法工具任務及一個由主機直接終止的操作。"
+  },
+  {
+    "id": "mixed-gap-and-balance",
+    "group": "mixed",
+    "question": "我距離換到霧港領航員還差多少點數？我上期的餘額是多少？",
+    "intents": [
+      {
+        "type": "analysis",
+        "request": "我距離換到霧港領航員還差多少點數？"
+      },
+      {
+        "type": "query",
+        "request": "我上期的餘額是多少？"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_shop_item",
+            "arguments": {
+              "edition": "2026-11",
+              "name": "霧港領航員"
+            },
+            "fields": [
+              "price"
+            ]
+          }
+        ]
+      },
+      {
+        "task_id": "T2",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "get_my_event_progress",
+            "arguments": {
+              "edition": "2026-10"
+            },
+            "fields": [
+              "balance"
+            ],
+            "account_scope": "self"
+          }
+        ]
+      }
+    ],
+    "rationale": "同一分析先查商品，獨立餘額查詢可同批；不強迫全體等待。"
+  },
+  {
+    "id": "mixed-compare-and-other",
+    "group": "mixed",
+    "question": "比較上期和本期活動玩法以及獎勵差異。順便幫我查火車時刻。",
+    "intents": [
+      {
+        "type": "analysis",
+        "request": "比較上期和本期活動玩法以及獎勵差異。"
+      },
+      {
+        "type": "other",
+        "request": "順便幫我查火車時刻。"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_rules",
+            "arguments": {
+              "edition": "2026-10",
+              "mode": "compare"
+            },
+            "query_terms": []
+          },
+          {
+            "tool": "find_rules",
+            "arguments": {
+              "edition": "2026-11",
+              "mode": "compare"
+            },
+            "query_terms": []
+          }
+        ]
+      },
+      {
+        "task_id": "T2",
+        "status": "outside_or_unclear",
+        "calls": []
+      }
+    ],
+    "rationale": "跨期須各查一期，範圍外不執行業務工具。"
+  },
+  {
+    "id": "mixed-hypothetical-and-personal",
+    "group": "mixed",
+    "question": "假設只玩自訂房，這樣會計入活動嗎？我的本期參加狀態是什麼？",
+    "intents": [
+      {
+        "type": "analysis",
+        "request": "假設只玩自訂房，這樣會計入活動嗎？"
+      },
+      {
+        "type": "query",
+        "request": "我的本期參加狀態是什麼？"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_rules",
+            "arguments": {
+              "edition": "2026-11",
+              "mode": "search"
+            },
+            "query_terms": [
+              "自訂房"
+            ]
+          }
+        ]
+      },
+      {
+        "task_id": "T2",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "get_my_event_progress",
+            "arguments": {
+              "edition": "2026-11"
+            },
+            "fields": [
+              "participation"
+            ],
+            "account_scope": "self"
+          }
+        ]
+      }
+    ],
+    "rationale": "假設不需本人資料；獨立個人查詢才需要。"
+  },
+  {
+    "id": "mixed-no-active",
+    "group": "mixed",
+    "question": "直接替我取消本期活動報名。推薦一家附近餐廳。",
+    "intents": [
+      {
+        "type": "operation",
+        "request": "直接替我取消本期活動報名。"
+      },
+      {
+        "type": "other",
+        "request": "推薦一家附近餐廳。"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "unsupported",
+        "calls": []
+      },
+      {
+        "task_id": "T2",
+        "status": "outside_or_unclear",
+        "calls": []
+      }
+    ],
+    "rationale": "無待處理業務任務，零模型呼叫。"
+  }
+]

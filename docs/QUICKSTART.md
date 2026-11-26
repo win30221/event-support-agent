@@ -289,3 +289,5 @@ Ollama 請選用支援 tool calling 的模型。兩個供應商的工具選擇�
 原 36 題已通過且 Prompt 不變時，只執行新增 20 題：`.\.venv\Scripts\python.exe -m evaluations.eval_intent --cases --suite holdout --report reports/intent-holdout.json`（macOS/Linux：`./.venv/bin/python` 取代 Python 路徑）。失敗題可用 `--case ID --suite holdout` 單獨重測。
 
 第二層獨立評測（只需已安裝依賴、啟動模型）：`.\.venv\Scripts\python.exe -m evaluations.eval_audit --cases --report reports/audit-all.json`；macOS/Linux 換成 `./.venv/bin/python`。詳見 [TESTING](TESTING.md)。
+
+新第二層候選實驗（只驗首輪工具規劃）：`.\.venv\Scripts\python.exe -m evaluations.eval_task_tools --cases --report reports/task-tools-all.json`，macOS/Linux 換成 `./.venv/bin/python`。舊 eval_audit 為歷史對照，正式 UI 暫未切換。詳見 [TESTING](TESTING.md)。

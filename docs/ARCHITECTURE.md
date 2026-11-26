@@ -71,3 +71,7 @@ Select 對暫時性傳輸錯誤使用 RetryPolicy（至多 2 次嘗試）；其�
 模型選工具時使用完整來源 ID（供 calculate 引用）；回答及審查階段使用本輪短 ID，由主機對照完整 ID。短 ID 只有本輪證據集合中存在才有效。完整工具資料留存工程紀錄；模型只取得必要原文、狀態、檔期、日期及條件。單一子問題格式或來源錯誤不會抹除其他有效子問題。
 
 第二層可透過 `python -m evaluations.eval_audit --cases` 注入固定第一層輸出，與正式流程共用 `IntentRuntime.audit_intents` 和 `bind_intents`，不啟動後續節點。LLM 提案 kind、editions、product、account；Python 核定初始狀態。跨期公開比較為 analysis/calculation；他人紀錄保留 query 及具體 kind，account=other。模型提案不構成資料授權。
+
+## 新第二層候選（尚未接入正式 Graph）
+
+固定第一層需求 → Python route_tasks → task_definitions（每個工具的 task_id enum 依任務允許範圍）→ 一次原生 tool_calls → validate_batch（逐任務驗證及現有 ToolRegistry 參數正規化）。不重分類、不建立 18 種 kind，不執行資料工具；限制提案經 report_task_status 控制契約處理。首輪不提供 calculate。舊 Graph、Audit、證據評估與回答流程保留，待獨立驗收後再設計整合與跨輪取證。

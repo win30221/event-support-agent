@@ -76,3 +76,7 @@ LLM 理解需求、選擇資料工具及生成回答；Python 管理工具契約
 2026-11-26：第一層兩批真實模型測試共 56/56，凍結 INTENT_PROMPT、原有題庫與第一層契約。原 AUDIT_PROMPT 允許跨期比較為 knowledge 或 calculation，與 CAPABILITIES 及第一層 analysis 定義矛盾；「他人紀錄填 other」未明確區分 kind 與 account。此次在原第二層 Prompt 內按意圖審查、業務類型及參數擷取三部分澄清，不增加模型呼叫，不修改 Schema、CAPABILITIES 或主機權限規則。比較結論為 analysis/calculation；他人紀錄保留語意 kind 並 account=other；缺參數及不可執行仍是有效意圖。LLM 的帳號範圍判斷可能出錯，主機現有的 account=other 拒絕並不能單獨證明任意錯誤 self 提案均會被阻擋；獨立評測特別檢查此類錯綁。後續工具與帳號授權不在本次修改範圍。
 
 正式流程抽出共用 audit_packet/audit_intents，保留既有封包、審查回饋及重試行為；新增 24 題獨立 Audit 評測（19 accept、5 revise）與離線測試，涵蓋 18 種 kind。對故意不正確的第一層輸入只驗證 Audit 決策，不啟動第一層重提案。核對主機狀態與原始 binding，避免安全降級或欄位被丟棄掩蓋語意錯誤。標記為依現有業務契約預先制定，合理等價答案與 revise issues 必須人工複核。新 Prompt 真實模型尚未驗收；既有全流程四項回歸失敗不藉此刪除或弱化。
+
+## 新第二層任務感知工具規劃實驗
+
+採用 Routing + Native Tool Calling + 主機核定，保留第一層 Prompt、標記題庫及現有正式流程。批次任務工具聯集可能等於全部工具；主要收益假設是任務 ID、覆蓋追蹤及逐任務工具範圍，不宣稱必然改善準確率。第二層不重複意圖審查或業務 kind 分類，欄位需求以 tool metadata 描述。新增 task_tool_planning.py、獨立實機評測與離線契約測試，10/5/5 題組、31 個任務。原生工具由既有 model_step / LangChain 介接，不以文字 JSON 模擬。控制工具不是實際資料工具。批次失敗不提交，合法子任務僅供診斷；不執行任何工具。待首輪模型驗收後再設計跨輪取證及正式 Graph 接入，避免改動後續層掩蓋問題。模型錯誤聲稱 self 仍可能通過結構檢查，需以語意驗收及後續授權方案處理，不能把 model scope 當授權。沒有已取得資料時不允許運算。此版未建立實際欄位投影及任務級證據傳遞，不能直接取代原流程上線。首輪檢索詞以概念粗略比對，非嚴格語意判定。舊 Audit 評測保留。
