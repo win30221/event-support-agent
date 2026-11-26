@@ -1,8 +1,9 @@
+import asyncio
 import os
 import unittest
 from unittest.mock import patch
 
-from model_client import model_for
+from model_client import model_for, model_step
 
 
 class ModelTimeoutTests(unittest.TestCase):
@@ -42,3 +43,33 @@ class ModelTimeoutTests(unittest.TestCase):
                 self.assertEqual(client.call_args.kwargs["base_url"], "http://localhost:11434")
                 self.assertEqual(client.call_args.kwargs["num_ctx"], 8192)
                 self.assertIs(client.call_args.kwargs["reasoning"], False)
+
+def test_request_metrics_use_configured_context_and_provider_reported_usage(self):
+        events = []
+        messages = [{"role": "system", "content": "system"}, {"role": "user", "content": "question"},
+                    {"role": "tool", "content": "private-result"}]
+        def complete(provider, messages, tools):
+            return {"content": "", "_provider_meta": {"model": "reported", "prompt_eval_count": 123,
+                    "eval_count": 45, "done_reason": "length"}}
+        with patch.dict(os.environ, {"OLLAMA_MODEL": "configured",
+                "EVENT_SUPPORT_AGENT_OLLAMA_NUM_CTX": "8192"}, clear=True):
+            asyncio.run(model_step("ollama", messages, [], complete,
+                                   lambda t, d: events.append((t, d)), "test", num_predict=2048))
+        metrics = dict(events)["Python 模型請求指標 · test"]
+        self.assertEqual(metrics["配置模型"], "configured")
+        self.assertEqual(metrics["供應商模型"], "reported")
+        self.assertEqual(metrics["配置Context上限"], 8192)
+        self.assertEqual(metrics["輸入Token"], 123)
+        self.assertEqual(metrics["輸出Token"], 45)
+        self.assertTrue(metrics["輸出達長度上限"])
+        self.assertEqual(metrics["工具結果字元數"], len("private-result"))
+        self.assertNotIn("private-result", str(metrics))
+
+    def test_missing_provider_metrics_remain_unknown(self):
+        events = []
+        with patch.dict(os.environ, {}, clear=True):
+            asyncio.run(model_step("ollama", [{"role": "user", "content": "question"}], [],
+                lambda *args: {"content": ""}, lambda t, d: events.append((t, d)), "test"))
+        metrics = dict(events)["Python 模型請求指標 · test"]
+        for field in ("配置Context上限", "輸入Token", "輸出Token", "輸出達長度上限"):
+            self.assertIsNone(metrics[field])

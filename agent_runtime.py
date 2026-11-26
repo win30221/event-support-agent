@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+from time import perf_counter
 from typing import TypedDict
 
 from langchain_core.messages import (AIMessage, HumanMessage, ToolMessage,
@@ -101,17 +102,20 @@ class TurnRuntime:
 
         async def execute(**args):
             # 只接受 prepare_tools 節點通過 registry.validate 的主機參數。
+            started = perf_counter()
             try:
                 result = await asyncio.to_thread(self.registry.execute, name, args)
                 source, refs, withheld = evidence_for(name, args, result, self.question)
                 # 保留實際核准查詢對象及範圍，供逐需求槽位比對；不是模型自行填寫的事實。
                 source["查詢參數"] = dict(args)
                 return compact_json(source), {"source": source, "raw": result,
-                                               "refs": refs, "withheld": withheld}
+                                               "refs": refs, "withheld": withheld,
+                                               "elapsed_ms": round((perf_counter() - started) * 1000, 2)}
             except Exception as error:
                 payload = {"工具": name, "檔期": args.get("edition", ""), "狀態": "tool_error",
                            "原因": "資料工具未能完成查詢。"}
-                return compact_json(payload), {"source": payload, "error": type(error).__name__}
+                return compact_json(payload), {"source": payload, "error": type(error).__name__,
+                                               "elapsed_ms": round((perf_counter() - started) * 1000, 2)}
 
         # dict schema 保留單一 registry 定義；權限及嚴格參數驗證在派發前完成。
         return StructuredTool.from_function(
@@ -168,6 +172,10 @@ class TurnRuntime:
     def validate_call(self, state, name, raw):
         return self.registry.validate(name, raw, self.context, state["evidence"])
 
+    def pre_dispatch_rejection(self, state, name):
+        """Optional host policy rejection before the data-tool budget is charged."""
+        return None
+
     async def prepare_tools(self, state: SupportState):
         self.node(state, "execute")
         calls = state["calls"]
@@ -185,6 +193,11 @@ class TurnRuntime:
             history_calls.append(native_call(call, raw if isinstance(raw, dict) else {}))
             plan = {"id": cid, "name": name}
             plans.append(plan)
+            rejection = self.pre_dispatch_rejection(state, name)
+            if rejection is not None:
+                plan["payload"] = rejection
+                self.observe("Python 工具派發拒絕", rejection)
+                continue
             if attempts >= MAX_TOOL_CALLS:
                 plan["payload"] = {"狀態": "budget_exhausted", "原因": "已達本輪工具上限。"}
                 continue
@@ -235,12 +248,25 @@ class TurnRuntime:
                 payload = artifact["source"]
                 if not plan.get("reused"):
                     cache[plan["key"]] = payload
+                    self.observe("Python 工具執行指標", {"工具": name,
+                                 "耗時毫秒": artifact.get("elapsed_ms"),
+                                 "成功": not bool(artifact.get("error"))})
                     if artifact.get("error"):
                         errors.append(payload)
                         self.observe(f"收到工具回傳 · {name}", {"isError": True,
                                      "錯誤類型": artifact["error"]})
                     else:
                         raw = artifact["raw"]
+                        if name == "find_rules" and isinstance(raw, list):
+                            # 只記公開檢索識別碼及分數；不把診斷資料再次送入模型。
+                            accepted = {row["段落ID"] for row in payload["段落"]}
+                            fields = ("段落ID", "文件ID", "檢索角色", "BM25", "詞彙名次",
+                                      "向量名次", "向量相似度", "RRF", "多查詢融合分數")
+                            self.observe("Python RAG 檢索指標", {"檔期": payload["檔期"],
+                                "模式": plan["args"]["mode"], "結果數": len(raw),
+                                "候選": [{**{key: row[key] for key in fields if key in row},
+                                          "回傳順序": index, "採用": row["段落ID"] in accepted}
+                                         for index, row in enumerate(raw, 1)]})
                         blocks = raw if isinstance(raw, list) else [raw]
                         content = [json.dumps(block, ensure_ascii=False, indent=2) for block in blocks]
                         self.observe(f"收到工具回傳 · {name}", {"isError": False, "內容": content,

@@ -3,6 +3,7 @@ import asyncio
 import json
 import os
 from copy import deepcopy
+from time import perf_counter
 
 import httpx
 from langchain_core.messages import AIMessage, convert_to_messages
@@ -16,9 +17,14 @@ class TransientModelError(RuntimeError):
     """Only transport/rate-limit/server failures are eligible for node retry."""
 
 
+def configured_model(provider):
+    return (os.getenv("OPENAI_MODEL", "gpt-4o-mini") if provider == "openai" else
+            os.getenv("OLLAMA_MODEL", "qwen3:8b"))
+
+
 def model_for(provider, *, num_predict=None):
     if provider == "openai":
-        return ChatOpenAI(model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        return ChatOpenAI(model=configured_model(provider),
                           timeout=120, max_retries=0, use_responses_api=False)
     if provider != "ollama":
         raise ValueError("未知模型服務。")
@@ -29,7 +35,7 @@ def model_for(provider, *, num_predict=None):
     base = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
     if base.endswith("/v1"):
         base = base[:-3]
-    options = {"model": os.getenv("OLLAMA_MODEL", "qwen3:8b"),
+    options = {"model": configured_model(provider),
                "base_url": base, "temperature": 0,
                "client_kwargs": {"timeout": int(setting) or None}}
     context = os.getenv("EVENT_SUPPORT_AGENT_OLLAMA_NUM_CTX", "").strip()
@@ -137,6 +143,29 @@ def ignore_event(title, data):
     pass
 
 
+def request_metrics(provider, messages, tools, response_schema, num_predict):
+    # 字元數不是 Token 數；num_ctx 是應用設定，不代表伺服器實際配置。
+    context = os.getenv("EVENT_SUPPORT_AGENT_OLLAMA_NUM_CTX", "").strip() if provider == "ollama" else ""
+    return {"服務": provider, "配置模型": configured_model(provider),
+            "配置Context上限": int(context) if context.isdecimal() and int(context) > 0 else None,
+            "輸出上限": num_predict, "訊息數": len(messages), "工具數": len(tools),
+            "工具結果字元數": sum(len(m["content"]) for m in messages
+                                  if m.get("role") == "tool" and isinstance(m.get("content"), str)),
+            "工具定義字元數": len(json.dumps(tools, ensure_ascii=False)),
+            "回答Schema字元數": len(json.dumps(response_schema, ensure_ascii=False)) if response_schema else 0}
+
+
+def response_metrics(reply):
+    meta = reply.get("_provider_meta") or {}
+    usage = meta.get("usage") or {}
+    reason = meta.get("finish_reason") or meta.get("done_reason")
+    return {"供應商模型": meta.get("model"),
+            "輸入Token": usage.get("prompt_tokens") if usage.get("prompt_tokens") is not None else meta.get("prompt_eval_count"),
+            "輸出Token": usage.get("completion_tokens") if usage.get("completion_tokens") is not None else meta.get("eval_count"),
+            "停止原因": reason,
+            "輸出達長度上限": reason in ("length", "max_tokens", "max_output_tokens") if reason else None}
+
+
 async def model_step(provider, messages, tools, complete, observe, stage, *, response_schema=None,
                      num_predict=None):
     request = {"服務": provider, "messages": deepcopy(messages), "tools": deepcopy(tools)}
@@ -145,22 +174,32 @@ async def model_step(provider, messages, tools, complete, observe, stage, *, res
     if num_predict is not None:
         request["num_predict"] = num_predict
     observe(f"送出模型請求 · {stage}", request)
-    if complete is completion:
-        options = {"response_schema": response_schema}
-        if num_predict is not None:
-            options["num_predict"] = num_predict
-        reply = await acompletion(provider, messages, tools, **options)
-    else:
-        def invoke():
-            try:
-                if response_schema is None:
-                    return complete(provider, deepcopy(messages), tools)
-                return complete(provider, deepcopy(messages), tools, response_schema=response_schema)
-            except StopIteration as error:
-                raise RuntimeError("模型回傳序列意外結束。") from error
-        reply = await asyncio.to_thread(invoke)
-    if not isinstance(reply, dict):
-        raise ValueError("模型回傳不是有效訊息。")
+    metrics = request_metrics(provider, messages, tools, response_schema, num_predict)
+    started = perf_counter()
+    try:
+        if complete is completion:
+            options = {"response_schema": response_schema}
+            if num_predict is not None:
+                options["num_predict"] = num_predict
+            reply = await acompletion(provider, messages, tools, **options)
+        else:
+            def invoke():
+                try:
+                    if response_schema is None:
+                        return complete(provider, deepcopy(messages), tools)
+                    return complete(provider, deepcopy(messages), tools, response_schema=response_schema)
+                except StopIteration as error:
+                    raise RuntimeError("模型回傳序列意外結束。") from error
+            reply = await asyncio.to_thread(invoke)
+        if not isinstance(reply, dict):
+            raise ValueError("模型回傳不是有效訊息。")
+        metrics.update(response_metrics(reply))
+    except Exception as error:
+        metrics["錯誤類型"] = type(error).__name__
+        raise
+    finally:
+        metrics["耗時毫秒"] = round((perf_counter() - started) * 1000, 2)
+        observe(f"Python 模型請求指標 · {stage}", metrics)
     output = {key: reply[key] for key in ("role", "content", "tool_calls", "_provider_meta") if key in reply}
     if response_schema is not None:
         try:

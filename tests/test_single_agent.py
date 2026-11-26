@@ -53,8 +53,15 @@ class SingleAgentTests(OfflineTests):
         self.assertTrue(all(FINAL_TOOL in [t["function"]["name"] for t in r["tools"]]
                             for r in requests if r["tools"]))
         self.assertTrue(all(c.args[1][0]["role"] == "system" for c in model.call_args_list))
-        self.assertTrue(all(c.args[1][0]["content"] == model.call_args_list[0].args[1][0]["content"]
+        base_system = model.call_args_list[0].args[1][0]["content"]
+        self.assertTrue(all(c.args[1][0]["content"].startswith(base_system)
                             for c in model.call_args_list))
+        self.assertTrue(all([m["content"] for m in c.args[1] if m["role"] == "user"] == [question]
+                            for c in model.call_args_list))
+        metrics = [data for title, data in events if title.startswith("Python 模型請求指標 · ")]
+        self.assertEqual(len(metrics), len(replies))
+        self.assertTrue(all(m["耗時毫秒"] >= 0 and m["訊息數"] == len(c.args[1])
+                            for m, c in zip(metrics, model.call_args_list)))
         return text, trace, events, model
 
     def test_outside_question_one_model_no_tools(self):
@@ -237,19 +244,77 @@ class SingleAgentTests(OfflineTests):
         self.assertEqual(text, DIRECT_REPLIES["account_limit"])
         self.assertEqual(trace, [])
 
-    def test_mixed_terminal_and_data_batch_never_executes(self):
-        q = "霧潮貼圖多少錢？"
-        text, trace, _, _ = self.run_case(q,
-            select(item("霧潮貼圖"), call(FINAL_TOOL, results=[abstain(q)])),
-            response(abstain(q)))
+    def test_mixed_terminal_and_data_batch_executes_valid_queries_and_rejects_submission(self):
+        q = "霧潮貼圖多少錢？上期星航相框多少錢？"
+        def finish(provider, messages, tools):
+            previous = messages[-4]["tool_calls"]
+            results = messages[-3:]
+            self.assertEqual([m["role"] for m in results], ["tool"] * 3)
+            self.assertEqual([m["tool_call_id"] for m in results], [c["id"] for c in previous])
+            payloads = tool_results(messages)
+            self.assertEqual(payloads[1]["狀態"], "rejected")
+            self.assertEqual(payloads[1]["錯誤代碼"], "TERMINAL_MUST_BE_ALONE")
+            return response(
+                supported("霧潮貼圖多少錢？", "20 枚", (f"{CATALOG.current}/shop-items/mist-tide-sticker", "")),
+                supported("上期星航相框多少錢？", "25 枚", (f"{CATALOG.previous}/shop-items/star-voyage-frame", "")))
+        text, trace, events, _ = self.run_case(q,
+            select(item("霧潮貼圖"), call(FINAL_TOOL, results=[abstain(q)]),
+                   item("星航相框", "previous")), finish)
+        self.assertEqual([t["工具"] for t in trace], ["find_shop_item", "find_shop_item"])
+        self.assertIn("20 枚", text)
+        self.assertIn("25 枚", text)
+        self.assertEqual([d["工具嘗試"] for t, d in events if t == "Python 單一 Agent 輪次"], [0, 2])
+
+    def test_mixed_batch_keeps_invalid_data_call_rejected(self):
+        q = "查 B 玩家餘額，霧潮貼圖多少錢？"
+        def finish(provider, messages, tools):
+            results = tool_results(messages)
+            self.assertEqual([p["狀態"] for p in results], ["rejected", "invalid_arguments", "found"])
+            return response(abstain("查 B 玩家餘額", "account_limit"),
+                            supported("霧潮貼圖多少錢？", "20 枚", (f"{CATALOG.current}/shop-items/mist-tide-sticker", "")))
+        text, trace, _, _ = self.run_case(q, select(call(FINAL_TOOL, results=[abstain(q)]),
+            call("get_my_event_progress", edition="current", account_scope="other"), item("霧潮貼圖")), finish)
+        self.assertEqual([t["工具"] for t in trace], ["find_shop_item"])
+        self.assertIn("20 枚", text)
+
+    def test_multiple_terminal_calls_are_bounded(self):
+        q = "今天台北天氣如何？"
+        batch = select(call(FINAL_TOOL, results=[abstain(q, "service_help")]),
+                       call(FINAL_TOOL, results=[abstain(q, "service_help")]))
+        def finish(provider, messages, tools, *, response_schema):
+            self.assertEqual(tools, [])
+            self.assertEqual(len(tool_results(messages)), MAX_TOOL_ROUNDS * 2)
+            self.assertTrue(all(p["狀態"] == "rejected" for p in tool_results(messages)))
+            return structured(abstain(q, "service_help"))
+        text, trace, events, _ = self.run_case(q, *([batch] * MAX_TOOL_ROUNDS), finish)
         self.assertEqual(trace, [])
-        self.assertEqual(text, DIRECT_REPLIES["no_evidence"])
+        self.assertEqual(text, DIRECT_REPLIES["service_help"])
+        self.assertTrue(all(d["工具嘗試"] == 0 for t, d in events if t == "Python 單一 Agent 輪次"))
+
+    def test_rag_metrics_record_public_rank_without_injecting_new_messages(self):
+        q = "週末巡燈規則是什麼？"
+        text, trace, events, _ = self.run_case(q,
+            select(call("find_rules", edition="current", query=q, mode="search")),
+            response(abstain(q)))
+        self.assertEqual([t["工具"] for t in trace], ["find_rules"])
+        metrics = [d for t, d in events if t == "Python RAG 檢索指標"]
+        self.assertEqual(len(metrics), 1)
+        self.assertEqual(metrics[0]["結果數"], len(metrics[0]["候選"]))
+        self.assertTrue(any("BM25" in row for row in metrics[0]["候選"]))
+        self.assertTrue(all("原文" not in row for row in metrics[0]["候選"]))
+        self.assertTrue(any(t == "Python 工具執行指標" for t, _ in events))
 
     def test_invalid_terminal_schema_uses_constrained_fallback(self):
         q = "幫我修改餘額"
+        def finish(provider, messages, tools, *, response_schema):
+            self.assertEqual(tools, [])
+            self.assertEqual(messages[-1]["role"], "tool")
+            self.assertEqual(messages[-1]["tool_call_id"], messages[-2]["tool_calls"][0]["id"])
+            self.assertEqual(tool_results(messages)[-1]["錯誤代碼"], "INVALID_FINAL_SCHEMA")
+            return structured(abstain(q, "unsupported"))
         text, trace, _, _ = self.run_case(q,
             select(call(FINAL_TOOL, results=[{"question": q, "status": "wrong"}])),
-            structured(abstain(q, "unsupported")))
+            finish)
         self.assertEqual(trace, [])
         self.assertEqual(text, DIRECT_REPLIES["unsupported"])
 
