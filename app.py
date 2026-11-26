@@ -10,6 +10,7 @@ import streamlit as st
 
 from agent import answer
 from guide import CATALOG
+from model_client import PROVIDERS, configured_model
 from starter_questions import render_starter_questions
 from reply_notification import render_reply_notification
 
@@ -180,16 +181,21 @@ player = st.sidebar.selectbox(
 )
 provider = st.sidebar.radio(
     "模型服務",
-    ["ollama", "openai"],
-    format_func=lambda value: {"ollama": "Ollama（本機）", "openai": "OpenAI（雲端）"}[value],
+    PROVIDERS,
+    format_func=lambda value: {"ollama": "Ollama（本機）", "openai": "OpenAI（雲端）",
+                              "nvidia": "NVIDIA NIM（雲端）"}[value],
 )
 developer_mode = st.sidebar.toggle(
     "顯示工程檢視",
     value=True,
     help="顯示查詢紀錄、完整互動流程與複製按鈕。",
 )
-if provider == "openai" and not os.getenv("OPENAI_API_KEY"):
-    st.sidebar.caption("使用 OpenAI 前，需要先設定 OPENAI_API_KEY。")
+key_variable = {"openai": "OPENAI_API_KEY", "nvidia": "NVIDIA_API_KEY"}.get(provider)
+if key_variable and not os.getenv(key_variable, "").strip():
+    st.sidebar.caption(f"使用雲端模型前，需要先設定 {key_variable}。")
+st.sidebar.caption(f"模型：{configured_model(provider)}")
+if provider == "nvidia":
+    st.sidebar.caption("NVIDIA 雲端推理：僅使用本 Demo 模擬資料。")
 
 # 每個體驗帳號與模型服務有獨立對話及待完成請求，避免切換時混入他人資料。
 key = f"chat-{player}-{provider}"
@@ -275,8 +281,8 @@ typed_question = st.chat_input(
 # 快速提問與手動輸入走同一個處理入口，送出原始文字而非評測題目。
 question = selected_question or typed_question
 if question and key not in jobs:
-    if provider == "openai" and not os.getenv("OPENAI_API_KEY"):
-        st.error("請先在啟動服務的環境設定 OPENAI_API_KEY。")
+    if key_variable and not os.getenv(key_variable, "").strip():
+        st.error(f"請先在啟動服務的環境設定 {key_variable}。")
         st.stop()
     history = [turn for turn in turns if turn["role"] != "error"][-8:]
     turns.append({"role": "user", "content": question})

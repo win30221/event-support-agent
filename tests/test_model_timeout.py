@@ -44,7 +44,7 @@ class ModelTimeoutTests(unittest.TestCase):
                 self.assertEqual(client.call_args.kwargs["num_ctx"], 8192)
                 self.assertIs(client.call_args.kwargs["reasoning"], False)
 
-def test_request_metrics_use_configured_context_and_provider_reported_usage(self):
+    def test_request_metrics_use_configured_context_and_provider_reported_usage(self):
         events = []
         messages = [{"role": "system", "content": "system"}, {"role": "user", "content": "question"},
                     {"role": "tool", "content": "private-result"}]

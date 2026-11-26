@@ -17,14 +17,32 @@ class TransientModelError(RuntimeError):
     """Only transport/rate-limit/server failures are eligible for node retry."""
 
 
+PROVIDERS = ("ollama", "openai", "nvidia")
+NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
+NVIDIA_DEFAULT_MODEL = "nvidia/nemotron-3.5-super-vl-120b-a12b"
+
+
 def configured_model(provider):
-    return (os.getenv("OPENAI_MODEL", "gpt-4o-mini") if provider == "openai" else
-            os.getenv("OLLAMA_MODEL", "qwen3:8b"))
+    defaults = {"openai": ("OPENAI_MODEL", "gpt-4o-mini"),
+                "ollama": ("OLLAMA_MODEL", "qwen3:8b"),
+                "nvidia": ("NVIDIA_MODEL", NVIDIA_DEFAULT_MODEL)}
+    if provider not in defaults:
+        raise ValueError("未知模型服務。")
+    return os.getenv(*defaults[provider])
 
 
 def model_for(provider, *, num_predict=None):
     if provider == "openai":
         return ChatOpenAI(model=configured_model(provider),
+                          timeout=120, max_retries=0, use_responses_api=False)
+    if provider == "nvidia":
+        credential = os.getenv("NVIDIA_API_KEY", "").strip()
+        if not credential:
+            raise ValueError("請先設定 NVIDIA_API_KEY。")
+        name = configured_model(provider).strip()
+        if not name:
+            raise ValueError("NVIDIA_MODEL 不可為空白。")
+        return ChatOpenAI(model=name, base_url=NVIDIA_BASE_URL, api_key=credential,
                           timeout=120, max_retries=0, use_responses_api=False)
     if provider != "ollama":
         raise ValueError("未知模型服務。")
@@ -59,8 +77,13 @@ def bound_model(provider, tools, response_schema, *, num_predict=None):
     model = model_for(provider) if num_predict is None else model_for(provider, num_predict=num_predict)
     if tools:
         # 同一份 registry 定義，不用文字 JSON 模擬 function calling。
+        if provider == "nvidia":
+            return model.bind_tools(tools, tool_choice="auto")
         return model.bind_tools(tools, **({"strict": True} if provider == "openai" else {}))
     if response_schema is not None:
+        if provider == "nvidia":
+            return model.bind(response_format={"type": "json_schema", "json_schema": {
+                "name": "agent_response", "schema": response_schema}})
         options = {"method": "json_schema", "include_raw": True}
         if provider == "openai":
             options["strict"] = True
@@ -112,7 +135,17 @@ def normalize_reply(value):
     return reply
 
 
-def transport_error(error):
+def transport_error(error, provider=None):
+    if provider == "nvidia":
+        status = getattr(error, "status_code", None)
+        if status in (401, 403):
+            return RuntimeError("NVIDIA API 驗證或授權失敗；請確認 NVIDIA_API_KEY 與模型存取權。")
+        if status == 404:
+            return RuntimeError("NVIDIA 模型或端點不可用；請確認 NVIDIA_MODEL。")
+        if status == 429:
+            return TransientModelError("NVIDIA API 達速率限制；請檢查帳號配額後重試。")
+        if status in (400, 422):
+            return RuntimeError(f"NVIDIA API 拒絕請求（HTTP {status}）；請核對工具及 JSON Schema 相容性。")
     if isinstance(error, (APIConnectionError, httpx.TransportError, ConnectionError)):
         return TransientModelError("模型服務連線或等待逾時。")
     status = getattr(error, "status_code", None)
@@ -127,7 +160,7 @@ def completion(provider, messages, tools, *, response_schema=None):
         model = bound_model(provider, tools, response_schema)
         return normalize_reply(model.invoke(convert_to_messages(messages)))
     except (APIConnectionError, APIStatusError, ResponseError, httpx.HTTPError, ConnectionError) as error:
-        raise transport_error(error) from error
+        raise transport_error(error, provider) from error
 
 
 async def acompletion(provider, messages, tools, *, response_schema=None, num_predict=None):
@@ -136,7 +169,7 @@ async def acompletion(provider, messages, tools, *, response_schema=None, num_pr
                  bound_model(provider, tools, response_schema, num_predict=num_predict))
         return normalize_reply(await model.ainvoke(convert_to_messages(messages)))
     except (APIConnectionError, APIStatusError, ResponseError, httpx.HTTPError, ConnectionError) as error:
-        raise transport_error(error) from error
+        raise transport_error(error, provider) from error
 
 
 def ignore_event(title, data):
