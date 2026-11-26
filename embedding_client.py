@@ -1,7 +1,5 @@
 """Request-scoped embedding selection, independent of chat completion."""
 from dataclasses import dataclass, replace
-from datetime import datetime, timezone
-from email.utils import parsedate_to_datetime
 import json
 import logging
 import math
@@ -10,6 +8,8 @@ import random
 import time
 import urllib.error
 import urllib.request
+
+from request_pacing import note_rate_limit, pace_request, retry_after_seconds
 
 PROVIDERS = ("ollama", "openai", "nvidia")
 DEFAULT_MODELS = {"ollama": "bge-m3", "openai": "text-embedding-3-small",
@@ -43,35 +43,19 @@ RETRYABLE_STATUS = {408, 429, 500, 502, 503, 504}
 logger = logging.getLogger(__name__)
 
 
-def retry_after_seconds(headers):
-    if not headers:
-        return None
-    raw = headers.get("Retry-After")
-    if not raw:
-        return None
-    try:
-        seconds = float(raw)
-    except (ValueError, TypeError):
-        try:
-            date = parsedate_to_datetime(raw)
-            if date.tzinfo is None:
-                date = date.replace(tzinfo=timezone.utc)
-            seconds = (date - datetime.now(timezone.utc)).total_seconds()
-        except (ValueError, TypeError, OverflowError):
-            return None
-    return max(0, seconds) if math.isfinite(seconds) else None
-
-
 def request_json(req, provider):
     # 嵌入查詢為唯讀；只重試暫時性服務/網路錯誤，不重試參數或憑證錯誤。
     for attempt in range(1, MAX_ATTEMPTS + 1):
         retry_after = None
         try:
+            pace_request(provider)
             with urllib.request.urlopen(req, timeout=120) as response:
                 return json.load(response)
         except urllib.error.HTTPError as error:
             reason = f"HTTP {error.code}"
             retry_after = retry_after_seconds(error.headers)
+            if error.code == 429:
+                note_rate_limit(provider, error.headers)
             error.close()
             if error.code not in RETRYABLE_STATUS:
                 raise EmbeddingError(f"{provider} embedding {reason}.") from None

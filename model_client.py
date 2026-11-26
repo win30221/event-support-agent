@@ -12,6 +12,8 @@ from langchain_openai import ChatOpenAI
 from ollama import ResponseError
 from openai import APIConnectionError, APIStatusError
 
+from request_pacing import note_rate_limit, pace_request
+
 
 class TransientModelError(RuntimeError):
     """Only transport/rate-limit/server failures are eligible for node retry."""
@@ -158,8 +160,11 @@ def completion(provider, messages, tools, *, response_schema=None):
     """Synchronous public adapter; tests can inject a scripted completion instead."""
     try:
         model = bound_model(provider, tools, response_schema)
+        pace_request(provider)
         return normalize_reply(model.invoke(convert_to_messages(messages)))
     except (APIConnectionError, APIStatusError, ResponseError, httpx.HTTPError, ConnectionError) as error:
+        if getattr(error, "status_code", None) == 429:
+            note_rate_limit(provider, getattr(getattr(error, "response", None), "headers", None))
         raise transport_error(error, provider) from error
 
 
@@ -167,8 +172,12 @@ async def acompletion(provider, messages, tools, *, response_schema=None, num_pr
     try:
         model = (bound_model(provider, tools, response_schema) if num_predict is None else
                  bound_model(provider, tools, response_schema, num_predict=num_predict))
+        if provider == "nvidia":
+            await asyncio.to_thread(pace_request, provider)
         return normalize_reply(await model.ainvoke(convert_to_messages(messages)))
     except (APIConnectionError, APIStatusError, ResponseError, httpx.HTTPError, ConnectionError) as error:
+        if getattr(error, "status_code", None) == 429:
+            note_rate_limit(provider, getattr(getattr(error, "response", None), "headers", None))
         raise transport_error(error, provider) from error
 
 

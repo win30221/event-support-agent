@@ -180,9 +180,9 @@ class SingleAgentTests(OfflineTests):
 
     def test_fake_citation_is_not_rendered(self):
         q = "我的餘額是多少？"
-        text, trace, _, _ = self.run_case(q,
-            response({"question": q, "status": "supported", "answer": "999999",
-                      "source_ids": ["E000000000000"]}))
+        invalid = {"question": q, "status": "supported", "answer": "999999",
+                   "source_ids": ["E000000000000"]}
+        text, trace, _, _ = self.run_case(q, response(invalid), structured(invalid))
         self.assertIn(ANSWER_VERIFICATION_FAILED, text)
         self.assertNotIn("999999", text)
         self.assertEqual(trace, [])
@@ -328,4 +328,59 @@ class SingleAgentTests(OfflineTests):
         text, trace, _, _ = self.run_case(q, select(item("不存在的紀念徽章")), finish)
         self.assertIn("查無", text)
         self.assertNotIn("100 枚", text)
+        self.assertEqual(len(trace), 1)
+
+    def test_inconsistent_status_is_repaired_before_terminal_acceptance(self):
+        q = "霧潮貼圖是免費的嗎？"
+        key = f"{CATALOG.current}/shop-items/mist-tide-sticker"
+        good = supported(q, "不是免費，需 20 枚星星幣。", (key, ""))
+        bad = {**good, "status": "no_evidence"}
+        def fix(provider, messages, tools, *, response_schema):
+            self.assertEqual(tools, [])
+            feedback = tool_results(messages)[-1]
+            self.assertEqual(feedback["錯誤代碼"], "INVALID_FINAL_EVIDENCE")
+            self.assertIn("非 supported", feedback["原因"])
+            self.assertIn("肯定或否定", messages[0]["content"])
+            return structured(good)
+        text, trace, events, _ = self.run_case(q, select(item("霧潮貼圖")), response(bad), fix)
+        self.assertIn("20 枚", text)
+        self.assertEqual(len(trace), 1)
+        self.assertFalse(any(t == "Python 接受終止工具" for t, _ in events))
+
+    def test_mixed_found_and_not_found_is_repaired_without_relaxing_guardrail(self):
+        q = "霧潮貼圖多少錢？"
+        def invalid(provider, messages, tools):
+            rows = [p for r in tool_results(messages) for p in r["段落"]]
+            return response({"question": q, "status": "supported", "answer": "20 枚",
+                             "source_ids": [p["段落ID"] for p in rows]})
+        def fix(provider, messages, tools, *, response_schema):
+            feedback = tool_results(messages)[-1]
+            self.assertEqual(feedback["錯誤代碼"], "INVALID_FINAL_EVIDENCE")
+            self.assertIn("檔期", feedback["原因"])
+            return structured(supported(q, "20 枚", (f"{CATALOG.current}/shop-items/mist-tide-sticker", "")))
+        text, trace, _, _ = self.run_case(q,
+            select(item("霧潮貼圖"), item("霧潮貼圖", "previous")), invalid, fix)
+        self.assertIn("20 枚", text)
+        self.assertEqual(len(trace), 2)
+
+    def test_schema_fallback_bad_status_does_not_promote_answer(self):
+        q = "霧潮貼圖多少錢？"
+        bad = {**supported(q, "20 枚", (f"{CATALOG.current}/shop-items/mist-tide-sticker", "")),
+               "status": "no_evidence"}
+        text, trace, _, _ = self.run_case(q, select(item("霧潮貼圖")),
+            {"content": "20 枚"}, structured(bad))
+        self.assertIn(ANSWER_VERIFICATION_FAILED, text)
+        self.assertNotIn("20 枚", text)
+        self.assertEqual(len(trace), 1)
+
+    def test_exhausted_repair_preserves_valid_independent_part(self):
+        q = "霧潮貼圖多少錢？我的餘額是多少？"
+        good = supported("霧潮貼圖多少錢？", "20 枚", (f"{CATALOG.current}/shop-items/mist-tide-sticker", ""))
+        bad = {"question": "我的餘額是多少？", "status": "supported", "answer": "999",
+               "source_ids": ["E000000000000"]}
+        text, trace, _, _ = self.run_case(q, select(item("霧潮貼圖")),
+            response(good, bad), {"content": "invalid json"})
+        self.assertIn("20 枚", text)
+        self.assertIn(ANSWER_VERIFICATION_FAILED, text)
+        self.assertNotIn("999", text)
         self.assertEqual(len(trace), 1)

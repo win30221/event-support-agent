@@ -146,3 +146,7 @@ Resolve the effective embedding provider/model once per request rather than muta
 ### Embedding transport resilience
 
 單題 Hybrid 成功後全量同題曾收到 NVIDIA HTTP 500。此證據只定位至服務請求失敗，無法證明具體供應商根因。唯讀嵌入請求採最多三次嘗試、指數退避加 jitter、有限 Retry-After；不重試非暫時性 HTTP 錯誤、不改模型或檢索排名、不自動降級。離線評測分開供應商執行失敗與證據漏召回，成功子集明確標記，仍以非零退出表示不完整。參考 OpenAI Python SDK 的暫時性錯誤重試做法，具體重試碼及上限為本專案取捨，尚待實機驗證。
+
+## 終止前 Guardrails 與 NVIDIA 節流
+
+基準 8c7ff7c 實機 JSON 顯示：wallet-b 正確自由文字因終止契約失敗進入 Schema-only，後續 status=no_evidence 卻附有效正文與來源；nov-title 混合跨期查無與正常商品證據後於呈現階段遭拒。此次僅移動既有確定性證據驗證至接受終止前，補非 supported 欄位互斥檢查，保留原有可信查無恢復、來源依賴展開、適用條件原文及安全拒絕。修復沿用單次既有預算，提供 INVALID_FINAL_EVIDENCE 與具體欄位/範圍原因；不自動更改 status、不增加正常路徑模型呼叫、不放寬混合查無限制、不引入語意模型。已耗盡修復時不信任拒絕的部分。這不保證語意充分性，也不保證已用過格式修復的 wallet-b 可恢復；Schema-only 明示有證據的否定也是 supported。NVIDIA 評測採程序內同供應商等距放行，預設 20 RPM 是保守取捨而非 NVIDIA 配額；跨模型聊天與 Embedding 共用，429 延後下一次請求。既有報告、題庫與回歸基準保留。新增離線腳本測試，實機與完整回歸待驗證。

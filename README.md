@@ -182,3 +182,25 @@ queries are sent to the selected cloud embedding API; use demo data only.
 The embedding API consumes its own provider quota even in offline retrieval tests.
 The implementation uses NVIDIA input_type=passage for indexing and query for
 search, truncate=NONE; official hosted API access needs live verification.
+
+
+## NVIDIA 批次評測節流
+
+NVIDIA API Catalog 試用速率依模型、帳號及當前負載而異；請於 build.nvidia.com 帳號查看限額。完整評測預設每分鐘最多 20 次 NVIDIA API 請求（本專案保守初始值，不是官方保證配額）。聊天與 Embedding 共用程序內節流器，重試也計入；每次請求開始至少間隔 60 / RPM 秒，模型已耗時超過間隔就不額外等待。429 時延後下一次請求，遵守 Retry-After；未提供則等待 60 秒。既有 Embedding 重試預算與 LLM 呼叫預算不增加；LLM 429 仍記錄該案例失敗，繼續其餘案例。HTTP 500 不等同於限流。多個程序或其他裝置不共用本節流器；不要同時跑多套評測。
+
+Windows PowerShell：
+
+```powershell
+$env:EVENT_SUPPORT_AGENT_EMBED_PROVIDER = "nvidia"
+$env:EVENT_SUPPORT_AGENT_RETRIEVAL = "hybrid"
+.\.venv\Scripts\python.exe -m evaluations.eval_rag --hybrid --nvidia-rpm 20
+.\.venv\Scripts\python.exe -m evaluations.eval_rag --live nvidia --nvidia-rpm 20 --report reports/nvidia-guardrails-hybrid.json
+```
+
+如仍頻繁出錯，將 --nvidia-rpm 20 改為 10。0 停用。未傳參數時使用 EVENT_SUPPORT_AGENT_NVIDIA_RPM，若未設定，批次預設 20；一般聊天與向量建置未設定時不節流。永久使用者設定（重新開啟 PowerShell 生效）：
+
+```powershell
+[Environment]::SetEnvironmentVariable("EVENT_SUPPORT_AGENT_NVIDIA_RPM", "20", "User")
+```
+
+評測報告記錄 nvidia_request_pacing_rpm；耗時包含等待與重試，不與未節流的效能直接比較。報告逐題保存，但沒有自動續跑；可用 --case 重測失敗案例，另存報告。

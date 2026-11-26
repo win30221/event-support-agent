@@ -115,7 +115,7 @@ def rejected_part(raw, index, reason):
 
 
 def decode_response(raw, *, observe=None, evidence=None, original_question="", stop_candidates=None,
-                    expand_dependencies=False):
+                    expand_dependencies=False, strict_terminal=False):
     """Model IDs -> canonical host citations. Never trust model-authored quotes."""
     try:
         data = json.loads(raw) if isinstance(raw, str) else raw
@@ -172,6 +172,8 @@ def decode_response(raw, *, observe=None, evidence=None, original_question="", s
                 if not part["answer"].strip() or not valid_ids:
                     raise ValueError("source_ids：有依據的回答須有正文及全部有效的本輪來源 ID。")
             elif part["answer"].strip() or ids:
+                if strict_terminal:
+                    raise ValueError("status：非 supported 不可附正文或來源。若本輪證據支持肯定或否定結論，使用 supported；否則清空正文與來源。")
                 if (stop_candidates is not None and part["status"] == "no_evidence"
                         and part["answer"].strip() and valid_ids):
                     stop_candidates.append({"問題": part["question"],

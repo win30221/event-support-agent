@@ -272,3 +272,29 @@ For a controlled chat-model comparison fix EVENT_SUPPORT_AGENT_EMBED_PROVIDER ex
 ### 雲端 Embedding 服務失敗與召回率
 
 離線 Hybrid 評測將耗盡暫時性錯誤重試的案例獨立列為執行失敗，保留其他案例的結果及完整 BM25 基準。Hybrid 召回率明確限定於成功完成且具有標記來源的案例；有任何此類錯誤時列出失敗案例 ID，回傳 exit code 1，不將服務失敗視為檢索漏召回，也不將成功子集當作全量成績。固定 Embedding provider/model 後可用 --case 重測失敗案例。
+
+
+## NVIDIA 批次評測節流
+
+NVIDIA API Catalog 試用速率依模型、帳號及當前負載而異；請於 build.nvidia.com 帳號查看限額。完整評測預設每分鐘最多 20 次 NVIDIA API 請求（本專案保守初始值，不是官方保證配額）。聊天與 Embedding 共用程序內節流器，重試也計入；每次請求開始至少間隔 60 / RPM 秒，模型已耗時超過間隔就不額外等待。429 時延後下一次請求，遵守 Retry-After；未提供則等待 60 秒。既有 Embedding 重試預算與 LLM 呼叫預算不增加；LLM 429 仍記錄該案例失敗，繼續其餘案例。HTTP 500 不等同於限流。多個程序或其他裝置不共用本節流器；不要同時跑多套評測。
+
+Windows PowerShell：
+
+```powershell
+$env:EVENT_SUPPORT_AGENT_EMBED_PROVIDER = "nvidia"
+$env:EVENT_SUPPORT_AGENT_RETRIEVAL = "hybrid"
+.\.venv\Scripts\python.exe -m evaluations.eval_rag --hybrid --nvidia-rpm 20
+.\.venv\Scripts\python.exe -m evaluations.eval_rag --live nvidia --nvidia-rpm 20 --report reports/nvidia-guardrails-hybrid.json
+```
+
+如仍頻繁出錯，將 --nvidia-rpm 20 改為 10。0 停用。未傳參數時使用 EVENT_SUPPORT_AGENT_NVIDIA_RPM，若未設定，批次預設 20；一般聊天與向量建置未設定時不節流。永久使用者設定（重新開啟 PowerShell 生效）：
+
+```powershell
+[Environment]::SetEnvironmentVariable("EVENT_SUPPORT_AGENT_NVIDIA_RPM", "20", "User")
+```
+
+評測報告記錄 nvidia_request_pacing_rpm；耗時包含等待與重試，不與未節流的效能直接比較。報告逐題保存，但沒有自動續跑；可用 --case 重測失敗案例，另存報告。
+
+### Single Agent 終止契約回歸
+
+Native submit_answer 與 Schema-only 均先通過原有證據驗證再結束。非 supported 附正文或來源視為契約錯誤（保留既有明確查無的可信原文恢復）。混合查無與正常證據不放行，回饋來源範圍及拆分方式。沿用原有一次格式修復及模型/工具總上限；若已耗盡，仍安全呈現通過的獨立部分。不變更評測門檻、RAG 排名、適用條件原文呈現或帳號權限。先跑單元測試，再以 --case wallet-b --case nov-title --case nov-sticker --case incident 等案例實測。後兩題的語意充分性仍須人工驗收，不宣稱本次已解決。

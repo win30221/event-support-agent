@@ -12,7 +12,7 @@ from answering import ANSWER_MARKDOWN_GUIDANCE, rejected_part, render_response
 from backend import compact_json
 from evidence import source_alias, source_map
 from model_client import completion, ignore_event, model_step
-from single_output import FINAL_DEFINITION, FINAL_SCHEMA, FINAL_TOOL, decode_final
+from single_output import FINAL_DEFINITION, FINAL_SCHEMA, FINAL_TOOL, decode_final, final_issues
 from tool_selection import MAX_BATCH, MAX_TOOL_CALLS, MAX_TOOL_ROUNDS, normalized_calls
 
 
@@ -34,6 +34,7 @@ class SingleState(SupportState, total=False):
     stop_queries: bool
     pending_text: str
     repair_feedback: str
+    repair_candidate: dict | None
 
 
 class SingleAgentRuntime(TurnRuntime):
@@ -68,7 +69,7 @@ class SingleAgentRuntime(TurnRuntime):
             {"role": "system", "content": SINGLE_AGENT_PROMPT + "\n服務上下文："
              + compact_json(self.context.public_summary())}, *self.conversation]),
             model_calls=0, format_retry_used=False, stop_queries=False, pending_text="",
-            repair_feedback="")
+            repair_feedback="", repair_candidate=None)
         return state
 
     def validate_call(self, state, name, raw):
@@ -96,15 +97,20 @@ class SingleAgentRuntime(TurnRuntime):
                     "原因": "終止工具必須單獨提交；本批其他工具依各自結果處理，這次提交未被接受。"}
         return super().pre_dispatch_rejection(state, name)
 
-    def repair(self, state, number, reason, *, final_only=False, terminal=None, content=""):
-        self.observe("Python 單一 Agent 回傳驗證失敗", {"原因": reason, "模型呼叫": number})
+    def repair(self, state, number, reason, *, final_only=False, terminal=None, content="",
+               error_code="INVALID_FINAL_SCHEMA", candidate=None):
+        self.observe("Python 單一 Agent 回傳驗證失敗", {"原因": reason, "模型呼叫": number,
+                     "錯誤代碼": error_code})
+        # 修復預算耗盡時，仍逐項安全呈現已通過的部分；不提升被拒絕的正文。
+        fallback = candidate if candidate is not None else state.get("repair_candidate")
         if state["format_retry_used"] or number >= MAX_MODEL_CALLS:
-            return {"model_calls": number, "data": None, "next_step": "finalize"}
+            return {"model_calls": number, "data": fallback, "next_step": "finalize"}
         # 有合法呼叫封套時回傳對應工具錯誤；無封套時由下一次 system 請求提供主機回饋。
         # 主機不冒充玩家，也不把任意工具內容提升成 system 指令。
         updates = {"model_calls": number, "format_retry_used": True, "next_step": "model",
                    "stop_queries": state["stop_queries"] or final_only,
-                   "repair_feedback": reason if terminal is None else ""}
+                   "repair_feedback": reason if terminal is None else "",
+                   "repair_candidate": fallback}
         if terminal is not None:
             try:
                 args = raw_arguments(terminal)
@@ -114,7 +120,7 @@ class SingleAgentRuntime(TurnRuntime):
                 AIMessage(content=content if isinstance(content, str) else "",
                           tool_calls=[native_call(terminal, args if isinstance(args, dict) else {})]),
                 ToolMessage(content=compact_json({"工具": FINAL_TOOL, "狀態": "rejected",
-                            "錯誤代碼": "INVALID_FINAL_SCHEMA", "原因": reason}),
+                            "錯誤代碼": error_code, "原因": reason}),
                             name=FINAL_TOOL, tool_call_id=terminal["id"])]
         return updates
 
@@ -131,7 +137,9 @@ class SingleAgentRuntime(TurnRuntime):
             instructions.append("主機回傳契約檢查：" + state["repair_feedback"]
                                 + "。請依原問及已有工具結果完成合法回傳。")
         if not allow_tools:
-            instructions.append("主機已停止新工具查詢。不要呼叫 submit_answer；依相同回答契約直接輸出 Schema 要求的 JSON，不足處保留限制。")
+            instructions.append("主機已停止新工具查詢。不要呼叫 submit_answer；依相同回答契約直接輸出 Schema 要求的 JSON。"
+                                "本輪證據支持的肯定或否定結論都用 supported 並附來源；"
+                                "無法確認的獨立需求才用 no_evidence，正文及來源留空。")
         if instructions:
             messages[0] = {**messages[0], "content": messages[0]["content"] + "\n" + "\n".join(instructions)}
         self.observe("Python 單一 Agent 輪次", {"模型呼叫": number, "工具輪次": state["round_number"],
@@ -162,6 +170,11 @@ class SingleAgentRuntime(TurnRuntime):
                 except ValueError as error:
                     return self.repair(state, number, str(error), final_only=True,
                                        terminal=terminal[0], content=reply.get("content"))
+                issues = final_issues(data, state["evidence"])
+                if issues:
+                    return self.repair(state, number, "；".join(issues), final_only=True,
+                                       terminal=terminal[0], content=reply.get("content"),
+                                       error_code="INVALID_FINAL_EVIDENCE", candidate=data)
                 self.observe("Python 接受終止工具", {"工具": FINAL_TOOL, "模型呼叫": number})
                 return {"model_calls": number, "data": data, "next_step": "finalize"}
             content = reply.get("content")
@@ -176,6 +189,10 @@ class SingleAgentRuntime(TurnRuntime):
                                 evidence=state["evidence"], original_question=self.question)
         except ValueError as error:
             return self.repair(state, number, str(error), final_only=True)
+        issues = final_issues(data, state["evidence"])
+        if issues:
+            return self.repair(state, number, "；".join(issues), final_only=True,
+                               error_code="INVALID_FINAL_EVIDENCE", candidate=data)
         return {"model_calls": number, "data": data, "next_step": "finalize"}
 
     async def prepare_tools(self, state):

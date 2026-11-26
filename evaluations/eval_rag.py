@@ -13,6 +13,7 @@ from pathlib import Path
 
 from guide import published_passages, rank_passages, search_rules
 from embedding_client import TransientEmbeddingError
+from request_pacing import DEFAULT_BATCH_RPM, ENV as NVIDIA_RPM_ENV, configured_rpm
 
 
 def legacy_search(question, passages):
@@ -188,6 +189,7 @@ def report_metadata(provider):
     return {"timestamp_utc": datetime.now(timezone.utc).isoformat(), "commit": commit,
             "python": platform.python_version(), "os": platform.platform(), "provider": provider,
             "configured_model": configured_model(provider),
+            "nvidia_request_pacing_rpm": configured_rpm(),
             "retrieval": os.getenv("EVENT_SUPPORT_AGENT_RETRIEVAL", "bm25"),
             "embedding": resolve_embedding(provider).public_metadata()
                          if os.getenv("EVENT_SUPPORT_AGENT_RETRIEVAL", "bm25") == "hybrid" else None,
@@ -307,7 +309,22 @@ def main():
     parser.add_argument("--report", type=Path, help="實機重播結果輸出 JSON；含模擬玩家問答與引用")
     parser.add_argument("--gate", action="store_true", help="實機結構性驗收；所有選定試驗通過才回傳 0，仍需人工語意驗收")
     parser.add_argument("--repeat", type=int, default=1, help="每個案例重跑次數")
+    parser.add_argument("--nvidia-rpm", type=int, default=None,
+                        help="NVIDIA 聊天、Embedding 及重試共用每分鐘請求上限；預設 20 或環境變數，0 停用")
     args = parser.parse_args()
+    if args.nvidia_rpm is not None and args.nvidia_rpm < 0:
+        parser.error("--nvidia-rpm 必須為非負整數")
+    if args.live or args.hybrid:
+        # 評測程序設定一次；不修改使用者的永久環境變數。
+        if args.nvidia_rpm is not None:
+            os.environ[NVIDIA_RPM_ENV] = str(args.nvidia_rpm)
+        else:
+            os.environ.setdefault(NVIDIA_RPM_ENV, str(DEFAULT_BATCH_RPM))
+        try:
+            rpm = configured_rpm()
+        except ValueError as error:
+            parser.error(str(error))
+        print(f"NVIDIA API pacing: {rpm} RPM (0 = disabled; chat + embeddings + retries)", flush=True)
     if args.repeat < 1 or args.repeat > 20:
         parser.error("--repeat 必須為 1 至 20")
     if (args.gate or args.repeat != 1) and not args.live:

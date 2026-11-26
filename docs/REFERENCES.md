@@ -112,3 +112,7 @@
 - pgvector variable-dimensional vector column and exact filtering: https://github.com/pgvector/pgvector#frequently-asked-questions.
 
 - [OpenAI Python SDK — Retries](https://github.com/openai/openai-python#retries)：參考唯讀請求的有限重試及指數退避；本專案針對通用 Embedding transport 自行選擇可重試 HTTP 狀態與上限，不宣稱 NVIDIA 的 HTTP 500 一定可恢復。
+
+- [OpenAI Agents SDK Guardrails](https://openai.github.io/openai-agents-python/guardrails/)：拒絕未通過的候選輸出；本專案沿用既有 LangGraph 有限修復，非導入 OpenAI SDK。
+- [LangChain Structured Output](https://docs.langchain.com/oss/python/langchain/structured-output)：參考 ToolStrategy 驗證失敗的錯誤回饋與重試，實際規則由本專案主機決定。
+- [NVIDIA NIM FAQ](https://forums.developer.nvidia.com/t/nvidia-nim-faq/300317)：試用配額可能變動。20 RPM 是本專案可調節流預設，不代表服務保證。
