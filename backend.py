@@ -246,8 +246,13 @@ def evidence_for(name, args, result, question):
     elif name == "get_my_event_progress":
         source["本人紀錄"] = result
         source["狀態"] = "unavailable" if "狀態" in result else "found"
-        rows.append({"段落ID": f"{edition}/my-progress", "來源": f"目前登入帳號的活動紀錄（{edition}）",
-                     "原文": json.dumps(result, ensure_ascii=False, indent=2)})
+        row = {"段落ID": f"{edition}/my-progress", "來源": f"目前登入帳號的活動紀錄（{edition}）",
+               "原文": json.dumps(result, ensure_ascii=False, indent=2)}
+        # 查無進度紀錄是查詢狀態，不是餘額、參加狀態或其他個人事實的依據。
+        # 與商城 unavailable 使用同一既有驗證路徑，保留可信原文、拒絕混合推論。
+        if source["狀態"] == "unavailable":
+            row["資料狀態"] = "unavailable"
+        rows.append(row)
     else:
         rows.append({"段落ID": result_id("calculation", result), "來源": "依本輪資料執行四則運算",
                      "原文": f"{result['expression']} = {result['result']}",

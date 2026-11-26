@@ -212,3 +212,7 @@ $env:EVENT_SUPPORT_AGENT_RETRIEVAL = "hybrid"
 ### 證據範圍與不確定性
 
 Single Agent 第一階段統一證據及結論強度、部分條件、未知資訊與補查指引。保留原有 Schema、主機驗證與工具權限，不新增語意審查模型；實際效果以人工語意複核及相同配置的回歸驗證為準。測試順序見 [EVALUATION](docs/EVALUATION.md)。
+
+### 資料不足的安全呈現
+
+現行 Single Agent 以本輪可信工具狀態補充 no_evidence 的限制說明，合併純未知需求且保留各需求，無額外模型呼叫、不接收模型自由拒答正文。見 [EVALUATION](docs/EVALUATION.md)。

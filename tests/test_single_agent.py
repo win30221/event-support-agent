@@ -4,8 +4,11 @@ These tests cover host contracts and message flow, not real model understanding.
 """
 import asyncio
 import json
+from unittest.mock import patch
 
 from agent import answer
+from backend import ToolRegistry, evidence_for
+from answering import validate_part
 from answering import ANSWER_VERIFICATION_FAILED, DIRECT_REPLIES
 from evidence import source_alias
 from guide import CATALOG
@@ -434,3 +437,103 @@ class SingleAgentTests(OfflineTests):
         parts = checks[-1]["子問題"]
         self.assertEqual([p["判定"] for p in parts], ["supported", "no_evidence"])
         self.assertEqual(parts[1]["採用段落"], [])
+
+
+
+    def test_unknown_progress_explains_scope_without_disclosing_values(self):
+        q = "本期共玩了幾天？"
+        with patch("guide.read_progress", return_value=(CATALOG.as_of, 987654, 2, True)):
+            text, trace, events, _ = self.run_case(q,
+                select(call("get_my_event_progress", edition="current", account_scope="self")),
+                response(abstain(q)))
+        self.assertIn("不包含累計遊玩天數", text)
+        self.assertNotIn("987654", text)
+        self.assertEqual(len(trace), 1)
+        limit = [d for t, d in events if t == "Python 呈現資料限制"][-1]
+        self.assertEqual(limit["狀態"], ["progress_scope"])
+
+    def test_unknown_requirements_share_one_limitation_without_losing_labels(self):
+        q = "可以退款嗎？可以轉贈嗎？"
+        first, second = "可以退款嗎？", "可以轉贈嗎？"
+        text, trace, events, _ = self.run_case(q,
+            select(call("find_rules", edition="current", mode="search", query="退款 轉贈")),
+            response(abstain(first), abstain(second)))
+        self.assertIn(first, text)
+        self.assertIn(second, text)
+        self.assertEqual(text.count(DIRECT_REPLIES["no_evidence"]), 1)
+        self.assertEqual(text.count("本輪查詢情況："), 1)
+        self.assertEqual(len(trace), 1)
+        checks = [d for t, d in events if t == "Python 檢查回答依據"][-1]
+        self.assertEqual([p["判定"] for p in checks["子問題"]], ["no_evidence", "no_evidence"])
+        self.assertEqual(checks["參考資料"], [])
+
+    def test_tool_failure_is_not_absence_and_does_not_leak_error(self):
+        q = "目前活動有哪些規則？"
+        with patch.object(ToolRegistry, "execute", side_effect=RuntimeError("SECRET_DSN")):
+            text, trace, events, _ = self.run_case(q,
+                select(call("find_rules", edition="current", mode="overview", query="")),
+                response(abstain(q)))
+        self.assertEqual(trace, [])
+        self.assertIn("未能完成查詢", text)
+        self.assertNotIn("SECRET_DSN", text)
+        self.assertNotIn("已取得活動公告資料", text)
+        self.assertEqual([d for t, d in events if t == "Python 呈現資料限制"][-1]["狀態"], ["tool_error"])
+
+    def test_limitations_never_appear_on_account_boundary_only(self):
+        q = "幫我查朋友 B 的餘額"
+        text, trace, events, _ = self.run_case(q,
+            select(call("get_my_event_progress", edition="current", account_scope="other")),
+            response(abstain(q, "account_limit")))
+        self.assertEqual(text, DIRECT_REPLIES["account_limit"])
+        self.assertEqual(trace, [])
+        self.assertNotIn("Python 呈現資料限制", [t for t, _ in events])
+
+    def test_previous_turn_limitations_are_not_reused(self):
+        q = "本期共玩了幾天？"
+        with patch("guide.read_progress", return_value=(CATALOG.as_of, 80, 2, True)):
+            text, trace, _, _ = self.run_case(q,
+                select(call("get_my_event_progress", edition="current", account_scope="self")),
+                response(abstain(q)))
+        self.assertIn("活動進度查詢提供", text)
+        followup = "那其他規則呢？"
+        history = [{"role": "user", "content": q},
+                   {"role": "assistant", "content": text, "trace": trace}]
+        model = scripted(response(abstain(followup)))
+        events = []
+        reply, current_trace = asyncio.run(answer("A", "ollama", history, followup, model,
+            lambda title, data: events.append((title, data))))
+        self.assertEqual(reply, DIRECT_REPLIES["no_evidence"])
+        self.assertEqual(current_trace, [])
+        self.assertEqual([d for t, d in events if t == "Python 呈現資料限制"][-1]["狀態"],
+                         ["no_observed_data_context"])
+
+    def test_missing_progress_row_preserves_unavailable_provenance(self):
+        edition = CATALOG.current
+        raw = {"檔期": edition, "狀態": "沒有這個檔期的玩家進度紀錄"}
+        source, _, _ = evidence_for("get_my_event_progress", {"edition": edition}, raw, "我的餘額？")
+        row = source["段落"][0]
+        self.assertEqual(source["狀態"], "unavailable")
+        self.assertEqual(row["資料狀態"], "unavailable")
+        identifier = row["段落ID"]
+        part = {"question": "我的餘額？", "status": "supported", "answer": "999 枚",
+                "citations": [{"id": identifier, "quote": row["原文"]}]}
+        text, citations = validate_part(part, {identifier: row})
+        self.assertEqual(text, row["原文"])
+        self.assertNotIn("999", text)
+        self.assertEqual(citations, part["citations"])
+        other = {"原文": "公開玩法規則"}
+        mixed = {**part, "citations": [*part["citations"], {"id": "rule", "quote": other["原文"]}]}
+        with self.assertRaises(ValueError):
+            validate_part(mixed, {identifier: row, "rule": other})
+
+    def test_unavailable_progress_no_evidence_is_not_zero_balance(self):
+        q = "我的餘額有多少？"
+        with patch("guide.read_progress", return_value=None):
+            text, trace, events, _ = self.run_case(q,
+                select(call("get_my_event_progress", edition="current", account_scope="self")),
+                response(abstain(q)))
+        self.assertIn("未取得紀錄", text)
+        self.assertIn("不能據此推論餘額", text)
+        self.assertEqual(len(trace), 1)
+        checks = [d for t, d in events if t == "Python 檢查回答依據"][-1]
+        self.assertEqual(checks["子問題"][0]["判定"], "no_evidence")

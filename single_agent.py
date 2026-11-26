@@ -9,6 +9,7 @@ from langsmith import tracing_context
 
 from agent_runtime import SupportState, TurnRuntime, native_call, raw_arguments
 from answering import ANSWER_MARKDOWN_GUIDANCE, rejected_part, render_response
+from answer_limitations import build_limitations
 from backend import compact_json
 from evidence import source_alias, source_map
 from model_client import completion, ignore_event, model_step
@@ -245,7 +246,9 @@ class SingleAgentRuntime(TurnRuntime):
         if data is None:
             data = {"action": "answer", "missing": "", "results": [
                 rejected_part({"question": self.question}, 0, "模型未提交有效最終回答")]}
-        return {"result": render_response(data, state["evidence"], self.observe)}
+        limitations = build_limitations(state["sources"], state["errors"])
+        return {"result": render_response(data, state["evidence"], self.observe,
+                                          limitations=limitations)}
 
     @staticmethod
     def route_model(state):

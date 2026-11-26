@@ -434,3 +434,22 @@ macOS/Linux 改用 `./.venv/bin/python`。BM25 歷史報告以實際檔名代入
 ```
 
 重複試驗用 --repeat 3；不要混合不同套件、模型、語料與設定的成績。每輪新報告 transport 記錄 chat/embedding adapter attempts、成功/失敗、HTTP 狀態、重試與節流等待；只使用安全欄位，無憑證或正文。SDK 內部未觀測請求不冒充已知；並行等待加總不是牆鐘時間。20 RPM 與原重試預算未改。
+
+## 第二階段離線回歸與實機檢查
+
+先跑新增主機限制模組與 Single Agent 回歸（不需模型 API）：
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest tests.test_answer_limitations tests.test_single_agent tests.test_eval_report -v
+```
+
+macOS/Linux 使用 `./.venv/bin/python`。依 AGENTS.md 初始化獨立測試 PostgreSQL，再跑完整 unittest、pip check 及離線 RAG。確認通過後，若需實機驗收，先以既有相同 NVIDIA Hybrid 配置測試三個案例（保留舊報告）：
+
+```powershell
+$env:EVENT_SUPPORT_AGENT_EMBED_PROVIDER = "nvidia"
+$env:EVENT_SUPPORT_AGENT_RETRIEVAL = "hybrid"
+.\.venv\Scripts\python.exe -m evaluations.eval_rag --live nvidia --case unrecorded-days --case missing-policy --case wallet-b --nvidia-rpm 20 --report reports/nvidia-limitations-smoke.json
+.\.venv\Scripts\python.exe -m evaluations.eval_report reports/nvidia-limitations-smoke.json --out reports/nvidia-limitations-smoke-v2.json
+```
+
+人工確認未知需求的限制說明只反映本輪工具狀態、不洩漏值、不宣稱全庫查無；多個未知需求不重複拒答。保留 supported 的正確答案與引用。舊評測規則不變，勿把限制摘要當成語意驗收通過。此次不需為了呈現改動重新建向量索引。

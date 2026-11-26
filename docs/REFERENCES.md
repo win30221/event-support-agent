@@ -132,3 +132,11 @@
 - [Anthropic — Implement tool use](https://platform.claude.com/docs/en/agents-and-tools/tool-use/implement-tool-use)：工具描述應說明功能、適用時機與限制。
 - [Google Cloud — Check grounding](https://docs.cloud.google.com/generative-ai-app-builder/docs/check-grounding)：以主張為單位判斷參考資料是否支持。此處僅參考設計原則，不導入外部 grounding API 或聲稱 Python 已能自動驗證語意。
 - [OpenAI — Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)：結構合法不等於內容正確；需另行評測。
+
+## 資料不足時的限制資訊（第二階段）
+
+- [Google Agent Search Answer resource](https://docs.cloud.google.com/generative-ai-app-builder/docs/reference/rest/v1/projects.locations.collections.dataStores.sessions.answers)：answerSkippedReasons 分類回答跳過原因；本專案使用自身工具狀態與能力資訊，不使用 Google 的語意判定或假設分類等價。
+- [OpenAI Function Calling](https://developers.openai.com/api/docs/guides/function-calling)：由程式處理已知資料、限制模型輸出契約。OpenAI Structured Outputs 的安全 refusal 與本專案資料不足狀態不同。
+- [AWS Bedrock contextual grounding](https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails-contextual-grounding-check.html)：證據支持度和問題相關性分別處理。本次不引入自動語意驗證。
+
+本專案以確定性主機呈現補充已知查詢範圍，非外部服務強制架構；全輪摘要不代表個別需求的原因已確認。

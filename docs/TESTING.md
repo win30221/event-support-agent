@@ -187,3 +187,22 @@ macOS/Linux 改用 `./.venv/bin/python`。不指定 `--suite` 仍測原 baseline
 ## Single Agent：證據依賴展開
 
 最終回答可只引用已取得的計算結果短 ID。主機依本輪可信證據內的 `運算依據` 展開多層來源，去重並保留穩定順序，再執行原有引用及適用條件驗證。未知 ID、缺失原文、循環或不合法依賴會使受影響的子問題降級；不新增模型呼叫，不自動引入未被引用的計算。舊 `legacy_answer`、`intent_answer` 的引用契約不變。此機制僅保證來源追溯，不證明運算式選擇、數字來源或回答語意正確。測試：`python -m unittest tests.test_evidence_dependencies tests.test_single_agent -v`。
+
+## 第二階段離線回歸與實機檢查
+
+先跑新增主機限制模組與 Single Agent 回歸（不需模型 API）：
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest tests.test_answer_limitations tests.test_single_agent tests.test_eval_report -v
+```
+
+macOS/Linux 使用 `./.venv/bin/python`。依 AGENTS.md 初始化獨立測試 PostgreSQL，再跑完整 unittest、pip check 及離線 RAG。確認通過後，若需實機驗收，先以既有相同 NVIDIA Hybrid 配置測試三個案例（保留舊報告）：
+
+```powershell
+$env:EVENT_SUPPORT_AGENT_EMBED_PROVIDER = "nvidia"
+$env:EVENT_SUPPORT_AGENT_RETRIEVAL = "hybrid"
+.\.venv\Scripts\python.exe -m evaluations.eval_rag --live nvidia --case unrecorded-days --case missing-policy --case wallet-b --nvidia-rpm 20 --report reports/nvidia-limitations-smoke.json
+.\.venv\Scripts\python.exe -m evaluations.eval_report reports/nvidia-limitations-smoke.json --out reports/nvidia-limitations-smoke-v2.json
+```
+
+人工確認未知需求的限制說明只反映本輪工具狀態、不洩漏值、不宣稱全庫查無；多個未知需求不重複拒答。保留 supported 的正確答案與引用。舊評測規則不變，勿把限制摘要當成語意驗收通過。此次不需為了呈現改動重新建向量索引。

@@ -342,3 +342,22 @@ $env:EVENT_SUPPORT_AGENT_RETRIEVAL = "hybrid"
 ```
 
 語意複核逐項核對：缺乏支持的主張、適當拒答、過度拒答、必要條件是否保留、是否出現無必要補查。使用現有五項人工評分記錄具體原因；未執行保持 not_run。本次尚未引入主張切分/自動比率計算，不能宣稱 Unsupported Claim Rate 或 Appropriate Abstention 等指標已自動計算。相同案例的單次結果只供診斷；跨版本比較應使用相同測試設定、題集、重複次數並核對完整 Trace。
+
+## 第二階段離線回歸與實機檢查
+
+先跑新增主機限制模組與 Single Agent 回歸（不需模型 API）：
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest tests.test_answer_limitations tests.test_single_agent tests.test_eval_report -v
+```
+
+macOS/Linux 使用 `./.venv/bin/python`。依 AGENTS.md 初始化獨立測試 PostgreSQL，再跑完整 unittest、pip check 及離線 RAG。確認通過後，若需實機驗收，先以既有相同 NVIDIA Hybrid 配置測試三個案例（保留舊報告）：
+
+```powershell
+$env:EVENT_SUPPORT_AGENT_EMBED_PROVIDER = "nvidia"
+$env:EVENT_SUPPORT_AGENT_RETRIEVAL = "hybrid"
+.\.venv\Scripts\python.exe -m evaluations.eval_rag --live nvidia --case unrecorded-days --case missing-policy --case wallet-b --nvidia-rpm 20 --report reports/nvidia-limitations-smoke.json
+.\.venv\Scripts\python.exe -m evaluations.eval_report reports/nvidia-limitations-smoke.json --out reports/nvidia-limitations-smoke-v2.json
+```
+
+人工確認未知需求的限制說明只反映本輪工具狀態、不洩漏值、不宣稱全庫查無；多個未知需求不重複拒答。保留 supported 的正確答案與引用。舊評測規則不變，勿把限制摘要當成語意驗收通過。此次不需為了呈現改動重新建向量索引。

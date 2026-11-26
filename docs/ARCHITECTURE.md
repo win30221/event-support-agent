@@ -107,3 +107,9 @@ Select 對暫時性傳輸錯誤使用 RetryPolicy（至多 2 次嘗試）；其�
 ## Single Agent：證據依賴展開
 
 最終回答可只引用已取得的計算結果短 ID。主機依本輪可信證據內的 `運算依據` 展開多層來源，去重並保留穩定順序，再執行原有引用及適用條件驗證。未知 ID、缺失原文、循環或不合法依賴會使受影響的子問題降級；不新增模型呼叫，不自動引入未被引用的計算。舊 `legacy_answer`、`intent_answer` 的引用契約不變。此機制僅保證來源追溯，不證明運算式選擇、數字來源或回答語意正確。測試：`python -m unittest tests.test_evidence_dependencies tests.test_single_agent -v`。
+
+## 主機端資料限制呈現（第二階段）
+
+Single Agent 在 finalize 依本輪 sources、errors 產生限制資訊，僅在經驗證的 no_evidence 存在時附上本輪查詢摘要；同輪純未知需求合併一段拒答但保留各需求標題。狀態分類與固定的工具能力說明由 Python 管理，不輸出工具參數、紀錄值、原文、例外或模型自由理由。沒有可信執行資訊時保留通用拒答；無效參數提案不是已執行查詢。搜尋無段落與背景資料不證明政策不存在，精確商城查無只限該次品名及檔期。摘要只描述全輪，不能將任一次查詢或失敗硬配到個別子問題。不更改 Prompt、Schema、工具派發、RAG、模型預算、NVIDIA 節流或評測門檻；原有 supported、account_limit、其他拒答與歷史 renderer 路徑保留。no_evidence 的正文與來源仍須留空，限制資訊不算作採用證據或語意證明。
+
+另將沒有玩家進度紀錄的證據段落標記為 unavailable，與原有商城未確認狀態的主機驗證一致。單獨引用僅能呈現可信查詢狀態原文，不允許模型將其改寫為餘額；與一般規則混合仍走原有拒絕規則。不將 unavailable 自動判為 not_found 或餘額為零。

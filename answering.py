@@ -249,7 +249,7 @@ def answer_references(decisions, evidence):
 
 
 # 先驗證再分組與呈現；參考資料只來自最終採用的有效引用。
-def render_response(data, evidence, observe, *, unresolved=False):
+def render_response(data, evidence, observe, *, unresolved=False, limitations=None):
     rendered, decisions, groups = [], [], {}
     parts = data["results"]
     for part in parts:
@@ -266,7 +266,16 @@ def render_response(data, evidence, observe, *, unresolved=False):
         entry = (detail["判定"], text)
         if entry not in group["answers"]:
             group["answers"].append(entry)
-    for group in groups.values():
+    # 只在現行 Single Agent 提供主機限制資訊時合併純未知需求；歷史流程不變。
+    unknown_groups = [key for key, group in groups.items()
+                      if all(status == "no_evidence" for status, _ in group["answers"])]
+    combine_unknown = limitations is not None and len(unknown_groups) > 1
+    for key, group in groups.items():
+        if combine_unknown and key in unknown_groups:
+            if key == unknown_groups[0]:
+                labels = "\n\n".join(f"**{groups[k]['question']}**" for k in unknown_groups)
+                rendered.append(labels + "\n\n" + DIRECT_REPLIES["no_evidence"])
+            continue
         entries = group["answers"]
         has_supported = any(status == "supported" for status, _ in entries)
         texts = [text for status, text in entries if status == "supported"]
@@ -281,6 +290,13 @@ def render_response(data, evidence, observe, *, unresolved=False):
         if len(groups) > 1:
             text = f"**{group['question']}**\n\n{text}"
         rendered.append(text)
+    if limitations is not None and any(d["判定"] == "no_evidence" for d in decisions):
+        summary = limitations.summary()
+        if summary:
+            rendered.append(summary)
+        observe("Python 呈現資料限制", {"範圍": "本輪查詢情況，非個別需求的因果判定",
+                                      "狀態": list(limitations.codes),
+                                      "合併未知需求數": len(unknown_groups) if combine_unknown else 0})
     if unresolved or data["action"] == "retrieve":
         rendered.append(UNRESOLVED)
     observe("Python 檢查回答依據", {"子問題": decisions,
