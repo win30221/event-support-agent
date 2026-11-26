@@ -56,7 +56,7 @@ async def intent_answer(player, provider, history, question, complete=completion
     return result["result"], result["trace"]
 
 
-async def answer(player, provider, history, question, complete=completion, observe=ignore_event):
+async def answer(player, provider, history, question, complete=completion, observe=ignore_event, *, embedding=None):
     """Default: one Agent, native tools, and a bounded tool-result loop."""
     from single_agent import single_answer
-    return await single_answer(player, provider, history, question, complete, observe)
+    return await single_answer(player, provider, history, question, complete, observe, embedding=embedding)

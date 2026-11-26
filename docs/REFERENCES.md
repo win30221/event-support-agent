@@ -104,3 +104,9 @@
 
 - [OpenAI Function Calling](https://developers.openai.com/api/docs/guides/function-calling)；[Anthropic Handle Tool Calls](https://platform.claude.com/docs/en/agents-and-tools/tool-use/handle-tool-calls)、[Parallel Tool Use](https://platform.claude.com/docs/en/agents-and-tools/tool-use/parallel-tool-use)：2026-11-26 核對；每個有效封套的工具呼叫都需對應結果（含未執行/拒絕），獨立唯讀工具可平行。採用於 single_agent.py 與 agent_runtime.py；終止工具必須單獨提交是本專案的停止契約。
 - [Ollama Tool Calling](https://docs.ollama.com/capabilities/tool-calling)、[Chat API](https://docs.ollama.com/api/chat)、[Context Length](https://docs.ollama.com/context-length)、[Anthropic Effective Context Engineering](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)：參考多輪工具回饋、供應商回報用量、輸入資訊與配置容量分開觀測。不新增模型探測請求，不推定實際 Context 或輸入截斷。
+
+## Multi-provider embedding
+
+- NVIDIA hosted Nemotron 3.5 Embed API: https://docs.api.nvidia.com/nim/reference/nvidia-nemotron-3_5-embed-1b-infer (passage/query, float, no silent truncation, 2048 native dimensions).
+- OpenAI embeddings: https://platform.openai.com/docs/api-reference/embeddings/create (input, model, float output).
+- pgvector variable-dimensional vector column and exact filtering: https://github.com/pgvector/pgvector#frequently-asked-questions.

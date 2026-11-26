@@ -264,3 +264,7 @@ macOS/Linux 改用 `./.venv/bin/python`。不指定 `--suite` 仍測原 baseline
 ```
 
 macOS/Linux 使用 `./.venv/bin/python`。需先設定 NVIDIA_API_KEY、NVIDIA_MODEL（選用）及 EVENT_SUPPORT_AGENT_PG_DSN。使用原 Demo 資料，勿提交含敏感資料的工程報告。每題完成即原子更新報告，可保留中斷前的結果；每題記錄模型回報 token、模型與工具耗時、工具呼叫、完整工程事件、必要來源及結構驗收。失敗案例保留錯誤類型，不將例外原文寫進報告。結構驗收通過不等於語意正確，必須逐題核對 reference；部分來源覆蓋要求可能比基本回答更嚴格。模型、供應商、取樣設定及運行環境不同，並非單變因效能實驗。先跑代表案例，再視結果跑全量 31 題。完整批次尚未實機驗證。
+
+## Embedding provider comparison
+
+For a controlled chat-model comparison fix EVENT_SUPPORT_AGENT_EMBED_PROVIDER explicitly; for a retrieval comparison fix the chat model. The live report records retrieval and effective embedding provider/model. Offline --hybrid uses the explicit environment selection (auto resolves to Ollama without a chat provider). See QUICKSTART for commands. Existing coverage gates and business tools are unchanged. Cloud embedding requests are real API requests even in offline retrieval evaluation.

@@ -79,11 +79,11 @@ def native_call(call, arguments):
 class TurnRuntime:
     """Dependencies live outside graph state; each answer owns one runtime and registry."""
 
-    def __init__(self, player, provider, history, question, complete, observe, *, stop_mode=None):
+    def __init__(self, player, provider, history, question, complete, observe, *, stop_mode=None, embedding=None):
         self.provider, self.question = provider, question
         self.complete, self.observe = complete, observe
         self.context = RequestContext.build(question, history)
-        self.registry = ToolRegistry(player)
+        self.registry = ToolRegistry(player, provider=provider, embedding=embedding)
         self.definitions = self.registry.definitions()
         self.stop_mode = (os.getenv("EVENT_SUPPORT_AGENT_STOP_GATE", "auto").strip().lower()
                           if stop_mode is None else stop_mode)
@@ -95,6 +95,9 @@ class TurnRuntime:
             [self.make_tool(d["function"]) for d in self.definitions],
             messages_key="dispatch_messages", handle_tool_errors=False)
         self.observe("Python 工具介接模式", {"服務": provider, "模式": "native"})
+        self.observe("Python retrieval configuration", {"retrieval": self.registry.retriever,
+                     "embedding": self.registry.embedding.public_metadata()
+                     if self.registry.retriever == "hybrid" else None})
         self.observe("Python Agent Harness", {"框架": "langgraph", "停止檢查": self.stop_mode})
 
     def make_tool(self, definition):

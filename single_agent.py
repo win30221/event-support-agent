@@ -39,8 +39,8 @@ class SingleState(SupportState, total=False):
 class SingleAgentRuntime(TurnRuntime):
     """共用現有可信工具派發與引用驗證，不呼叫舊流程的 assess / stop_gate / review。"""
 
-    def __init__(self, player, provider, history, question, complete, observe):
-        super().__init__(player, provider, history, question, complete, observe, stop_mode="off")
+    def __init__(self, player, provider, history, question, complete, observe, *, embedding=None):
+        super().__init__(player, provider, history, question, complete, observe, stop_mode="off", embedding=embedding)
         # Backend 仍只有主機登入帳號；模型的 account_scope 僅是語意提案，
         # 不代表授權。保留舊候選的明示對象檢查，不允許模型傳入帳號 ID。
         self.definitions = deepcopy(self.definitions)
@@ -238,8 +238,8 @@ def build_single_graph(runtime):
     return graph.compile()
 
 
-async def single_answer(player, provider, history, question, complete=completion, observe=ignore_event):
-    runtime = SingleAgentRuntime(player, provider, list(history), question, complete, observe)
+async def single_answer(player, provider, history, question, complete=completion, observe=ignore_event, *, embedding=None):
+    runtime = SingleAgentRuntime(player, provider, list(history), question, complete, observe, embedding=embedding)
     with tracing_context(enabled=False):
         result = await build_single_graph(runtime).ainvoke(runtime.initial_state(),
                                                           config={"recursion_limit": 24})

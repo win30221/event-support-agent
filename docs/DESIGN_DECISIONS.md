@@ -138,3 +138,7 @@ macOS/Linux 改用 `./.venv/bin/python`。不指定 `--suite` 仍測原 baseline
 工程觀測新增每次模型的配置/回報名稱、配置 Context（非實際伺服器容量）、訊息與工具結果字元數、供應商 Token、停止原因及耗時；新增實際資料工具耗時及公開 RAG 候選排序、分數、採用狀態。缺少供應商資訊時不猜測；不將字元數換算為 Token，不新增模型請求或調整檢索策略。主機格式修復與停止指令只附加於該次 system 請求，合法終止封套驗證失敗則回傳對應 ToolMessage。現有完整工程紀錄仍屬本機 Demo，正式環境須限制存取、遮罩及保留期限。
 
 參考 OpenAI Function Calling 的多呼叫與結果配對、Anthropic Parallel Tool Use 的未執行呼叫回傳錯誤、Ollama Tool Calling 與 Chat API，以及 Anthropic Effective Context Engineering；具體終止策略與錯誤代碼是本專案契約，不是供應商強制規則。保留歷史流程及題庫；其共用模組仍被既有回歸和獨立評測使用，不刪除。回歸涵蓋混批、未授權工具、重複終止、格式修復角色、RAG 及模型指標；CI 與本地真實模型驗收待確認。
+
+## Multi-provider embedding spaces
+
+Resolve the effective embedding provider/model once per request rather than mutate process-wide environment variables. Keep a manual override so evaluations isolate chat and retrieval changes. Migrate the original Ollama-only table transactionally, preserving existing rows under provider=ollama. Scope exact similarity by provider/model/edition/revision/passage IDs; reject missing data and dimensional mismatch. No automatic fallback that would conceal embedding failures. NVIDIA native 2048 dimensions are retained; approximate indexing is outside this change. No prompt, answer contract, or business authorization changes. Live cloud and PostgreSQL integration requires user-side verification.

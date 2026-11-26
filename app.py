@@ -11,6 +11,7 @@ import streamlit as st
 from agent import answer
 from guide import CATALOG
 from model_client import PROVIDERS, configured_model
+from embedding_client import resolve_embedding, KEY_VARIABLES
 from starter_questions import render_starter_questions
 from reply_notification import render_reply_notification
 
@@ -39,7 +40,7 @@ def timestamp():
 
 
 # 背景執行緒執行一次 Agent 請求；回傳正文、參考資料及獨立工程紀錄。
-def run_query(player, provider, history, question):
+def run_query(player, provider, history, question, embedding=None):
     interactions = []
     references = []
 
@@ -49,7 +50,7 @@ def run_query(player, provider, history, question):
             references[:] = data.get("參考資料", [])
 
     try:
-        reply, trace = asyncio.run(answer(player, provider, history, question, observe=observe))
+        reply, trace = asyncio.run(answer(player, provider, history, question, observe=observe, embedding=embedding))
         observe("送回聊天頁面", {"回答": reply, "參考資料": references})
         turn = {"role": "assistant", "content": reply, "trace": trace,
                 "references": references}
@@ -194,11 +195,30 @@ key_variable = {"openai": "OPENAI_API_KEY", "nvidia": "NVIDIA_API_KEY"}.get(prov
 if key_variable and not os.getenv(key_variable, "").strip():
     st.sidebar.caption(f"使用雲端模型前，需要先設定 {key_variable}。")
 st.sidebar.caption(f"模型：{configured_model(provider)}")
+retrieval = os.getenv("EVENT_SUPPORT_AGENT_RETRIEVAL", "bm25")
+embedding_choices = ("auto", *PROVIDERS)
+default_embedding = os.getenv("EVENT_SUPPORT_AGENT_EMBED_PROVIDER", "auto").strip().lower()
+if default_embedding not in embedding_choices:
+    st.error("Invalid EVENT_SUPPORT_AGENT_EMBED_PROVIDER.")
+    st.stop()
+selection = st.sidebar.selectbox("Embedding Provider", embedding_choices,
+    index=embedding_choices.index(default_embedding),
+    format_func=lambda value: {"auto": "Auto (follow chat provider)", "ollama": "Ollama",
+                               "openai": "OpenAI", "nvidia": "NVIDIA"}[value],
+    disabled=retrieval != "hybrid")
+embedding = resolve_embedding(provider, selection)
+st.sidebar.caption(f"RAG: {retrieval}")
+if retrieval == "hybrid":
+    st.sidebar.caption(f"Embedding: {embedding.provider}/{embedding.model}")
+    embed_key = KEY_VARIABLES.get(embedding.provider)
+    if embed_key and not os.getenv(embed_key, "").strip():
+        st.sidebar.caption(f"Embedding requires {embed_key}.")
 if provider == "nvidia":
     st.sidebar.caption("NVIDIA 雲端推理：僅使用本 Demo 模擬資料。")
 
 # 每個體驗帳號與模型服務有獨立對話及待完成請求，避免切換時混入他人資料。
-key = f"chat-{player}-{provider}"
+key = (f"chat-{player}-{provider}-{embedding.provider}-{embedding.model}"
+       if retrieval == "hybrid" else f"chat-{player}-{provider}")
 turns = st.session_state.setdefault(key, [])
 jobs = st.session_state.setdefault("pending_queries", {})
 cases = practice_cases()
@@ -286,5 +306,5 @@ if question and key not in jobs:
         st.stop()
     history = [turn for turn in turns if turn["role"] != "error"][-8:]
     turns.append({"role": "user", "content": question})
-    jobs[key] = workers().submit(run_query, player, provider, history, question)
+    jobs[key] = workers().submit(run_query, player, provider, history, question, embedding)
     st.rerun()

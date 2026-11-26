@@ -1,4 +1,5 @@
 """Typed, read-only local function tools; application code owns authorization."""
+import os
 import ast
 import hashlib
 import json
@@ -88,8 +89,11 @@ class QueryMemo:
 class ToolRegistry:
     """A new registry per player request. No tool accepts an account ID."""
 
-    def __init__(self, player):
+    def __init__(self, player, *, provider=None, embedding=None):
+        from embedding_client import resolve_embedding
         self.retrieval = QueryMemo()
+        self.embedding = embedding or resolve_embedding(provider)
+        self.retriever = os.getenv("EVENT_SUPPORT_AGENT_RETRIEVAL", "bm25")
         self._tools = {tool.name: tool for tool in (
             Tool("find_rules", "查單期公開公告。overview：核心參加、玩法及兌換流程；search：具體規則、條件或代碼，包含核心背景與相關細節；compare：單期全部有效公告，供完整盤點。跨期分別查詢。只選符合資料需求的一種模式。",
                  {"edition": EDITION, "query": {"type": "string", "description": "搜尋文字；保留明示對象、日期、條件及代碼。"},
@@ -168,7 +172,8 @@ class ToolRegistry:
             if args["mode"] not in tool.properties["mode"]["enum"]:
                 raise ValueError("公告模式不符。")
             return tool.handler(**args, alternate_queries=alternates, include_overview=True,
-                                retrieve_once=self.retrieval.get)
+                                retrieve_once=self.retrieval.get, retriever=self.retriever,
+                                embedding=self.embedding)
         return tool.handler(**args)
 
 

@@ -149,6 +149,7 @@ def turn_metrics(events, trace, elapsed):
 def report_metadata(provider):
     from hashlib import sha256
     from model_client import configured_model
+    from embedding_client import resolve_embedding
     from single_agent import MAX_MODEL_CALLS, NUM_PREDICT, SINGLE_AGENT_PROMPT
     from single_output import FINAL_SCHEMA
     try:
@@ -160,6 +161,8 @@ def report_metadata(provider):
             "python": platform.python_version(), "os": platform.platform(), "provider": provider,
             "configured_model": configured_model(provider),
             "retrieval": os.getenv("EVENT_SUPPORT_AGENT_RETRIEVAL", "bm25"),
+            "embedding": resolve_embedding(provider).public_metadata()
+                         if os.getenv("EVENT_SUPPORT_AGENT_RETRIEVAL", "bm25") == "hybrid" else None,
             "tool_selection": "native", "agent_framework": "langgraph",
             "answer_review": "off",
             "ollama_num_ctx": os.getenv("EVENT_SUPPORT_AGENT_OLLAMA_NUM_CTX"),

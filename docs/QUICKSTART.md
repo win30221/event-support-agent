@@ -325,3 +325,48 @@ Ollama 請選用支援 tool calling 的模型。兩個供應商的工具選擇�
 ### NVIDIA NIM 批次驗收
 
 使用原 Demo PostgreSQL 環境與 NVIDIA_API_KEY；不需要啟動 Streamlit。參考 [評測與驗收](EVALUATION.md#nvidia-端到端批次評測) 的代表案例及完整 31 題指令。報告保存在本機 reports/，請勿提交私人資料。
+
+
+## Multi-provider Hybrid RAG (NVIDIA without Ollama)
+
+The chat provider and embedding provider are independent. By default
+`EVENT_SUPPORT_AGENT_EMBED_PROVIDER=auto` follows the selected chat provider;
+an explicit ollama/openai/nvidia overrides it. For offline retrieval/build commands
+without a chat provider, auto defaults to Ollama; select the provider explicitly.
+The existing EVENT_SUPPORT_AGENT_EMBED_MODEL and EVENT_SUPPORT_AGENT_EMBED_URL
+remain Ollama-only. Optional provider-specific model overrides:
+EVENT_SUPPORT_AGENT_OLLAMA_EMBED_MODEL, EVENT_SUPPORT_AGENT_OPENAI_EMBED_MODEL,
+EVENT_SUPPORT_AGENT_NVIDIA_EMBED_MODEL. The default models are bge-m3,
+text-embedding-3-small, and nvidia/nemotron-3.5-embed-1b respectively.
+
+Windows PowerShell (same project virtualenv and PostgreSQL demo DSN):
+
+```powershell
+$env:EVENT_SUPPORT_AGENT_EMBED_PROVIDER = "nvidia"
+$env:EVENT_SUPPORT_AGENT_RETRIEVAL = "hybrid"
+.\.venv\Scripts\python.exe vector_search.py --provider nvidia
+.\.venv\Scripts\python.exe -m evaluations.eval_rag --hybrid --case midnight
+.\.venv\Scripts\python.exe -m evaluations.eval_rag --hybrid
+.\.venv\Scripts\python.exe -m evaluations.eval_rag --live nvidia --report reports/nvidia-hybrid-nvidia-embed.json
+.\.venv\Scripts\python.exe -m streamlit run app.py
+```
+
+Use the existing NVIDIA_API_KEY. On macOS/Linux use export and ./.venv/bin/python.
+No Ollama process is required for NVIDIA/NVIDIA or OpenAI/NVIDIA.
+After index setup, change EVENT_SUPPORT_AGENT_EMBED_PROVIDER to auto if desired;
+the sidebar can override it for each request. To build another provider's
+vectors run vector_search.py --provider ollama or --provider openai (the latter
+requires OPENAI_API_KEY and incurs API charges).
+
+One PostgreSQL table holds different embedding spaces. The first build
+transaction adds the provider column to an old Ollama-only table and preserves
+existing rows. The primary key includes provider, model, edition, revision and
+passage_id. Query only the selected space. The variable-dimension vector
+column and exact distance search support 2048-dimensional NVIDIA embeddings
+without an ANN index. Build each provider/model once per corpus revision;
+no player progress is modified. Missing/stale indexes or mismatched dimensions
+fail explicitly; do not silently fall back to BM25. Public notices and search
+queries are sent to the selected cloud embedding API; use demo data only.
+The embedding API consumes its own provider quota even in offline retrieval tests.
+The implementation uses NVIDIA input_type=passage for indexing and query for
+search, truncate=NONE; official hosted API access needs live verification.
