@@ -204,7 +204,8 @@ def report_metadata(provider):
             "online_verifier": "off", "max_model_calls": MAX_MODEL_CALLS,
             "num_predict": NUM_PREDICT if provider == "ollama" else None,
             "prompt_sha256": sha256(SINGLE_AGENT_PROMPT.encode()).hexdigest(),
-            "final_output": "native_submit_answer_with_schema_fallback",
+            "final_output": "native_split_claims_with_schema_fallback",
+            "final_contract_version": 2,
             "final_schema_sha256": sha256(json.dumps(FINAL_SCHEMA, sort_keys=True).encode()).hexdigest()}
 
 
@@ -221,7 +222,8 @@ async def replay(case, provider, report_turns=None):
             events.append((title, data))
             if title in ("Python 工具批次", "Python 工具驗證失敗", "Python 接受補查需求",
                          "Python 啟動回答品質審查", "Python 回答品質審查結果", "Python 檢查回答依據",
-                         "Python 單一 Agent 回傳驗證失敗", "Python 查詢進展", "Python 檢索快取統計"):
+                         "Python 單一 Agent 回傳驗證失敗", "Python 查詢進展", "Python 檢索快取統計",
+                         "Python 終止契約版本", "Python 商品依賴核對", "Python 本人查詢依賴契約"):
                 print(title, json.dumps(data, ensure_ascii=False))
             if title == "Python 單一 Agent 輪次" and not data.get("允許工具"):
                 print(title, json.dumps(data, ensure_ascii=False))

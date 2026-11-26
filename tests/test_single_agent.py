@@ -24,12 +24,22 @@ def call(tool_name, /, **args):
             "function": {"name": tool_name, "arguments": json.dumps(args, ensure_ascii=False)}}
 
 
+def terminal_payload(*parts):
+    # 正常 fixture 跑新版封套；既有故意錯誤的舊回傳仍測試原嚴格相容路徑。
+    if any(p["status"] != "supported" and (p.get("answer") or p.get("source_ids")) for p in parts):
+        return {"results": list(parts)}
+    return {"supported": [{"question": p["question"], "statement": p["answer"], "condition": "",
+                            "source_ids": p["source_ids"]} for p in parts if p["status"] == "supported"],
+            "unresolved": [{"question": p["question"], "status": p["status"]}
+                           for p in parts if p["status"] != "supported"]}
+
+
 def response(*parts):
-    return select(call(FINAL_TOOL, results=list(parts)))
+    return select(call(FINAL_TOOL, **terminal_payload(*parts)))
 
 
 def structured(*parts):
-    return {"content": json.dumps({"results": list(parts)}, ensure_ascii=False)}
+    return {"content": json.dumps(terminal_payload(*parts), ensure_ascii=False)}
 
 
 def item(name, edition="current"):
@@ -404,10 +414,10 @@ class SingleAgentTests(OfflineTests):
                 ("find_shop_item", "欄位未提供"),
                 ("list_shop_items", "不提供個人交易結果"),
                 ("get_my_event_progress", "實際回傳的欄位"),
-                ("calculate", "不證明全部業務資格"),
                 (FINAL_TOOL, "未知需求用 no_evidence"),
             ):
                 self.assertIn(guidance, definitions[name]["description"])
+            self.assertNotIn("calculate", definitions)
             self.assertEqual(definitions[FINAL_TOOL]["parameters"], FINAL_SCHEMA)
             return {"content": "未提交終止工具"}
         def fallback(provider, messages, tools, *, response_schema):
@@ -581,3 +591,79 @@ class SingleAgentTests(OfflineTests):
         self.assertEqual(rounds[-1]["停止資料工具原因"], ["terminal_repair"])
         self.assertEqual([d["錯誤代碼"] for title, d in events
                           if title == "Python 單一 Agent 回傳驗證失敗"], ["INVALID_FINAL_SCHEMA"])
+
+
+
+    def test_native_split_contract_conditions_and_unknown_share_one_response(self):
+        q = "霧潮貼圖多少錢？退款能保證成功嗎？"
+        key = f"{CATALOG.current}/shop-items/mist-tide-sticker"
+        def finish(provider, messages, tools):
+            payload = {"supported": [{"question": q, "statement": "需要 20 枚星星幣。",
+                                       "condition": "兌換霧潮貼圖", "source_ids": [source_alias(key)]}],
+                       "unresolved": [{"question": "退款能保證成功嗎？", "status": "no_evidence"}]}
+            return select(call(FINAL_TOOL, **payload))
+        text, trace, events, _ = self.run_case(q, select(item("霧潮貼圖")), finish)
+        self.assertIn("成立條件", text)
+        self.assertIn("20 枚", text)
+        self.assertIn(DIRECT_REPLIES["no_evidence"], text)
+        self.assertEqual(len(trace), 1)
+        self.assertEqual([d for t, d in events if t == "Python 終止契約版本"][-1],
+                         {"version": 2, "claims": 1, "conditional_claims": 1, "unresolved": 1})
+
+    def test_product_dependent_progress_can_batch_when_catalogue_verified(self):
+        q = "霧潮貼圖和我目前的餘額，夠換嗎？"
+        def finish(provider, messages, tools):
+            self.assertIn("calculate", {t["function"]["name"] for t in tools})
+            return response(supported(q, "貼圖 20 枚，餘額 80 枚。",
+                (f"{CATALOG.current}/shop-items/mist-tide-sticker", ""),
+                (f"{CATALOG.current}/my-progress", "")))
+        with patch("guide.read_progress", return_value=(CATALOG.as_of, 80, 2, True)) as read:
+            text, trace, events, model = self.run_case(q,
+                select(item("霧潮貼圖"), call("get_my_event_progress", edition="current",
+                                             account_scope="self", required_item="霧潮貼圖")), finish)
+        self.assertEqual([t["工具"] for t in trace], ["find_shop_item", "get_my_event_progress"])
+        self.assertEqual(model.call_count, 2)
+        read.assert_called_once()
+        self.assertEqual([d["狀態"] for t, d in events if t == "Python 商品依賴核對"], ["found"])
+        self.assertIn("80 枚", text)
+
+    def test_unknown_product_dependency_never_dispatches_private_lookup(self):
+        q = "不存在的測試紀念徽章，我的餘額夠買嗎？"
+        def finish(provider, messages, tools):
+            payloads = tool_results(messages)
+            self.assertEqual([p["狀態"] for p in payloads], ["not_found", "invalid_arguments"])
+            return response({"question": q, "status": "supported", "answer": "查無品項",
+                             "source_ids": [payloads[0]["段落"][0]["段落ID"]]})
+        with patch("guide.read_progress") as read:
+            text, trace, _, _ = self.run_case(q, select(item("不存在的測試紀念徽章"),
+                call("get_my_event_progress", edition="current", account_scope="self",
+                     required_item="不存在的測試紀念徽章")), finish)
+            read.assert_not_called()
+        self.assertEqual([t["工具"] for t in trace], ["find_shop_item"])
+        self.assertIn("查無", text)
+
+    def test_independent_progress_with_unknown_product_remains_allowed(self):
+        q = "我的餘額？另外不存在的測試紀念徽章多少錢？"
+        def finish(provider, messages, tools):
+            payloads = tool_results(messages)
+            return response(supported("我的餘額？", "80 枚", (f"{CATALOG.current}/my-progress", "")),
+                            {"question": "不存在的測試紀念徽章多少錢？", "status": "supported",
+                             "answer": "查無品項", "source_ids": [payloads[0]["段落"][0]["段落ID"]]})
+        with patch("guide.read_progress", return_value=(CATALOG.as_of, 80, 2, True)):
+            text, trace, _, _ = self.run_case(q, select(item("不存在的測試紀念徽章"),
+                call("get_my_event_progress", edition="current", account_scope="self", required_item="")), finish)
+        self.assertEqual(len(trace), 2)
+        self.assertIn("80 枚", text)
+        self.assertIn("查無", text)
+
+    def test_unverified_same_batch_calculation_still_rejected(self):
+        q = "霧潮貼圖多少錢？"
+        def finish(provider, messages, tools):
+            payloads = tool_results(messages)
+            self.assertEqual([p["狀態"] for p in payloads], ["found", "invalid_arguments"])
+            return response(supported(q, "20 枚", (f"{CATALOG.current}/shop-items/mist-tide-sticker", "")))
+        text, trace, _, _ = self.run_case(q, select(item("霧潮貼圖"),
+            call("calculate", expression="20+1", source_ids=[source_alias(f"{CATALOG.current}/shop-items/mist-tide-sticker")])),
+            finish)
+        self.assertEqual(len(trace), 1)
+        self.assertIn("20 枚", text)
