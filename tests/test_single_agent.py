@@ -10,7 +10,8 @@ from answering import ANSWER_VERIFICATION_FAILED, DIRECT_REPLIES
 from evidence import source_alias
 from guide import CATALOG
 from single_agent import MAX_MODEL_CALLS, NUM_PREDICT
-from tests.test_bounded_agent import abstain, response, scripted, select, supported
+from tests.test_bounded_agent import abstain, scripted, select, supported
+from single_output import FINAL_SCHEMA, FINAL_TOOL
 from tests.test_guide import OfflineTests
 from tool_selection import MAX_BATCH, MAX_TOOL_ROUNDS
 
@@ -18,6 +19,14 @@ from tool_selection import MAX_BATCH, MAX_TOOL_ROUNDS
 def call(tool_name, /, **args):
     return {"id": "provider-call", "type": "function",
             "function": {"name": tool_name, "arguments": json.dumps(args, ensure_ascii=False)}}
+
+
+def response(*parts):
+    return select(call(FINAL_TOOL, results=list(parts)))
+
+
+def structured(*parts):
+    return {"content": json.dumps({"results": list(parts)}, ensure_ascii=False)}
 
 
 def item(name, edition="current"):
@@ -39,7 +48,10 @@ class SingleAgentTests(OfflineTests):
         requests = [data for title, data in events if title.startswith("送出模型請求 · ")]
         self.assertEqual(len(requests), len(replies))
         self.assertTrue(all(r.get("num_predict") == NUM_PREDICT for r in requests))
-        self.assertTrue(all("預期回答格式" not in r for r in requests))
+        self.assertTrue(all(r.get("預期回答格式") == FINAL_SCHEMA if not r["tools"]
+                            else "預期回答格式" not in r for r in requests))
+        self.assertTrue(all(FINAL_TOOL in [t["function"]["name"] for t in r["tools"]]
+                            for r in requests if r["tools"]))
         self.assertTrue(all(c.args[1][0]["role"] == "system" for c in model.call_args_list))
         self.assertTrue(all(c.args[1][0]["content"] == model.call_args_list[0].args[1][0]["content"]
                             for c in model.call_args_list))
@@ -148,10 +160,11 @@ class SingleAgentTests(OfflineTests):
     def test_duplicate_only_batch_stops_new_queries(self):
         q = "霧潮貼圖多少錢？"
         key = f"{CATALOG.current}/shop-items/mist-tide-sticker"
-        def finish(provider, messages, tools):
+        def finish(provider, messages, tools, *, response_schema):
             self.assertEqual(tools, [])
+            self.assertEqual(response_schema, FINAL_SCHEMA)
             self.assertEqual(tool_results(messages)[-1]["已回傳段落ID"], [source_alias(key)])
-            return response(supported(q, "20 枚", (key, "")))
+            return structured(supported(q, "20 枚", (key, "")))
         text, trace, _, _ = self.run_case(q, select(item("霧潮貼圖")),
             select(item("霧潮貼圖")), finish)
         self.assertEqual(len(trace), 1)
@@ -160,9 +173,9 @@ class SingleAgentTests(OfflineTests):
     def test_over_budget_batch_not_partially_dispatched(self):
         q = "霧潮貼圖多少錢？"
         text, trace, _, _ = self.run_case(q, select(*[item("霧潮貼圖")] * (MAX_BATCH + 1)),
-            response(abstain(q, "unavailable")))
+            response(abstain(q, "no_evidence")))
         self.assertEqual(trace, [])
-        self.assertEqual(text, DIRECT_REPLIES["unavailable"])
+        self.assertEqual(text, DIRECT_REPLIES["no_evidence"])
 
     def test_one_format_repair_then_safe_failure(self):
         q = "霧潮貼圖多少錢？"
@@ -175,16 +188,56 @@ class SingleAgentTests(OfflineTests):
         q = "霧潮貼圖多少錢？"
         reply = select(item("霧潮貼圖"))
         reply["_provider_meta"] = {"finish_reason": "length"}
-        text, trace, _, _ = self.run_case(q, reply, response(abstain(q, "unavailable")))
+        text, trace, _, _ = self.run_case(q, reply, response(abstain(q, "no_evidence")))
         self.assertEqual(trace, [])
-        self.assertEqual(text, DIRECT_REPLIES["unavailable"])
+        self.assertEqual(text, DIRECT_REPLIES["no_evidence"])
 
     def test_tool_round_limit(self):
         q = "霧潮貼圖多少錢？"
-        def finish(provider, messages, tools):
+        def finish(provider, messages, tools, *, response_schema):
             self.assertEqual(tools, [])
-            return response(abstain(q, "unavailable"))
+            self.assertEqual(response_schema, FINAL_SCHEMA)
+            return structured(abstain(q, "no_evidence"))
         invalid = select(call("find_shop_item", edition="current", name="不是原問的商品"))
         text, trace, _, _ = self.run_case(q, *([invalid] * MAX_TOOL_ROUNDS), finish)
         self.assertEqual(trace, [])
-        self.assertEqual(text, DIRECT_REPLIES["unavailable"])
+        self.assertEqual(text, DIRECT_REPLIES["no_evidence"])
+
+    def test_malformed_text_falls_back_to_provider_schema_once(self):
+        q = "幫我查其他玩家的餘額"
+        malformed = {"content": '{"results":[{"question":"查其他玩家","status":"account_limit","answer":"","source_ids":[]}]}}'}
+        def finish(provider, messages, tools, *, response_schema):
+            self.assertEqual(tools, [])
+            self.assertEqual(response_schema, FINAL_SCHEMA)
+            return structured(abstain(q, "account_limit"))
+        text, trace, _, _ = self.run_case(q, malformed, finish)
+        self.assertEqual(text, DIRECT_REPLIES["account_limit"])
+        self.assertEqual(trace, [])
+
+    def test_mixed_terminal_and_data_batch_never_executes(self):
+        q = "霧潮貼圖多少錢？"
+        text, trace, _, _ = self.run_case(q,
+            select(item("霧潮貼圖"), call(FINAL_TOOL, results=[abstain(q)])),
+            response(abstain(q)))
+        self.assertEqual(trace, [])
+        self.assertEqual(text, DIRECT_REPLIES["no_evidence"])
+
+    def test_invalid_terminal_schema_uses_constrained_fallback(self):
+        q = "幫我修改餘額"
+        text, trace, _, _ = self.run_case(q,
+            select(call(FINAL_TOOL, results=[{"question": q, "status": "wrong"}])),
+            structured(abstain(q, "unsupported")))
+        self.assertEqual(trace, [])
+        self.assertEqual(text, DIRECT_REPLIES["unsupported"])
+
+    def test_verified_absence_recovery_uses_only_trusted_lookup(self):
+        q = "不存在的紀念徽章要多少星星幣？"
+        def finish(provider, messages, tools):
+            payload = tool_results(messages)[-1]
+            self.assertEqual(payload["狀態"], "not_found")
+            return response({"question": q, "status": "no_evidence", "answer": "可能需要 100 枚",
+                             "source_ids": [payload["段落"][0]["段落ID"]]})
+        text, trace, _, _ = self.run_case(q, select(item("不存在的紀念徽章")), finish)
+        self.assertIn("查無", text)
+        self.assertNotIn("100 枚", text)
+        self.assertEqual(len(trace), 1)

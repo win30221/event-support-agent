@@ -143,6 +143,7 @@ def turn_metrics(events, trace, elapsed):
 def report_metadata(provider):
     from hashlib import sha256
     from single_agent import MAX_MODEL_CALLS, NUM_PREDICT, SINGLE_AGENT_PROMPT
+    from single_output import FINAL_SCHEMA
     try:
         commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=Path(__file__).resolve().parents[1],
             capture_output=True, text=True, check=True, timeout=5).stdout.strip()
@@ -162,7 +163,9 @@ def report_metadata(provider):
             "semantic_review": "not_run", "workflow": "single-agent-loop",
             "online_verifier": "off", "max_model_calls": MAX_MODEL_CALLS,
             "num_predict": NUM_PREDICT if provider == "ollama" else None,
-            "prompt_sha256": sha256(SINGLE_AGENT_PROMPT.encode()).hexdigest()}
+            "prompt_sha256": sha256(SINGLE_AGENT_PROMPT.encode()).hexdigest(),
+            "final_output": "native_submit_answer_with_schema_fallback",
+            "final_schema_sha256": sha256(json.dumps(FINAL_SCHEMA, sort_keys=True).encode()).hexdigest()}
 
 
 # 真實模型重播同一題集及多輪歷史，記錄證據覆蓋、工具及人工驗收要點。
