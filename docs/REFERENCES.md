@@ -64,3 +64,7 @@
 - [Anthropic Building Effective Agents](https://www.anthropic.com/research/building-effective-agents)：參考 routing、可組合工具工作流；採用既有意圖分派，不聲稱供應商要求固定兩層。
 - [OpenAI Function Calling](https://platform.openai.com/docs/guides/function-calling) 與 [Ollama Tool Calling](https://docs.ollama.com/capabilities/tool-calling)：原生工具定義與多呼叫，主機驗證後執行。候選 task_tool_planning.py 共用 model_step，動態定義 task_id 與允許工具；只驗收提案，不執行。任務 ID、欄位 metadata 是本專案設計，不是供應商固定契約。
 - [Anthropic Demystifying evals for AI agents](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents)：參考多任務評測及避免固定軌跡；首輪工具集合無序比對，限制理由與檢索語意人工複核。尚無本專案真實模型結果。
+
+- [OpenAI Function Calling](https://developers.openai.com/api/docs/guides/function-calling)：參考程式持有的已知參數不交給模型；唯一待辦 ID 由主機綁定。strict schema 相容性下保留 query 宣告，僅非檢索模式允許主機補空字串。
+- [Anthropic Writing Effective Tools](https://www.anthropic.com/research/writing-tools-for-agents) 與 [Effective Context Engineering](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)：參考減少工具歧義與重複上下文，不增加問句特例。
+- [ChatOllama API](https://reference.langchain.com/python/langchain-ollama/chat_models/ChatOllama)：num_predict 是生成限制；2048 為本專案實驗值，不是官方建議閾值。

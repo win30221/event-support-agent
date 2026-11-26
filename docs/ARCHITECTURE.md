@@ -75,3 +75,7 @@ Select 對暫時性傳輸錯誤使用 RetryPolicy（至多 2 次嘗試）；其�
 ## 新第二層候選（尚未接入正式 Graph）
 
 固定第一層需求 → Python route_tasks → task_definitions（每個工具的 task_id enum 依任務允許範圍）→ 一次原生 tool_calls → validate_batch（逐任務驗證及現有 ToolRegistry 參數正規化）。不重分類、不建立 18 種 kind，不執行資料工具；限制提案經 report_task_status 控制契約處理。首輪不提供 calculate。舊 Graph、Audit、證據評估與回答流程保留，待獨立驗收後再設計整合與跨輪取證。
+
+### 第二層契約精簡實驗
+
+初次 Qwen3:8b 實機基準：15/20 輪、25/31 任務，17/20 契約有效。保留原題庫、預期結果及 exact_match。唯一待辦任務由主機綁定 ID；多任務仍要求 task_id。公告 overview/compare 不使用 query，缺欄位時主機補空字串；search 仍需非空 query。為維持 OpenAI strict schema，模型可見 query 仍宣告必填，但描述指出非 search 填空字串。僅傳待辦任務與服務、歷史上下文，不重複傳完整原問；原問仍用於主機錨定。工具描述集中在候選契約，不增加工具或模型呼叫。若終止任務含待辦所需指涉，可能須補問，未驗證跨任務指涉。Ollama 候選獨立預設 num_predict=2048，CLI --num-predict -1 可做不限制的對照；OpenAI 不套用此參數。長度截斷批次不核准，無自動重試。未實機驗證新版。
