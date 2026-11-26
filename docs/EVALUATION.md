@@ -380,3 +380,45 @@ $env:EVENT_SUPPORT_AGENT_RETRIEVAL = "hybrid"
 ```
 
 逐題比對必要來源、狀態及語意；檢查 retrieval_diagnostics 的 query_vector reuses、ranking reuses、新段落數、schema reasons、repair codes，以及 transport 的實際請求數和延遲。一次試驗不能證明 Token 或模型呼叫降低；以相同案例、模型、配置及重複試驗比較，禁止因少查而過度拒答。舊資料不存在的觀測欄位保持未知。
+
+## 第四階段整合驗收（現行 research/nvidia-provider）
+
+先使用 QUICKSTART 第 8 節的獨立測試 PostgreSQL，勿用正式或已修改的 demo DB。以下為 Windows PowerShell；macOS/Linux 使用 ./.venv/bin/python。
+
+```powershell
+git pull --ff-only
+.\.venv\Scripts\python.exe player_progress.py
+.\.venv\Scripts\python.exe -m unittest discover -s tests -t . -v
+.\.venv\Scripts\python.exe -m pip check
+.\.venv\Scripts\python.exe -m evaluations.eval_rag
+```
+
+上述預設不呼叫模型（勿開啟 opt-in LIVE_OLLAMA）；test_final_contract_v2 驗證 schema、主張、來源與模擬三個 provider adapter；test_single_agent 驗證相依工具同批、未確認品項、缺相依欄位及同批未取得來源的拒絕。先確認全部通過，再切回正常 demo DSN 及已建立的 hybrid 索引。此次沒有修改公告或 embedding 模型，不需重建索引。先針對 NVIDIA 及另外兩個可用的實機模型做少量相容性驗收；不要在未確認回傳合法前耗用完整題庫配額。OpenAI/Ollama 實測必須先完成各自的 API key/本機服務設定；不具備環境時保持未驗證。為各供應商分別使用對應 embedding 設定與索引，或在 schema smoke 使用 BM25。
+
+```powershell
+$env:EVENT_SUPPORT_AGENT_RETRIEVAL = "bm25"
+.\.venv\Scripts\python.exe -m evaluations.eval_rag --live nvidia --case missing-policy --case wallet-a --nvidia-rpm 20 --report reports/nvidia-contract-v2-smoke.json
+# 選擇已配置的其他 provider，使用獨立檔名：
+.\.venv\Scripts\python.exe -m evaluations.eval_rag --live ollama --case missing-policy --case wallet-a --report reports/ollama-contract-v2-smoke.json
+.\.venv\Scripts\python.exe -m evaluations.eval_rag --live openai --case missing-policy --case wallet-a --report reports/openai-contract-v2-smoke.json
+```
+
+確認 native 及 Schema fallback 實際回傳、契約版本、私人工具依賴和主張引用；若 smoke 沒有觸發其中一路徑，該路徑仍未實機驗證，不宣稱完整相容。使用已建 NVIDIA hybrid 索引及相同 20 RPM，依序跑原 baseline 31、既有 holdout 9、另編 generalization 6；不要同時執行多個評測。
+
+```powershell
+$env:EVENT_SUPPORT_AGENT_EMBED_PROVIDER = "nvidia"
+$env:EVENT_SUPPORT_AGENT_RETRIEVAL = "hybrid"
+.\.venv\Scripts\python.exe -m evaluations.eval_rag --live nvidia --suite baseline --nvidia-rpm 20 --report reports/nvidia-integrated-baseline.json
+.\.venv\Scripts\python.exe -m evaluations.eval_rag --live nvidia --suite holdout --nvidia-rpm 20 --report reports/nvidia-integrated-holdout.json
+.\.venv\Scripts\python.exe -m evaluations.eval_rag --live nvidia --suite generalization --nvidia-rpm 20 --report reports/nvidia-integrated-generalization.json
+```
+
+新評分標準需顯式指定 --rubric（不傳仍是原 2.0.0）。舊報告可重評新標準，但不會得到新版模型回答；留存原評分與 rubric hash，不覆蓋任何檔案。
+
+```powershell
+foreach ($suite in @("baseline","holdout","generalization")) {
+    .\.venv\Scripts\python.exe -m evaluations.eval_report "reports/nvidia-integrated-$suite.json" --rubric evaluations/rubric_v2_1.json --out "reports/nvidia-integrated-$suite-v2_1.json" --review-template "reports/nvidia-integrated-$suite-review.json"
+}
+```
+
+人工在 review 檔案填 reviewer、criteria（pass/fail/not_run）與 notes；逐主張核對 claim_evidence、原文、必要條件、未知需求、安全及相關性。以同一 rubric 再執行 --review，使用不同 --out 檔名。先驗收正確性及安全，再比較 model_requests、tokens、HTTP、cache、schema repair 及耗時。原 legacy gate 不因新版等價證據而改寫，單次試驗不代表穩定效益；新題集尚未經實機測試。

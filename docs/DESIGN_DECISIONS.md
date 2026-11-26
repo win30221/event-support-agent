@@ -175,3 +175,15 @@ Single Agent 的 find_rules 描述明示成功 search 已含 overview；不在�
 新 Trace：Python 查詢進展、Python 檢索快取統計、Python 單一 Agent 輪次的停止資料工具原因；終止契約修復保留既有錯誤代碼並於終端機顯示。Evaluation V2 另列 retrieval_diagnostics，舊報告無新欄位標記未知；聚合只計觀測到的輪次，不變更評分門檻。快取重用包含等待相同 in-flight 計算，不能直接等同節省 HTTP 次數；HTTP 實際觀測仍看 transport。未新增證據批次也不代表無效查詢或模型語意正確。
 
 基準 cf03a48：第二階段三題的機械驗收均通過，但 missing-policy 的兩次公告搜尋有重疊且仍有新增段落；終端輸出只能確認走 Schema 備援，沒有完整原始 Trace 無法定位確切修復原因。先做不改檢索品質的重用與診斷，不以重疊率、任意閾值或案例特例硬停，也不降低模型預算。以相同配置的回歸及人工語意驗收衡量實際效益。
+
+## 終止契約、工具調度及證據評測整合（第四階段）
+
+本節取代前述歷史 Single Agent 終止封套及商品依賴指引；legacy_answer、intent_answer、RAG 排名、快取、權限、既有停止條件與預算保留。現行 submit_answer 與無工具 Schema fallback 共用同一閉合物件，兩個必填陣列：supported 為 question、statement、condition、source_ids，unresolved 只含 question 與 status（clarify/no_evidence/account_limit/unsupported/service_help）。沒有項目填空陣列，不使用 anyOf/oneOf/discriminator。主機轉為既有驗證/呈現格式，再逐主張核對本輪短 ID、運算依賴、適用條件和可信查無狀態；沒有有效主張或需求、超過原 16 項上限、缺來源或非法欄位仍不得直接放行。舊 results 回傳保留嚴格相容 decoder，記錄契約版本，不接收舊非 supported 的任意正文；舊已確認查無的恢復路徑仍然保留。新版已確認查無必須作 supported 並引用查詢結果，未知需求沒有來源欄。新欄位 condition 是模型提出的成立條件，不是主機已驗證語意充分性。只有實際呈現的 supported 文字及其來源記入主張級 Trace，方便人工審查；同需求的多主張應使用相同 question。主張與未知需求分組呈現，可能先呈現已能回答的部分，不承諾逐字原問順序。
+
+本人進度工具新增必填 required_item：相依品項使用原問或可信參照的名稱；獨立本人需求使用空字串。缺欄位、型別錯誤、未核對商品指涉、非 found（含 ambiguous、not_found、unavailable）或非 self 一律不得執行相依私人查詢。主機先在本機唯讀商城查核 declared dependency，才派發本人 DB 查詢；與其他公開工具可同批。這個預檢不是模型證據，回答仍需採用正式本輪工具來源；沒有商品欄位的獨立查詢仍可執行。模型填空字串是語意提案，主機無法確定其是否正確辨認所有依賴或本人指涉，不把它當作授權或完整的語意安全證明。計算仍依賴先前已驗證的本輪 ID，不能引用同批尚未取得的結果。沒有本輪證據時暫不提供 calculate，後續恢復；其餘工具不依語意猜測而隱藏。精簡 Single Agent system prompt，保留原問、已知條件、歷史指涉、證據全文與既有預算；不新增 LLM 呼叫或外部 grounding API。
+
+評測器保留原 rubric 2.0.0 與 legacy gate；新增可顯式選用的 rubric_v2_1.json（2.1.0）。價格等價來源只證明指定品名及價格，不證明完整限兌或交易狀態。新版另要求可回答本人餘額的案例採用本輪本人紀錄，部分資格案例需保留相關規則來源。這些是預先定義的測試資料，不進入正式 Agent 路由。新增 generalization 六題（同一示範語料另編，未實機驗收，不宣稱第三方獨立盲測）。新舊評測結果應分別保留，對照相同 rubric；歷史欄位缺失保持未知。claim_evidence 僅供人工對照，不自動評定 correctness、completeness、groundedness、uncertainty 或 relevance。
+
+### 取捨與本次驗收狀態
+
+基準 37115a6 的 66 項指定離線測試通過；六題實機 legacy 5/6、契約/安全/任務狀態 6/6、usable 9/9、adopted 8/9、17 次模型、84,675 tokens，query vector 重用 2 次、schema 因工具輪次 2 次及 INVALID_FINAL_EVIDENCE 修復 1 次。缺證據的雙欄位衝突以分離陣列降低，不透過忽略錯誤取得綠燈。OpenAI strict 支援部分 JSON Schema；Ollama 本機支援 format schema，NVIDIA NIM guided decoding 依部署與 backend 而異。保留現有 provider adapter，不改 NVIDIA hosted endpoint 的介接參數，不能把 NIM 文件當成實際託管模型相容性證明。模擬 adapter 測試只驗證 SDK 呼叫參數，不等同實際輸出。成立條件及拆分主張可能增加輸出 token，需實機比較。此變更不加入針對任一題目或商品的執行特例，不宣稱自動判斷自然語言語意或效能已改善。正式驗收待完整離線回歸、三供應商實機 smoke、46 題重播與人工審查。若原始 legacy gate 仍要求指定段落，保留其失敗與新版事實群組結果，不覆蓋舊標準。

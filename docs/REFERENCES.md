@@ -150,3 +150,13 @@
 - [Google Agent Search — retrieval and ranking](https://docs.cloud.google.com/generative-ai-app-builder/docs/ranking-overview)：檢索、排名與範圍限制分開。
 
 本專案選擇完全相同 query vector 的同輪 single-flight 重用、保守無新增證據提示與停止原因觀測；不是以上供應商規定的唯一演算法，不聲稱已判定語意充分性。
+
+## 終止契約與主張驗收（第四階段，2026-11-26 核對）
+
+- [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)：JSON Schema 子集合及結構與語意差異；採全部必要欄位及閉合物件，不依賴根聯合型別。
+- [OpenAI Function Calling](https://developers.openai.com/api/docs/guides/function-calling)：以明確參數契約及程式端驗證執行工具，模型提案不等於已執行。
+- [Ollama Structured Outputs](https://docs.ollama.com/capabilities/structured-outputs)：本機 format 可傳 JSON Schema，Pydantic 驗證；文件明示 Ollama Cloud 支援限制。本專案使用本機 Ollama。
+- [NVIDIA NIM Structured Generation](https://docs.nvidia.com/nim/large-language-models/1.15.0/structured-generation.html)：不同 guided decoding backend 有支援差異；不將自架 NIM 規格視為 API Catalog 的保證，不更換既有 hosted adapter。
+- [Anthropic Building Effective Agents](https://www.anthropic.com/research/building-effective-agents)：獨立工作平行，需前序證據的工作順序執行；不為平行而增加 Agent。
+- [Anthropic Effective Context Engineering](https://www.anthropic.com/research/effective-context-engineering-for-ai-agents)：維持高訊號上下文，僅提供當前可用的工具；保留原始證據及安全必要資訊。
+- [Google Cloud Check Grounding with RAG](https://docs.cloud.google.com/generative-ai-app-builder/docs/check-grounding?hl=en)：主張與來源的關聯及支持度應區分；此處只實作主張級來源可追溯及人工審查，不呼叫該服務或假稱已自動驗證語意。

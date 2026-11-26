@@ -117,3 +117,11 @@ Single Agent 在 finalize 依本輪 sources、errors 產生限制資訊，僅在
 Single Agent 的 find_rules 描述明示成功 search 已含 overview；不在主機預先跳過不同查詢（例如 search 失敗仍可能需要 overview）。每批成功公告工具回傳後由 Python 計算可採用來源的唯一、已知、新增數；沒有新段落只給下一次模型請求簡短的主機觀測提示，不當作證據充分或強制拒答。新段落存在也不證明足以回答。MAX_TOOL_ROUNDS、MAX_TOOL_CALLS、MAX_MODEL_CALLS、終止 Schema、原有 Guardrails、20 RPM 不變。
 
 新 Trace：Python 查詢進展、Python 檢索快取統計、Python 單一 Agent 輪次的停止資料工具原因；終止契約修復保留既有錯誤代碼並於終端機顯示。Evaluation V2 另列 retrieval_diagnostics，舊報告無新欄位標記未知；聚合只計觀測到的輪次，不變更評分門檻。快取重用包含等待相同 in-flight 計算，不能直接等同節省 HTTP 次數；HTTP 實際觀測仍看 transport。未新增證據批次也不代表無效查詢或模型語意正確。
+
+## 終止契約、工具調度及證據評測整合（第四階段）
+
+本節取代前述歷史 Single Agent 終止封套及商品依賴指引；legacy_answer、intent_answer、RAG 排名、快取、權限、既有停止條件與預算保留。現行 submit_answer 與無工具 Schema fallback 共用同一閉合物件，兩個必填陣列：supported 為 question、statement、condition、source_ids，unresolved 只含 question 與 status（clarify/no_evidence/account_limit/unsupported/service_help）。沒有項目填空陣列，不使用 anyOf/oneOf/discriminator。主機轉為既有驗證/呈現格式，再逐主張核對本輪短 ID、運算依賴、適用條件和可信查無狀態；沒有有效主張或需求、超過原 16 項上限、缺來源或非法欄位仍不得直接放行。舊 results 回傳保留嚴格相容 decoder，記錄契約版本，不接收舊非 supported 的任意正文；舊已確認查無的恢復路徑仍然保留。新版已確認查無必須作 supported 並引用查詢結果，未知需求沒有來源欄。新欄位 condition 是模型提出的成立條件，不是主機已驗證語意充分性。只有實際呈現的 supported 文字及其來源記入主張級 Trace，方便人工審查；同需求的多主張應使用相同 question。主張與未知需求分組呈現，可能先呈現已能回答的部分，不承諾逐字原問順序。
+
+本人進度工具新增必填 required_item：相依品項使用原問或可信參照的名稱；獨立本人需求使用空字串。缺欄位、型別錯誤、未核對商品指涉、非 found（含 ambiguous、not_found、unavailable）或非 self 一律不得執行相依私人查詢。主機先在本機唯讀商城查核 declared dependency，才派發本人 DB 查詢；與其他公開工具可同批。這個預檢不是模型證據，回答仍需採用正式本輪工具來源；沒有商品欄位的獨立查詢仍可執行。模型填空字串是語意提案，主機無法確定其是否正確辨認所有依賴或本人指涉，不把它當作授權或完整的語意安全證明。計算仍依賴先前已驗證的本輪 ID，不能引用同批尚未取得的結果。沒有本輪證據時暫不提供 calculate，後續恢復；其餘工具不依語意猜測而隱藏。精簡 Single Agent system prompt，保留原問、已知條件、歷史指涉、證據全文與既有預算；不新增 LLM 呼叫或外部 grounding API。
+
+評測器保留原 rubric 2.0.0 與 legacy gate；新增可顯式選用的 rubric_v2_1.json（2.1.0）。價格等價來源只證明指定品名及價格，不證明完整限兌或交易狀態。新版另要求可回答本人餘額的案例採用本輪本人紀錄，部分資格案例需保留相關規則來源。這些是預先定義的測試資料，不進入正式 Agent 路由。新增 generalization 六題（同一示範語料另編，未實機驗收，不宣稱第三方獨立盲測）。新舊評測結果應分別保留，對照相同 rubric；歷史欄位缺失保持未知。claim_evidence 僅供人工對照，不自動評定 correctness、completeness、groundedness、uncertainty 或 relevance。

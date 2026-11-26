@@ -220,3 +220,7 @@ Single Agent 第一階段統一證據及結論強度、部分條件、未知資�
 ### 查詢效率
 
 同輪完全相同的 query vector 可重用，公開檔期仍獨立檢索；新增查詢進展、快取統計與停止原因觀測。不強制以證據重疊停止，不增加模型或工具預算。見 [EVALUATION](docs/EVALUATION.md)。
+
+### 第四階段整合契約
+
+現行 Single Agent 使用 supported 主張/condition/source_ids 與 unresolved 兩陣列，同一 Schema 供 native submit_answer 和 fallback；主機仍核對來源與依賴，未知需求不接收正文。相依的本人進度先核對商品，獨立公開查詢可同批。新增 rubric 2.1（以 --rubric 選用，舊版不變）、claim_evidence、6 題 generalization 及三供應商模擬契約測試。人工語意、完整回歸及真實端點仍須驗收。指令見 [TESTING](docs/TESTING.md#第四階段整合驗收現行-researchnvidia-provider) 與 [EVALUATION](docs/EVALUATION.md)。
