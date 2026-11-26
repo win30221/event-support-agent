@@ -10,8 +10,8 @@ from task_tool_planning import (CONTROL, TASK_TOOL_PROMPT, plan_tools, route_tas
                                 task_definitions, validate_batch)
 
 
-def call(name, **args):
-    return {"function": {"name": name, "arguments": json.dumps(args, ensure_ascii=False)}}
+def call(tool_name, /, **args):
+    return {"function": {"name": tool_name, "arguments": json.dumps(args, ensure_ascii=False)}}
 
 
 def fixture_calls(case):
