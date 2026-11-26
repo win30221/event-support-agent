@@ -13,6 +13,7 @@ from ollama import ResponseError
 from openai import APIConnectionError, APIStatusError
 
 from request_pacing import note_rate_limit, pace_request
+from transport_observation import record_transport
 
 
 class TransientModelError(RuntimeError):
@@ -160,11 +161,17 @@ def completion(provider, messages, tools, *, response_schema=None):
     """Synchronous public adapter; tests can inject a scripted completion instead."""
     try:
         model = bound_model(provider, tools, response_schema)
-        pace_request(provider)
-        return normalize_reply(model.invoke(convert_to_messages(messages)))
+        pace_request(provider, kind="chat")
+        converted = convert_to_messages(messages)
+        record_transport(provider, "chat", "attempt")
+        value = model.invoke(converted)
+        record_transport(provider, "chat", "success")
+        return normalize_reply(value)
     except (APIConnectionError, APIStatusError, ResponseError, httpx.HTTPError, ConnectionError) as error:
+        record_transport(provider, "chat", "failure", http_status=getattr(error, "status_code", None),
+                         error_type=type(error).__name__)
         if getattr(error, "status_code", None) == 429:
-            note_rate_limit(provider, getattr(getattr(error, "response", None), "headers", None))
+            note_rate_limit(provider, getattr(getattr(error, "response", None), "headers", None), kind="chat")
         raise transport_error(error, provider) from error
 
 
@@ -173,11 +180,17 @@ async def acompletion(provider, messages, tools, *, response_schema=None, num_pr
         model = (bound_model(provider, tools, response_schema) if num_predict is None else
                  bound_model(provider, tools, response_schema, num_predict=num_predict))
         if provider == "nvidia":
-            await asyncio.to_thread(pace_request, provider)
-        return normalize_reply(await model.ainvoke(convert_to_messages(messages)))
+            await asyncio.to_thread(pace_request, provider, kind="chat")
+        converted = convert_to_messages(messages)
+        record_transport(provider, "chat", "attempt")
+        value = await model.ainvoke(converted)
+        record_transport(provider, "chat", "success")
+        return normalize_reply(value)
     except (APIConnectionError, APIStatusError, ResponseError, httpx.HTTPError, ConnectionError) as error:
+        record_transport(provider, "chat", "failure", http_status=getattr(error, "status_code", None),
+                         error_type=type(error).__name__)
         if getattr(error, "status_code", None) == 429:
-            note_rate_limit(provider, getattr(getattr(error, "response", None), "headers", None))
+            note_rate_limit(provider, getattr(getattr(error, "response", None), "headers", None), kind="chat")
         raise transport_error(error, provider) from error
 
 

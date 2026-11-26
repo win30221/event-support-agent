@@ -298,3 +298,32 @@ $env:EVENT_SUPPORT_AGENT_RETRIEVAL = "hybrid"
 ### Single Agent 終止契約回歸
 
 Native submit_answer 與 Schema-only 均先通過原有證據驗證再結束。非 supported 附正文或來源視為契約錯誤（保留既有明確查無的可信原文恢復）。混合查無與正常證據不放行，回饋來源範圍及拆分方式。沿用原有一次格式修復及模型/工具總上限；若已耗盡，仍安全呈現通過的獨立部分。不變更評測門檻、RAG 排名、適用條件原文呈現或帳號權限。先跑單元測試，再以 --case wallet-b --case nov-title --case nov-sticker --case incident 等案例實測。後兩題的語意充分性仍須人工驗收，不宣稱本次已解決。
+
+
+## Evaluation V2：使用既有報告重新評分
+
+舊 `eval_rag --gate/--strict`、原始題庫和報告不變；V2 是獨立、唯讀的離線評分器，無模型、資料庫、LangChain 或 API key 依賴。分別呈現契約、實際安全邊界與模型禁止提案、任務狀態／必要工具、證據群組、工具效率、服務可靠性及人工語意評分。等價證據由凍結的 `evaluations/rubric_v2.json` 明確標記，群組內為 OR、每個選項為 AND；不同群組都必須滿足。不是文字相似度或全商城來源互換。原公告 RAG 召回率與舊 gate 保留。公用公告額外檔期派發是效率診斷；錯用檔期證據、私有資料錯範圍與禁止工具仍單獨判定失敗；模型提案不等於主機執行。所有已記錄輪次依各輪預期分別檢查。
+
+Windows PowerShell（**不需要再跑 NVIDIA**）：
+
+```powershell
+.\.venv\Scripts\python.exe -m evaluations.eval_report reports/nvidia-guardrails-hybrid.json --out reports/nvidia-guardrails-hybrid-v2.json --review-template reports/nvidia-guardrails-hybrid-review.json
+.\.venv\Scripts\python.exe -m evaluations.eval_report reports/nvidia-hybrid-nvidia-embed.json --out reports/nvidia-hybrid-v2.json
+```
+
+macOS/Linux 改用 `./.venv/bin/python`。BM25 歷史報告以實際檔名代入。輸出路徑須不存在，避免覆蓋原始報告。V2 同時記錄來源報告及 rubric 的 SHA256（規範化 JSON）。只有吻合題目、參考、玩家、檔期及既有必要來源標記的報告可重評；部分完成/執行錯誤會列明並回傳非零，V2 不以機械分數判定正式驗收。舊報告無 transport 欄位就標記未知，不能填 0。未執行輪次也不算通過。
+
+人工語意評分：開啟 review JSON，填 reviewer，對每一輪的 correctness、completeness、groundedness、uncertainty、relevance 填 pass、fail、not_run；核對原始報告的問題、回答、工具原文、引用及 rubric，已評分項目須填 notes（理由）。未確認的不評分。審查必須匹配原報告及 rubric 雜湊，避免拿別次的分數當作本次結果。
+
+```powershell
+.\.venv\Scripts\python.exe -m evaluations.eval_report reports/nvidia-guardrails-hybrid.json --review reports/nvidia-guardrails-hybrid-review.json --out reports/nvidia-guardrails-hybrid-v2-reviewed.json
+```
+
+九個新問句另存 holdout，先凍結不調 Prompt；它與原題庫用相同示範語料，但並非獨立第三方資料集。確認原報告重評與離線回歸後再執行：
+
+```powershell
+.\.venv\Scripts\python.exe -m evaluations.eval_rag --live nvidia --suite holdout --nvidia-rpm 20 --report reports/nvidia-holdout.json
+.\.venv\Scripts\python.exe -m evaluations.eval_report reports/nvidia-holdout.json --out reports/nvidia-holdout-v2.json --review-template reports/nvidia-holdout-review.json
+```
+
+重複試驗用 --repeat 3；不要混合不同套件、模型、語料與設定的成績。每輪新報告 transport 記錄 chat/embedding adapter attempts、成功/失敗、HTTP 狀態、重試與節流等待；只使用安全欄位，無憑證或正文。SDK 內部未觀測請求不冒充已知；並行等待加總不是牆鐘時間。20 RPM 與原重試預算未改。

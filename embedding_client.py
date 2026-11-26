@@ -10,6 +10,7 @@ import urllib.error
 import urllib.request
 
 from request_pacing import note_rate_limit, pace_request, retry_after_seconds
+from transport_observation import record_transport
 
 PROVIDERS = ("ollama", "openai", "nvidia")
 DEFAULT_MODELS = {"ollama": "bge-m3", "openai": "text-embedding-3-small",
@@ -48,19 +49,27 @@ def request_json(req, provider):
     for attempt in range(1, MAX_ATTEMPTS + 1):
         retry_after = None
         try:
-            pace_request(provider)
+            pace_request(provider, kind="embedding")
+            record_transport(provider, "embedding", "attempt", attempt=attempt)
             with urllib.request.urlopen(req, timeout=120) as response:
-                return json.load(response)
+                payload = json.load(response)
+            record_transport(provider, "embedding", "success", attempt=attempt)
+            return payload
         except urllib.error.HTTPError as error:
             reason = f"HTTP {error.code}"
+            record_transport(provider, "embedding", "failure", http_status=error.code, attempt=attempt)
             retry_after = retry_after_seconds(error.headers)
             if error.code == 429:
-                note_rate_limit(provider, error.headers)
+                note_rate_limit(provider, error.headers, kind="embedding")
             error.close()
             if error.code not in RETRYABLE_STATUS:
                 raise EmbeddingError(f"{provider} embedding {reason}.") from None
         except OSError as error:
             reason = type(error).__name__
+            record_transport(provider, "embedding", "failure", error_type=reason, attempt=attempt)
+        except (ValueError, TypeError) as error:
+            record_transport(provider, "embedding", "failure", error_type=type(error).__name__, attempt=attempt)
+            raise
         if attempt == MAX_ATTEMPTS or (retry_after is not None and retry_after > MAX_RETRY_AFTER):
             raise TransientEmbeddingError(
                 f"{provider} embedding {reason} after {attempt} attempt(s).") from None
@@ -68,6 +77,7 @@ def request_json(req, provider):
         delay = max(retry_after or 0, 2 ** (attempt - 1) + random.uniform(0, 0.25))
         logger.warning("%s embedding %s; retry %d/%d after %.2fs",
                        provider, reason, attempt, MAX_ATTEMPTS - 1, delay)
+        record_transport(provider, "embedding", "retry", seconds=delay, attempt=attempt)
         time.sleep(delay)
 
 

@@ -204,3 +204,7 @@ $env:EVENT_SUPPORT_AGENT_RETRIEVAL = "hybrid"
 ```
 
 評測報告記錄 nvidia_request_pacing_rpm；耗時包含等待與重試，不與未節流的效能直接比較。報告逐題保存，但沒有自動續跑；可用 --case 重測失敗案例，另存報告。
+
+### 離線重新評分（不消耗 API）
+
+`python -m evaluations.eval_report reports/nvidia-guardrails-hybrid.json --out reports/nvidia-guardrails-hybrid-v2.json --review-template reports/nvidia-guardrails-hybrid-review.json`。V2 保留舊 gate，分開證據、契約、安全、效率、可靠性與人工語意評分；新問句以 --suite holdout 實測。詳細見 [EVALUATION](docs/EVALUATION.md)。

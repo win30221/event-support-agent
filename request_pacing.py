@@ -7,6 +7,8 @@ from email.utils import parsedate_to_datetime
 from threading import Lock
 from time import monotonic, sleep
 
+from transport_observation import record_transport
+
 ENV = "EVENT_SUPPORT_AGENT_NVIDIA_RPM"
 DEFAULT_BATCH_RPM = 20
 logger = logging.getLogger(__name__)
@@ -68,16 +70,21 @@ class RequestPacer:
 _pacer = RequestPacer()
 
 
-def pace_request(provider):
+def pace_request(provider, *, kind="unspecified"):
     if provider == "nvidia":
-        return _pacer.wait(configured_rpm())
+        # 記錄排隊與實際等待耗時，不把並行等待加總解釋為總牆鐘耗時。
+        started = monotonic()
+        delay = _pacer.wait(configured_rpm())
+        record_transport(provider, kind, "pacing", seconds=round(monotonic() - started, 6))
+        return delay
     return 0.0
 
 
-def note_rate_limit(provider, headers=None):
+def note_rate_limit(provider, headers=None, *, kind="unspecified"):
     if provider == "nvidia" and configured_rpm():
         # 429 未提供 Retry-After 時等待一個分鐘窗口；不新增 LLM 重試。
         seconds = retry_after_seconds(headers)
         delay = 60.0 if seconds is None else seconds
         _pacer.defer(delay)
+        record_transport(provider, kind, "rate_limit_defer", http_status=429, seconds=delay)
         logger.warning("NVIDIA rate limit: next request deferred %.2fs", delay)

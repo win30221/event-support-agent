@@ -116,3 +116,11 @@
 - [OpenAI Agents SDK Guardrails](https://openai.github.io/openai-agents-python/guardrails/)：拒絕未通過的候選輸出；本專案沿用既有 LangGraph 有限修復，非導入 OpenAI SDK。
 - [LangChain Structured Output](https://docs.langchain.com/oss/python/langchain/structured-output)：參考 ToolStrategy 驗證失敗的錯誤回饋與重試，實際規則由本專案主機決定。
 - [NVIDIA NIM FAQ](https://forums.developer.nvidia.com/t/nvidia-nim-faq/300317)：試用配額可能變動。20 RPM 是本專案可調節流預設，不代表服務保證。
+
+## Evaluation V2 官方設計依據
+
+- [OpenAI Evaluation Best Practices](https://developers.openai.com/api/docs/guides/evaluation-best-practices)：單一 Agent 分開功能正確性、工具選擇與參數；程式、人工與模型評分互補，模型 grader 需人工校準。
+- [Anthropic Demystifying evals for AI agents](https://www.anthropic.com/research/demystifying-evals-for-ai-agents)：task、trial、grader、trace、outcome 分離，多次試驗及多 grader。避免把固定路徑當成唯一成功解法。
+- [Google Cloud Agent Evaluation](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/evaluation-agents)：分開最終回答與工具軌跡、執行個體與匯總結果。
+
+本專案選擇本地確定性 grader 與人工 rubric，非導入上述平台或聲稱自動語意證明；版本化證據群組、雜湊及節流紀錄為本專案設計取捨。

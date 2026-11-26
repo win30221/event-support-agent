@@ -150,3 +150,7 @@ Resolve the effective embedding provider/model once per request rather than muta
 ## 終止前 Guardrails 與 NVIDIA 節流
 
 基準 8c7ff7c 實機 JSON 顯示：wallet-b 正確自由文字因終止契約失敗進入 Schema-only，後續 status=no_evidence 卻附有效正文與來源；nov-title 混合跨期查無與正常商品證據後於呈現階段遭拒。此次僅移動既有確定性證據驗證至接受終止前，補非 supported 欄位互斥檢查，保留原有可信查無恢復、來源依賴展開、適用條件原文及安全拒絕。修復沿用單次既有預算，提供 INVALID_FINAL_EVIDENCE 與具體欄位/範圍原因；不自動更改 status、不增加正常路徑模型呼叫、不放寬混合查無限制、不引入語意模型。已耗盡修復時不信任拒絕的部分。這不保證語意充分性，也不保證已用過格式修復的 wallet-b 可恢復；Schema-only 明示有證據的否定也是 supported。NVIDIA 評測採程序內同供應商等距放行，預設 20 RPM 是保守取捨而非 NVIDIA 配額；跨模型聊天與 Embedding 共用，429 延後下一次請求。既有報告、題庫與回歸基準保留。新增離線腳本測試，實機與完整回歸待驗證。
+
+## Evaluation V2（不修改正式 Agent）
+
+在 a5e1c81 的完整實機 31 題中，結構 gate 混合來源 ID、檔期與任務狀態；nov-title 的商城證據足以支持同樣事實，nov-sticker 的商城資料不含信箱規則，因此不可整批等價。保留原題庫、gate 與離線 RAG 評測；另外按每輪明確 rubric 用 OR/AND 群組評估可信工具證據覆蓋，分開公用額外查詢、引用檔期錯誤、禁止提案、實際安全範圍、契約及語意人工評分。狀態和必要工具不合格仍列出；來源 ID 覆蓋不等於陳述語意正確。九個新問句在 holdout 獨立凍結。報告重評不用模型，使用 SHA256 綁定 rubric、來源及人工評分；舊 transport 未知不算 0；未審查不算 PASS。新增 request-scoped transport 觀察，使用 ContextVar 與 lock 只記安全欄位，保留既有 RPM 與重試，不改 Prompt、RAG 或安全核定。正式語意驗收與實機 holdout 尚待執行。

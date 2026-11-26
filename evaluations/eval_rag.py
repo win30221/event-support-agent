@@ -14,6 +14,7 @@ from pathlib import Path
 from guide import published_passages, rank_passages, search_rules
 from embedding_client import TransientEmbeddingError
 from request_pacing import DEFAULT_BATCH_RPM, ENV as NVIDIA_RPM_ENV, configured_rpm
+from transport_observation import capture_transport
 
 
 def legacy_search(question, passages):
@@ -228,7 +229,18 @@ async def replay(case, provider, report_turns=None):
                 print("實際段落", [p["段落ID"] for p in passages])
 
         started = perf_counter()
-        reply, trace = await answer(player, provider, history[-8:], question, observe=observe)
+        with capture_transport() as transport:
+            try:
+                reply, trace = await answer(player, provider, history[-8:], question, observe=observe)
+            except Exception as error:
+                if report_turns is not None:
+                    metrics = turn_metrics(events, [], perf_counter() - started)
+                    metrics["tool_successes"] = None  # 尚未取得最後的成功 trace。
+                    report_turns.append({"question": question, "reply": "", "metrics": metrics,
+                        "tools": [], "checks": [d for t, d in events if t == "Python 檢查回答依據"],
+                        "events": [{"title": t, "data": d} for t, d in events],
+                        "transport": transport, "execution_error": type(error).__name__})
+                raise
         metrics = turn_metrics(events, trace, perf_counter() - started)
         print("助手：", reply)
         print("實機呼叫統計", json.dumps(metrics, ensure_ascii=False))
@@ -236,7 +248,7 @@ async def replay(case, provider, report_turns=None):
             report_turns.append({"question": question, "reply": reply, "metrics": metrics,
                 "tools": [{"name": t["工具"], "arguments": t["參數"]} for t in trace],
                 "checks": [d for t, d in events if t == "Python 檢查回答依據"],
-                "events": [{"title": t, "data": d} for t, d in events]})
+                "events": [{"title": t, "data": d} for t, d in events], "transport": transport})
         history.extend([{"role": "user", "content": question},
                         {"role": "assistant", "content": reply, "trace": trace}])
     print("期望來源", case["sources"])
@@ -303,6 +315,8 @@ def main():
     from model_client import PROVIDERS
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--case", action="append", help="指定案例 ID；可重複指定")
+    parser.add_argument("--suite", choices=("baseline", "holdout"), default="baseline",
+                        help="baseline 保留原 31 題；holdout 為另行凍結的新問句，僅實機")
     parser.add_argument("--hybrid", action="store_true", help="用已建好的 pgvector 索引額外比較混合檢索")
     parser.add_argument("--live", choices=PROVIDERS, help="透過指定模型重播所選情境")
     parser.add_argument("--strict", action="store_true", help="實機重播時必要來源未被採用則回傳非零結束碼；不等於語意驗收")
@@ -331,9 +345,14 @@ def main():
         parser.error("--gate/--repeat 需要 --live")
     if args.report and not args.live:
         parser.error("--report 需要搭配 --live")
-    cases = json.loads(Path(__file__).with_name("rag_cases.json").read_text(encoding="utf-8"))
-    if args.live:
-        cases += json.loads(Path(__file__).with_name("task_cases.json").read_text(encoding="utf-8"))
+    if args.suite == "holdout":
+        if not args.live:
+            parser.error("--suite holdout 需要 --live")
+        cases = json.loads(Path(__file__).with_name("holdout_cases.json").read_text(encoding="utf-8"))
+    else:
+        cases = json.loads(Path(__file__).with_name("rag_cases.json").read_text(encoding="utf-8"))
+        if args.live:
+            cases += json.loads(Path(__file__).with_name("task_cases.json").read_text(encoding="utf-8"))
     if args.case:
         known = {case["id"] for case in cases}
         missing = set(args.case) - known
@@ -347,6 +366,8 @@ def main():
     if args.live:
         reports, details = [], []
         run = report_metadata(args.live)
+        run["suite"] = args.suite
+        run["transport_observation_version"] = 1
         expected_trials = len(cases) * args.repeat
         for case in cases:
             for trial in range(1, args.repeat + 1):
@@ -377,6 +398,8 @@ def main():
         print(f"無指定必要段落、需另行人工驗收：{len(reports) - len(labelled)} 題")
         print("結構驗收通過", sum(not d["gate_issues"] for d in details), "/", len(details))
         print("語意驗收尚未執行：請逐題對照 reference，不將 PASS 視為語意正確。")
+        if args.report:
+            print("可使用 python -m evaluations.eval_report 重新評分，不重新呼叫模型。")
         if any(d["execution_error"] for d in details):
             raise SystemExit(1)
         if args.gate and any(d["gate_issues"] for d in details):

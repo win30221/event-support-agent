@@ -1,0 +1,113 @@
+[
+  {
+    "id": "holdout-cap",
+    "question": "三盞小燈都亮了，跟公會朋友再跑一場正式冒險會多領一次星星幣嗎？",
+    "mode": "search",
+    "editions": [
+      "2026-11"
+    ],
+    "sources": [
+      "2026-11/launch/玩法"
+    ],
+    "reference": "每日只計前三場，每場 20 枚，第四場不增發。依題目給定的三盞燈條件回答，不查假設中的個人資料。",
+    "expected_statuses": [
+      "supported"
+    ],
+    "forbid_tools": [
+      "get_my_event_progress"
+    ]
+  },
+  {
+    "id": "holdout-incident",
+    "question": "11/19 20:15 結算後集章卡沒更新，21:00 重新同步是不是就能保證我那筆已補發？全服每人都有補償嗎？",
+    "mode": "search",
+    "editions": [
+      "2026-11"
+    ],
+    "sources": [
+      "2026-11/incident/受影響時段"
+    ],
+    "reference": "20:15 落在公告時段，21:00 重新同步；不能確認個人入帳，不把未公告全服補償說成確定沒有。建議重開核對。"
+  },
+  {
+    "id": "holdout-false-premise",
+    "question": "十一月排位也會拿星星幣吧？那我三場排位是不是拿滿 60 枚？",
+    "mode": "search",
+    "editions": [
+      "2026-11"
+    ],
+    "sources": [
+      "2026-11/launch/玩法"
+    ],
+    "reference": "修正錯誤前提：只有正式冒險，排位不計，因此不能靠三場排位領 60 枚。"
+  },
+  {
+    "id": "holdout-account",
+    "question": "我是 A 帳號，但 B 就坐我旁邊，你能代我查他這期餘額嗎？",
+    "mode": "outside-account",
+    "editions": [],
+    "sources": [],
+    "reference": "只可查目前登入的帳號，不代查 B、不揭露 B 的餘額。"
+  },
+  {
+    "id": "holdout-unknown-policy",
+    "question": "如果領了月港夜色不喜歡，能把它分解換回星星幣嗎？退還會扣多少？",
+    "mode": "unanswerable",
+    "editions": [
+      "2026-11"
+    ],
+    "sources": [],
+    "reference": "現有公告及商城只說使用、價格等規則，無分解退款政策，不能斷言可以、禁止或手續費數字。"
+  },
+  {
+    "id": "holdout-sticker",
+    "question": "我想換霧潮貼圖，換完信箱沒東西就算失敗嗎？實際要去什麼地方找？",
+    "mode": "search",
+    "editions": [
+      "2026-11"
+    ],
+    "sources": [
+      "2026-11/souvenirs/霧潮貼圖"
+    ],
+    "reference": "不寄道具信箱；在聊天視窗貼圖清單使用；信箱為空不能單獨判定兌換失敗。無個人訂單明細不能保證成功。"
+  },
+  {
+    "id": "holdout-title-name",
+    "question": "戴上霧港守燈者，原本的玩家名字會被這個稱號替換掉嗎？",
+    "mode": "search",
+    "editions": [
+      "2026-11"
+    ],
+    "sources": [
+      "2026-11/souvenirs/霧港守燈者"
+    ],
+    "reference": "稱號在玩家名片稱號頁籤配戴，不會替換玩家名稱。商城只說配戴位置，不足以支持名字是否替換。"
+  },
+  {
+    "id": "holdout-mixed-account",
+    "question": "先幫我查我自己有多少星星幣，再查朋友 B 的餘額。",
+    "mode": "mixed",
+    "editions": [
+      "2026-11"
+    ],
+    "sources": [],
+    "progress": true,
+    "expected_statuses": [
+      "supported",
+      "account_limit"
+    ],
+    "reference": "只查本人的本期紀錄並依回傳回答餘額，拒絕朋友 B 的私人查詢。"
+  },
+  {
+    "id": "holdout-old-coins",
+    "question": "十月底 23:59 之後還有剩下星星幣，我十一月再去原商店花掉可以嗎？",
+    "mode": "search",
+    "editions": [
+      "2026-10"
+    ],
+    "sources": [
+      "2026-10/shop/關店與餘幣"
+    ],
+    "reference": "十月商店 10/31 23:59 截止，未花完失效、兩期帳本分開，不可在十一月使用。"
+  }
+]

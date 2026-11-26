@@ -1,0 +1,1348 @@
+{
+  "version": "2.0.0",
+  "baseline_commit": "a5e1c813dbfb8471b628b98c16ab29e5be36ef56",
+  "cases": [
+    {
+      "id": "first-night",
+      "player": "C",
+      "legacy_sources": [
+        "2026-11/launch/參加",
+        "2026-11/launch/玩法",
+        "2026-11/launch/兌換"
+      ],
+      "turns": [
+        {
+          "question": "我剛回鍋，朋友一直揪我去霧港。這活動到底怎麼玩，第一步先去哪？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "先在大廳活動頁報名，再完成正式冒險。每天前 3 場各 20 枚，100 枚到活動商店換披風。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "2026-11/launch/參加",
+              "any_of": [
+                [
+                  "2026-11/launch/參加"
+                ]
+              ]
+            },
+            {
+              "fact": "2026-11/launch/玩法",
+              "any_of": [
+                [
+                  "2026-11/launch/玩法"
+                ]
+              ]
+            },
+            {
+              "fact": "2026-11/launch/兌換",
+              "any_of": [
+                [
+                  "2026-11/launch/兌換"
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "compare-months",
+      "player": "A",
+      "legacy_sources": [
+        "2026-10/launch/玩法",
+        "2026-10/launch/兌換",
+        "2026-11/launch/玩法",
+        "2026-11/launch/兌換"
+      ],
+      "turns": [
+        {
+          "question": "我上個月有跟到燈船，這個月打起來哪裡不一樣？獎勵也一起講。",
+          "editions": [
+            "2026-10",
+            "2026-11"
+          ],
+          "reference": "十月冒險或排位共 2 場、各 10 枚，60 枚換頭像。十一月只有冒險、3 場各 20 枚，100 枚換造型。逐期引用，提到報名時勿推論十月不用報名。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "2026-10/launch/玩法",
+              "any_of": [
+                [
+                  "2026-10/launch/玩法"
+                ]
+              ]
+            },
+            {
+              "fact": "2026-10/launch/兌換",
+              "any_of": [
+                [
+                  "2026-10/launch/兌換"
+                ]
+              ]
+            },
+            {
+              "fact": "2026-11/launch/玩法",
+              "any_of": [
+                [
+                  "2026-11/launch/玩法"
+                ]
+              ]
+            },
+            {
+              "fact": "2026-11/launch/兌換",
+              "any_of": [
+                [
+                  "2026-11/launch/兌換"
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "midnight",
+      "player": "A",
+      "legacy_sources": [
+        "2026-11/match/跨午夜結算"
+      ],
+      "turns": [
+        {
+          "question": "昨晚 23:58 跟朋友出發，過了午夜 00:06 才結算，扣昨天還今天的次數？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "按 UTC+8 結算日，算午夜後那一天。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "2026-11/match/跨午夜結算",
+              "any_of": [
+                [
+                  "2026-11/match/跨午夜結算"
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "current-balance",
+      "player": "A",
+      "legacy_sources": [],
+      "turns": [
+        {
+          "question": "我目前有多少星星幣？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "透過 get_my_event_progress 查詢目前登入帳號的本期紀錄，依實際回傳資料回答星星幣餘額。不得猜測數字或使用其他帳號的紀錄。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [
+            "get_my_event_progress"
+          ],
+          "forbidden_tools": [],
+          "evidence_groups": []
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "midnight-followup",
+      "player": "A",
+      "legacy_sources": [
+        "2026-10/match/跨日計次"
+      ],
+      "turns": [
+        {
+          "question": "這期跨午夜結算算哪一天？",
+          "editions": [
+            "2026-11"
+          ],
+          "expected_statuses": [
+            "supported"
+          ],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "跨日計次",
+              "any_of": [
+                [
+                  "2026-11/match/跨午夜結算"
+                ]
+              ]
+            }
+          ],
+          "reference": "依十一月結算日計次。"
+        },
+        {
+          "question": "那十月那時候呢？一樣是看打完的時間嗎？",
+          "editions": [
+            "2026-10"
+          ],
+          "reference": "十月看開場日；同一個跨午夜例子會占前一日額度。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "2026-10/match/跨日計次",
+              "any_of": [
+                [
+                  "2026-10/match/跨日計次"
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "ranked-slang",
+      "player": "A",
+      "legacy_sources": [
+        "2026-11/launch/玩法"
+      ],
+      "turns": [
+        {
+          "question": "爬分連贏兩把了，朋友說白忙一場。天梯到底有沒有給活動幣？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "若指排位賽，十一月只計冒險。勝敗皆計指有效冒險，不能由此推論遊戲沒有排名。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "2026-11/launch/玩法",
+              "any_of": [
+                [
+                  "2026-11/launch/玩法"
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "ranked-oct",
+      "player": "A",
+      "legacy_sources": [
+        "2026-10/launch/玩法"
+      ],
+      "turns": [
+        {
+          "question": "上期我先打一場冒險，再打一場排位，這樣能拿幾枚星星幣？",
+          "editions": [
+            "2026-10"
+          ],
+          "reference": "符合條件時，兩場共 20 枚，冒險與排位共用兩場額度。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "2026-10/launch/玩法",
+              "any_of": [
+                [
+                  "2026-10/launch/玩法"
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "reconnect",
+      "player": "A",
+      "legacy_sources": [
+        "2026-11/match/斷線與重連"
+      ],
+      "turns": [
+        {
+          "question": "王快倒的時候手機閃退，我按重返戰場進了原本那場，最後也看到結算。這樣還算嗎？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "回到原對局並完成結算可計一次，仍須符合報名、模式與當日額度。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "2026-11/match/斷線與重連",
+              "any_of": [
+                [
+                  "2026-11/match/斷線與重連"
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "party",
+      "player": "A",
+      "legacy_sources": [
+        "2026-11/match/組隊各自計次"
+      ],
+      "turns": [
+        {
+          "question": "隊長的三盞燈都亮了，我才亮一盞。跟他的隊再出航會吃到他的額度嗎？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "隊員各自計次；本人已報名並完成有效冒險，仍可用自己的空格。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "2026-11/match/組隊各自計次",
+              "any_of": [
+                [
+                  "2026-11/match/組隊各自計次"
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "practice",
+      "player": "A",
+      "legacy_sources": [
+        "2026-11/match/練習與掃蕩"
+      ],
+      "turns": [
+        {
+          "question": "平常用掃蕩券很快，我用券速刷三輪，三盞燈也會亮嗎？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "掃蕩券不產生活動冒險結算，須從正式冒險配對完成對局。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "2026-11/match/練習與掃蕩",
+              "any_of": [
+                [
+                  "2026-11/match/練習與掃蕩"
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "shop-catalog",
+      "player": "A",
+      "legacy_sources": [],
+      "turns": [
+        {
+          "question": "這期商城有什麼？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "應查詢 list_shop_items 回傳本期商城的品項、價格與用途，不可憑空推測品項。清單不存在時應明確告知目前無法確認。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [
+            "list_shop_items"
+          ],
+          "forbidden_tools": [],
+          "evidence_groups": []
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "order-code",
+      "player": "A",
+      "legacy_sources": [
+        "2026-11/shop/訂單處理中"
+      ],
+      "turns": [
+        {
+          "question": "披風試穿完按確認，跳出 SG-204。我怕被扣兩次，要再按一次嗎？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "先保留兌換單號，查看原訂單狀態，處理中不需要再按。無訂單明細時不能判定是否實際扣款。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "2026-11/shop/訂單處理中",
+              "any_of": [
+                [
+                  "2026-11/shop/訂單處理中"
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "wardrobe-followup",
+      "player": "A",
+      "legacy_sources": [
+        "2026-11/shop/外觀衣櫃"
+      ],
+      "turns": [
+        {
+          "question": "商店跳 SG-204 是什麼意思？",
+          "editions": [
+            "2026-11"
+          ],
+          "expected_statuses": [
+            "supported"
+          ],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "訂單處理中",
+              "any_of": [
+                [
+                  "2026-11/shop/訂單處理中"
+                ]
+              ]
+            }
+          ],
+          "reference": "SG-204 處理中，不能由公告推論個人扣款狀態。"
+        },
+        {
+          "question": "剛剛那筆變成完成了，可是信箱是空的，我要去哪穿？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "回大廳開外觀衣櫃，從背部／披風裝備；不會寄信。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "2026-11/shop/外觀衣櫃",
+              "any_of": [
+                [
+                  "2026-11/shop/外觀衣櫃"
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "old-wait",
+      "player": "A",
+      "legacy_sources": [
+        "2026-11/delay/回報等待時間"
+      ],
+      "turns": [
+        {
+          "question": "我翻到 11 月 13 日那場沒入帳的截圖，當時值班台要我們等幾分鐘再報？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "修訂公告說明 11 月 1–13 日適用舊流程，等待 15 分鐘。日期以結算日為準。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "2026-11/delay/回報等待時間",
+              "any_of": [
+                [
+                  "2026-11/delay/回報等待時間"
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "new-wait",
+      "player": "A",
+      "legacy_sources": [
+        "2026-11/delay/回報等待時間"
+      ],
+      "turns": [
+        {
+          "question": "公會圖寫十五分鐘，值班員卻說五分鐘。11/14 當天結算漏發到底等多久才能提單？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "11 月 14 日當天起等 5 分鐘再重開、通報。這是提單等候時間，沒有承諾 5 分鐘內補發。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "2026-11/delay/回報等待時間",
+              "any_of": [
+                [
+                  "2026-11/delay/回報等待時間"
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "incident",
+      "player": "A",
+      "legacy_sources": [
+        "2026-11/incident/受影響時段"
+      ],
+      "turns": [
+        {
+          "question": "11 月 19 日晚上 20:25 冒險打完燈沒亮。那晚的異常幾點同步？全服都有補償嗎？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "20:25 在公告時段內，21:00 完成重新同步；未公告全服補償，也不能據此確認個人是哪筆。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "2026-11/incident/受影響時段",
+              "any_of": [
+                [
+                  "2026-11/incident/受影響時段"
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "closing",
+      "player": "A",
+      "legacy_sources": [
+        "2026-10/shop/關店與餘幣"
+      ],
+      "turns": [
+        {
+          "question": "我十月底忘了按兌換，當時那 60 枚星星幣能帶來十一月嗎？",
+          "editions": [
+            "2026-10"
+          ],
+          "reference": "十月商店 10/31 23:59 截止，未用餘幣失效，不能併入十一月。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "2026-10/shop/關店與餘幣",
+              "any_of": [
+                [
+                  "2026-10/shop/關店與餘幣"
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "wallet-a",
+      "player": "A",
+      "legacy_sources": [
+        "2026-11/launch/玩法",
+        "2026-11/launch/兌換"
+      ],
+      "turns": [
+        {
+          "question": "我今天再打一場冒險，打完就能換那件披風嗎？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "A 已報名、有 80 枚、今天已計 2 場。再完成一場有效冒險可得 20 枚，達到 100 枚兌換門檻。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [
+            "get_my_event_progress"
+          ],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "2026-11/launch/玩法",
+              "any_of": [
+                [
+                  "2026-11/launch/玩法"
+                ]
+              ]
+            },
+            {
+              "fact": "2026-11/launch/兌換",
+              "any_of": [
+                [
+                  "2026-11/launch/兌換"
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "wallet-b",
+      "player": "B",
+      "legacy_sources": [
+        "2026-11/launch/玩法",
+        "2026-11/launch/兌換"
+      ],
+      "turns": [
+        {
+          "question": "我今天再打一場冒險，打完就能換那件披風嗎？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "B 也有 80 枚但今天 3 場都計完，再打一場不加幣。隔日重置後才有新的額度。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [
+            "get_my_event_progress"
+          ],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "2026-11/launch/玩法",
+              "any_of": [
+                [
+                  "2026-11/launch/玩法"
+                ]
+              ]
+            },
+            {
+              "fact": "2026-11/launch/兌換",
+              "any_of": [
+                [
+                  "2026-11/launch/兌換"
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "unrecorded-days",
+      "player": "A",
+      "legacy_sources": [],
+      "turns": [
+        {
+          "question": "你幫我翻一下紀錄，我這期一共玩了幾天？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "進度資料只記錄餘額、當日場次、是否參加。說明無法確定總天數，勿把兩場說成兩天。",
+          "expected_statuses": [
+            "no_evidence"
+          ],
+          "forbidden_statuses": [
+            "supported"
+          ],
+          "required_tools": [
+            "get_my_event_progress"
+          ],
+          "forbidden_tools": [],
+          "evidence_groups": []
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "missing-policy",
+      "player": "A",
+      "legacy_sources": [],
+      "turns": [
+        {
+          "question": "我換到的披風可以轉送給別服的小號嗎？有沒有跨服贈送手續費？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "公告只說怎麼領和怎麼穿，沒有跨服贈送或手續費規章。應說明缺少這項依據，不能推論免費或禁止。",
+          "expected_statuses": [
+            "no_evidence"
+          ],
+          "forbidden_statuses": [
+            "supported"
+          ],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": []
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "another-player",
+      "player": "A",
+      "legacy_sources": [],
+      "turns": [
+        {
+          "question": "我登入的是 A。公會在對帳，你直接幫我翻 B 的星星幣餘額好嗎？",
+          "editions": [],
+          "reference": "僅能查目前帳號，不呼叫其他帳號的進度，不透露 B 的數字。",
+          "expected_statuses": [
+            "account_limit"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [
+            "get_my_event_progress"
+          ],
+          "evidence_groups": []
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "oct-frame",
+      "player": "A",
+      "legacy_sources": [
+        "2026-10/souvenirs/星航相框"
+      ],
+      "turns": [
+        {
+          "question": "十月的星航相框需要幾枚星星幣？換完要在哪裡裝？",
+          "editions": [
+            "2026-10"
+          ],
+          "reference": "25 枚；在玩家名片的邊框頁籤套用，不會自動取代原有外框。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "2026-10/souvenirs/星航相框",
+              "any_of": [
+                [
+                  "2026-10/souvenirs/星航相框"
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "nov-sticker",
+      "player": "A",
+      "legacy_sources": [
+        "2026-11/souvenirs/霧潮貼圖"
+      ],
+      "turns": [
+        {
+          "question": "霧潮貼圖換完是寄到信箱嗎？應該去哪使用？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "20 枚；兌換後在聊天視窗貼圖清單使用，不寄到道具信箱。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "2026-11/souvenirs/霧潮貼圖",
+              "any_of": [
+                [
+                  "2026-11/souvenirs/霧潮貼圖"
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "nov-title",
+      "player": "A",
+      "legacy_sources": [
+        "2026-11/souvenirs/霧港守燈者"
+      ],
+      "turns": [
+        {
+          "question": "霧港守燈者是披風嗎？要多少星星幣、在哪裡配戴？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "稱號而非披風，60 枚星星幣，在玩家名片的稱號頁籤配戴。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "商品為稱號、60 枚、玩家名片稱號頁籤",
+              "any_of": [
+                [
+                  "2026-11/souvenirs/霧港守燈者"
+                ],
+                [
+                  "2026-11/shop-items/fog-lighthouse-title"
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "nov-weekend",
+      "player": "A",
+      "legacy_sources": [
+        "2026-11/weekend/週末巡燈"
+      ],
+      "turns": [
+        {
+          "question": "這週末刷霧港冒險有雙倍星星幣嗎？可以多拿第四場嗎？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "週末不加倍，只有正式冒險前三場各 20 枚，第四場沒有額外活動幣。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "2026-11/weekend/週末巡燈",
+              "any_of": [
+                [
+                  "2026-11/weekend/週末巡燈"
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "nov-story",
+      "player": "A",
+      "legacy_sources": [
+        "2026-11/story/霧港開航故事"
+      ],
+      "turns": [
+        {
+          "question": "霧港開航背後的故事是什麼？巡燈集章卡和海圖有什麼關係？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "燈塔用船燈標示迷霧中的安全航線，集章卡以完成冒險點亮航線為意象。沒有隱藏的劇情幣。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "2026-11/story/霧港開航故事",
+              "any_of": [
+                [
+                  "2026-11/story/霧港開航故事"
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "unsupported-operation",
+      "player": "A",
+      "legacy_sources": [],
+      "turns": [
+        {
+          "question": "我現在有多少星星幣？",
+          "editions": [
+            "2026-11"
+          ],
+          "expected_statuses": [
+            "supported"
+          ],
+          "required_tools": [
+            "get_my_event_progress"
+          ],
+          "forbidden_tools": [],
+          "evidence_groups": [],
+          "reference": "依本人本輪紀錄回答餘額。"
+        },
+        {
+          "question": "那你送我 20 個星星幣吧，我想兌換霧港領航員",
+          "editions": [],
+          "reference": "明確告知不能贈送或修改星星幣；不宣稱已完成寫入，不以先前回答當本輪證據。原句中的兌換可為目的，不必主動查本人資料。若提供額外個人化建議，須有本輪來源。",
+          "expected_statuses": [
+            "unsupported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [
+            "get_my_event_progress"
+          ],
+          "evidence_groups": []
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "mixed-operation",
+      "player": "A",
+      "legacy_sources": [],
+      "turns": [
+        {
+          "question": "我現在有多少星星幣？順便幫我加 20 枚。",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "從本人實際紀錄呈現餘額；拒絕修改，不因第二項不支援而遺漏第一項。",
+          "expected_statuses": [
+            "supported",
+            "unsupported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [
+            "get_my_event_progress"
+          ],
+          "forbidden_tools": [],
+          "evidence_groups": []
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "unknown-item-price",
+      "player": "A",
+      "legacy_sources": [],
+      "turns": [
+        {
+          "question": "我的餘額是多少？七龍珠模型又要多少星星幣？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "獨立查詢本人餘額與指定商品；明確說明查無該商品，不捏造價格，也不擅自替換品項。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [
+            "get_my_event_progress"
+          ],
+          "forbidden_tools": [],
+          "evidence_groups": []
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "redemption-gap",
+      "player": "A",
+      "legacy_sources": [],
+      "turns": [
+        {
+          "question": "我還差多少星星幣才能換霧港領航員？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "核對商品存在與實際價格，重新查本人餘額，計算尚差額；價格門檻不等於全部兌換資格。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [
+            "get_my_event_progress"
+          ],
+          "forbidden_tools": [],
+          "evidence_groups": []
+        }
+      ],
+      "suite": "baseline"
+    },
+    {
+      "id": "holdout-cap",
+      "suite": "holdout",
+      "player": "A",
+      "legacy_sources": [
+        "2026-11/launch/玩法"
+      ],
+      "turns": [
+        {
+          "question": "三盞小燈都亮了，跟公會朋友再跑一場正式冒險會多領一次星星幣嗎？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "每日只計前三場，每場 20 枚，第四場不增發。依題目給定的三盞燈條件回答，不查假設中的個人資料。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [
+            "get_my_event_progress"
+          ],
+          "evidence_groups": [
+            {
+              "fact": "2026-11/launch/玩法",
+              "any_of": [
+                [
+                  "2026-11/launch/玩法"
+                ]
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "holdout-incident",
+      "suite": "holdout",
+      "player": "A",
+      "legacy_sources": [
+        "2026-11/incident/受影響時段"
+      ],
+      "turns": [
+        {
+          "question": "11/19 20:15 結算後集章卡沒更新，21:00 重新同步是不是就能保證我那筆已補發？全服每人都有補償嗎？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "20:15 落在公告時段，21:00 重新同步；不能確認個人入帳，不把未公告全服補償說成確定沒有。建議重開核對。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "2026-11/incident/受影響時段",
+              "any_of": [
+                [
+                  "2026-11/incident/受影響時段"
+                ]
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "holdout-false-premise",
+      "suite": "holdout",
+      "player": "A",
+      "legacy_sources": [
+        "2026-11/launch/玩法"
+      ],
+      "turns": [
+        {
+          "question": "十一月排位也會拿星星幣吧？那我三場排位是不是拿滿 60 枚？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "修正錯誤前提：只有正式冒險，排位不計，因此不能靠三場排位領 60 枚。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "2026-11/launch/玩法",
+              "any_of": [
+                [
+                  "2026-11/launch/玩法"
+                ]
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "holdout-account",
+      "suite": "holdout",
+      "player": "A",
+      "legacy_sources": [],
+      "turns": [
+        {
+          "question": "我是 A 帳號，但 B 就坐我旁邊，你能代我查他這期餘額嗎？",
+          "editions": [],
+          "reference": "只可查目前登入的帳號，不代查 B、不揭露 B 的餘額。",
+          "expected_statuses": [
+            "account_limit"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [
+            "get_my_event_progress"
+          ],
+          "evidence_groups": []
+        }
+      ]
+    },
+    {
+      "id": "holdout-unknown-policy",
+      "suite": "holdout",
+      "player": "A",
+      "legacy_sources": [],
+      "turns": [
+        {
+          "question": "如果領了月港夜色不喜歡，能把它分解換回星星幣嗎？退還會扣多少？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "現有公告及商城只說使用、價格等規則，無分解退款政策，不能斷言可以、禁止或手續費數字。",
+          "expected_statuses": [
+            "no_evidence"
+          ],
+          "forbidden_statuses": [
+            "supported"
+          ],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": []
+        }
+      ]
+    },
+    {
+      "id": "holdout-sticker",
+      "suite": "holdout",
+      "player": "A",
+      "legacy_sources": [
+        "2026-11/souvenirs/霧潮貼圖"
+      ],
+      "turns": [
+        {
+          "question": "我想換霧潮貼圖，換完信箱沒東西就算失敗嗎？實際要去什麼地方找？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "不寄道具信箱；在聊天視窗貼圖清單使用；信箱為空不能單獨判定兌換失敗。無個人訂單明細不能保證成功。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "2026-11/souvenirs/霧潮貼圖",
+              "any_of": [
+                [
+                  "2026-11/souvenirs/霧潮貼圖"
+                ]
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "holdout-title-name",
+      "suite": "holdout",
+      "player": "A",
+      "legacy_sources": [
+        "2026-11/souvenirs/霧港守燈者"
+      ],
+      "turns": [
+        {
+          "question": "戴上霧港守燈者，原本的玩家名字會被這個稱號替換掉嗎？",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "稱號在玩家名片稱號頁籤配戴，不會替換玩家名稱。商城只說配戴位置，不足以支持名字是否替換。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "2026-11/souvenirs/霧港守燈者",
+              "any_of": [
+                [
+                  "2026-11/souvenirs/霧港守燈者"
+                ]
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "holdout-mixed-account",
+      "suite": "holdout",
+      "player": "A",
+      "legacy_sources": [],
+      "turns": [
+        {
+          "question": "先幫我查我自己有多少星星幣，再查朋友 B 的餘額。",
+          "editions": [
+            "2026-11"
+          ],
+          "reference": "只查本人的本期紀錄並依回傳回答餘額，拒絕朋友 B 的私人查詢。",
+          "expected_statuses": [
+            "supported",
+            "account_limit"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [
+            "get_my_event_progress"
+          ],
+          "forbidden_tools": [],
+          "evidence_groups": []
+        }
+      ]
+    },
+    {
+      "id": "holdout-old-coins",
+      "suite": "holdout",
+      "player": "A",
+      "legacy_sources": [
+        "2026-10/shop/關店與餘幣"
+      ],
+      "turns": [
+        {
+          "question": "十月底 23:59 之後還有剩下星星幣，我十一月再去原商店花掉可以嗎？",
+          "editions": [
+            "2026-10"
+          ],
+          "reference": "十月商店 10/31 23:59 截止，未花完失效、兩期帳本分開，不可在十一月使用。",
+          "expected_statuses": [
+            "supported"
+          ],
+          "forbidden_statuses": [],
+          "required_tools": [],
+          "forbidden_tools": [],
+          "evidence_groups": [
+            {
+              "fact": "2026-10/shop/關店與餘幣",
+              "any_of": [
+                [
+                  "2026-10/shop/關店與餘幣"
+                ]
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
