@@ -221,3 +221,35 @@ class TaskToolPlanningTests(unittest.TestCase):
                        {"edition": "previous", "account_scope": "self"}):
             result = self.check(case, [call("get_my_event_progress", **params)])
             self.assertFalse(result["contract_valid"])
+
+    def test_length_limited_batch_not_accepted(self):
+        case = load_cases("single-balance")[0]
+        complete = Mock(return_value={"content": "", "tool_calls": fixture_calls(case),
+                                      "_provider_meta": {"done_reason": "length"}})
+        result = asyncio.run(plan_tools(case["question"], case["intents"], complete=complete))
+        self.assertEqual(result["num_predict"], 2048)
+        self.assertFalse(result["contract_valid"])
+        self.assertFalse(compare(result, case["expected"])["exact_match"])
+        complete.assert_called_once()
+
+    def test_num_predict_is_scoped_to_candidate_ollama_call(self):
+        from unittest.mock import AsyncMock
+        case = load_cases("single-balance")[0]
+        reply = {"content": "", "tool_calls": fixture_calls(case)}
+        for provider, limit, expected in (("ollama", 2048, 2048),
+                                          ("ollama", -1, -1), ("openai", 2048, None)):
+            with self.subTest(provider=provider, limit=limit):
+                with patch("model_client.acompletion", new_callable=AsyncMock, return_value=reply) as model:
+                    result = asyncio.run(plan_tools(case["question"], case["intents"],
+                                                   provider, num_predict=limit))
+                self.assertEqual(result["num_predict"], expected)
+                self.assertEqual(model.call_args.kwargs.get("num_predict"), expected)
+                self.assertTrue(compare(result, case["expected"])["exact_match"])
+
+    def test_model_constructor_receives_limit_only_when_explicit(self):
+        from model_client import model_for
+        with patch("model_client.ChatOllama") as constructor:
+            model_for("ollama")
+            self.assertNotIn("num_predict", constructor.call_args.kwargs)
+            model_for("ollama", num_predict=2048)
+            self.assertEqual(constructor.call_args.kwargs["num_predict"], 2048)

@@ -16,7 +16,7 @@ class TransientModelError(RuntimeError):
     """Only transport/rate-limit/server failures are eligible for node retry."""
 
 
-def model_for(provider):
+def model_for(provider, *, num_predict=None):
     if provider == "openai":
         return ChatOpenAI(model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
                           timeout=120, max_retries=0, use_responses_api=False)
@@ -42,13 +42,15 @@ def model_for(provider):
         if reasoning not in ("true", "false", "low", "medium", "high"):
             raise ValueError("EVENT_SUPPORT_AGENT_OLLAMA_REASONING 設定無效。")
         options["reasoning"] = {"true": True, "false": False}.get(reasoning, reasoning)
+    if num_predict is not None:
+        options["num_predict"] = num_predict
     return ChatOllama(**options)
 
 
-def bound_model(provider, tools, response_schema):
+def bound_model(provider, tools, response_schema, *, num_predict=None):
     if tools and response_schema is not None:
         raise ValueError("工具選擇與最終結構化回答分開請求。")
-    model = model_for(provider)
+    model = model_for(provider) if num_predict is None else model_for(provider, num_predict=num_predict)
     if tools:
         # 同一份 registry 定義，不用文字 JSON 模擬 function calling。
         return model.bind_tools(tools, **({"strict": True} if provider == "openai" else {}))
@@ -122,9 +124,10 @@ def completion(provider, messages, tools, *, response_schema=None):
         raise transport_error(error) from error
 
 
-async def acompletion(provider, messages, tools, *, response_schema=None):
+async def acompletion(provider, messages, tools, *, response_schema=None, num_predict=None):
     try:
-        model = bound_model(provider, tools, response_schema)
+        model = (bound_model(provider, tools, response_schema) if num_predict is None else
+                 bound_model(provider, tools, response_schema, num_predict=num_predict))
         return normalize_reply(await model.ainvoke(convert_to_messages(messages)))
     except (APIConnectionError, APIStatusError, ResponseError, httpx.HTTPError, ConnectionError) as error:
         raise transport_error(error) from error
@@ -134,13 +137,19 @@ def ignore_event(title, data):
     pass
 
 
-async def model_step(provider, messages, tools, complete, observe, stage, *, response_schema=None):
+async def model_step(provider, messages, tools, complete, observe, stage, *, response_schema=None,
+                     num_predict=None):
     request = {"服務": provider, "messages": deepcopy(messages), "tools": deepcopy(tools)}
     if response_schema is not None:
         request["預期回答格式"] = response_schema
+    if num_predict is not None:
+        request["num_predict"] = num_predict
     observe(f"送出模型請求 · {stage}", request)
     if complete is completion:
-        reply = await acompletion(provider, messages, tools, response_schema=response_schema)
+        options = {"response_schema": response_schema}
+        if num_predict is not None:
+            options["num_predict"] = num_predict
+        reply = await acompletion(provider, messages, tools, **options)
     else:
         def invoke():
             try:

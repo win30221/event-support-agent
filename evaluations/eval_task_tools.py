@@ -9,7 +9,7 @@ from time import perf_counter
 
 from guide import CATALOG, normalize_item_name
 from intent_analysis import INTENT_PROMPT
-from task_tool_planning import TASK_TOOL_PROMPT, plan_tools
+from task_tool_planning import DEFAULT_NUM_PREDICT, TASK_TOOL_PROMPT, plan_tools
 
 
 CASE_FILE = Path(__file__).with_name("task_tool_cases.json")
@@ -86,13 +86,14 @@ def compare(result, expected):
                                 and all(t["exact_match"] for t in comparisons))}
 
 
-async def evaluate_cases(cases, provider, repeat):
+async def evaluate_cases(cases, provider, repeat, num_predict=DEFAULT_NUM_PREDICT):
     results = []
     for run in range(1, repeat + 1):
         for case in cases:
             started = perf_counter()
             try:
-                result = await plan_tools(case["question"], case["intents"], provider, case.get("history", []))
+                result = await plan_tools(case["question"], case["intents"], provider,
+                                          case.get("history", []), num_predict=num_predict)
             except (RuntimeError, ValueError, OSError) as error:
                 result = {"contract_valid": False, "tasks": [], "errors": [str(error)], "model_calls": None}
             row = {"case": case["id"], "group": case["group"], "run": run,
@@ -116,13 +117,14 @@ async def evaluate_cases(cases, provider, repeat):
     return {"provider": provider, "configured_model": model, "case_file": CASE_FILE.name,
             "prompt_sha256": hashlib.sha256(TASK_TOOL_PROMPT.encode()).hexdigest(),
             "first_layer_prompt_sha256": hashlib.sha256(INTENT_PROMPT.encode()).hexdigest(),
+            "num_predict": num_predict if provider == "ollama" else None,
             "repeat": repeat, "summary": summary, "results": results}
 
 
 async def main(args):
     cases = load_cases(args.case)
     print(f"第二層工具規劃：{len(cases)} 題，重跑 {args.repeat} 次。", flush=True)
-    report = await evaluate_cases(cases, args.provider, args.repeat)
+    report = await evaluate_cases(cases, args.provider, args.repeat, args.num_predict)
     if args.report:
         path = Path(args.report)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -138,10 +140,14 @@ if __name__ == "__main__":
     mode.add_argument("--cases", action="store_true")
     mode.add_argument("--case", help="單一案例 ID")
     parser.add_argument("--repeat", type=int, default=1)
+    parser.add_argument("--num-predict", type=int, default=DEFAULT_NUM_PREDICT,
+                        help="僅 Ollama 第二層輸出上限；-1 不限制（對照用）")
     parser.add_argument("--report", help="本機 JSON 報告")
     args = parser.parse_args()
     if args.repeat < 1:
         parser.error("--repeat 必須為正整數。")
+    if args.num_predict != -1 and args.num_predict <= 0:
+        parser.error("--num-predict 必須為正整數或 -1。")
     try:
         raise SystemExit(asyncio.run(main(args)))
     except (RuntimeError, ValueError, OSError) as error:

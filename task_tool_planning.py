@@ -29,6 +29,7 @@ FIELDS = {
 CONTROL = "report_task_status"
 LIMIT_STATES = ("clarify", "account_limit", "unavailable", "no_evidence")
 STAGE = "任務感知工具選擇"
+DEFAULT_NUM_PREDICT = 2048
 TASK_TOOL_PROMPT = """你是活動客服工具規劃員。輸入只有待處理任務；每個任務已完成意圖分類，不重拆、不回答。
 依各任務原文與可信上下文，逐一提出最少必要的原生 tool_calls 或限制提案。多個獨立任務可同批，依各自 allowed_tools 選工具；若 Schema 有 task_id，必須填該呼叫對應的任務 ID，否則由主機綁定唯一待處理任務。勿把其他任務的欄位、對象、檔期或目的混入本任務。
 依工具描述選資料來源與 fields；只取本任務要求或推導所必需的欄位。先取得未知前置條件，再規劃依賴其結果的呼叫。已有明確商品時先核對存在及所需商品資料；依賴該商品的本人查詢或運算留待下一輪。不預設工具結果。
@@ -213,15 +214,20 @@ def validate_batch(reply, tasks, registry, history=()):
 
 
 async def plan_tools(question, first_layer, provider="ollama", history=(), *,
-                     player="A", complete=completion, observe=lambda *_: None):
+                     player="A", complete=completion, observe=lambda *_: None,
+                     num_predict=DEFAULT_NUM_PREDICT):
     """正式候選第二層入口；與實機評測共用，不重新呼叫分類模型。"""
+    if type(num_predict) is not int or (num_predict != -1 and num_predict <= 0):
+        raise ValueError("num_predict 必須是正整數，或 -1（Ollama 不限制，供對照實驗）。")
+    limit = num_predict if provider == "ollama" else None
     tasks = route_tasks(question, first_layer, history)
     registry = ToolRegistry(player)
     definitions = task_definitions(registry, tasks)
     if not definitions:
         checked = validate_batch({"tool_calls": []}, tasks, registry, history)
         return {"routed_tasks": tasks, "available_tools": [], "raw_tool_calls": [],
-                "raw_content": "", "provider_meta": None, "model_calls": 0, **checked}
+                "raw_content": "", "provider_meta": None, "model_calls": 0,
+                "num_predict": limit, **checked}
     context = RequestContext.build(question, history)
     # 完整原問仍由主機錨定；模型只收到待辦清單，避免終止任務重新進入規劃。
     # 保留所有待辦任務與可信歷史供解析指涉，無法核對時須補問。
@@ -230,8 +236,15 @@ async def plan_tools(question, first_layer, provider="ollama", history=(), *,
                            for t in tasks if t["status"] == "pending"]}
     messages = [{"role": "system", "content": TASK_TOOL_PROMPT}, *context.history,
                 {"role": "user", "content": compact_json(packet)}]
-    reply = await model_step(provider, messages, definitions, complete, observe, STAGE)
+    reply = await model_step(provider, messages, definitions, complete, observe, STAGE,
+                             num_predict=limit)
     checked = validate_batch(reply, tasks, registry, history)
+    # 達到輸出上限的回傳可能只有部分工具，不可提交部分計畫。
+    meta = reply.get("_provider_meta") or {}
+    if meta.get("finish_reason") == "length" or meta.get("done_reason") == "length":
+        checked["contract_valid"] = False
+        checked["errors"].append("模型輸出達長度上限，拒絕提交可能不完整的批次。")
     return {"routed_tasks": tasks, "available_tools": definitions,
             "raw_tool_calls": reply.get("tool_calls", []), "raw_content": reply.get("content", ""),
-            "provider_meta": reply.get("_provider_meta"), "model_calls": 1, **checked}
+            "provider_meta": reply.get("_provider_meta"), "model_calls": 1,
+            "num_predict": limit, **checked}
