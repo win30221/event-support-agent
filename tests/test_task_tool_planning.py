@@ -64,6 +64,8 @@ class TaskToolPlanningTests(unittest.TestCase):
         self.assertEqual(messages[0]["content"], TASK_TOOL_PROMPT)
         packet = json.loads(messages[-1]["content"])
         self.assertEqual([t["id"] for t in packet["待處理任務"]], ["T1", "T2"])
+        self.assertNotIn("玩家原問", packet)
+        self.assertNotIn(case["intents"][2]["request"], messages[-1]["content"])
         self.assertNotIn("expected", packet)
         self.assertNotIn("rationale", packet)
         self.assertNotIn("response_schema", complete.call_args.kwargs)
@@ -162,3 +164,60 @@ class TaskToolPlanningTests(unittest.TestCase):
         result = self.check(case, [call("get_my_event_progress", task_id="T1",
                                         edition="unavailable", account_scope="self", fields=["balance"])])
         self.assertFalse(result["contract_valid"])
+
+    def test_single_active_task_id_is_owned_by_host(self):
+        # 同時涵蓋單一輸入、複合輸入但只剩一個待辦；不以工具種類猜 ID。
+        for case_id in ("single-participation", "mixed-compare-and-other"):
+            case = load_cases(case_id)[0]
+            tasks = route_tasks(case["question"], case["intents"])
+            for definition in task_definitions(self.registry, tasks):
+                schema = definition["function"]["parameters"]
+                self.assertNotIn("task_id", schema["properties"])
+                self.assertNotIn("task_id", schema["required"])
+            calls = fixture_calls(case)
+            for raw in calls:
+                args = json.loads(raw["function"]["arguments"])
+                args.pop("task_id")
+                raw["function"]["arguments"] = json.dumps(args, ensure_ascii=False)
+            result = self.check(case, calls)
+            self.assertTrue(compare(result, case["expected"])["exact_match"], result)
+            args = json.loads(calls[0]["function"]["arguments"])
+            args["task_id"] = "T99"
+            calls[0]["function"]["arguments"] = json.dumps(args, ensure_ascii=False)
+            self.assertFalse(self.check(case, calls)["contract_valid"])
+
+    def test_multiple_active_tasks_cannot_infer_id(self):
+        case = load_cases("same-balance-editions")[0]
+        calls = fixture_calls(case)
+        args = json.loads(calls[0]["function"]["arguments"])
+        args.pop("task_id")
+        calls[0]["function"]["arguments"] = json.dumps(args)
+        self.assertFalse(self.check(case, calls)["contract_valid"])
+
+    def test_only_non_search_modes_allow_missing_query(self):
+        for case_id in ("mixed-compare-and-other", "mixed-rule-balance-operation", "single-rule"):
+            case = load_cases(case_id)[0]
+            calls = fixture_calls(case)
+            for raw in calls:
+                if raw["function"]["name"] == "find_rules":
+                    args = json.loads(raw["function"]["arguments"])
+                    args.pop("query")
+                    raw["function"]["arguments"] = json.dumps(args, ensure_ascii=False)
+            result = self.check(case, calls)
+            if case_id == "single-rule":
+                self.assertFalse(result["contract_valid"])
+            else:
+                self.assertTrue(compare(result, case["expected"])["exact_match"], result)
+
+    def test_single_control_without_id_is_valid(self):
+        case = load_cases("single-missing-item")[0]
+        result = self.check(case, [call(CONTROL, status="clarify", reason="缺少必要對象")])
+        self.assertTrue(compare(result, case["expected"])["exact_match"], result)
+
+    def test_single_task_does_not_infer_business_parameters(self):
+        case = load_cases("single-balance")[0]
+        for params in ({"fields": ["balance"], "account_scope": "self"},
+                       {"edition": "previous", "fields": ["balance"]},
+                       {"edition": "previous", "account_scope": "self"}):
+            result = self.check(case, [call("get_my_event_progress", **params)])
+            self.assertFalse(result["contract_valid"])
