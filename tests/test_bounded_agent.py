@@ -546,7 +546,7 @@ class FixtureReplayTests(OfflineTests):
     language-model accuracy score. Live tests are a separate opt-in suite.
     """
     def test_all_existing_cases_replay_through_local_tools(self):
-        cases = json.loads((Path(__file__).resolve().parents[1] / "rag_cases.json").read_text(encoding="utf-8"))
+        cases = json.loads((Path(__file__).resolve().parents[1] / "evaluations" / "rag_cases.json").read_text(encoding="utf-8"))
         for case in cases:
             with self.subTest(case=case["id"]):
                 q, mode = case["question"], case["mode"]

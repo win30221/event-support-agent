@@ -88,7 +88,7 @@ class GuideTests(OfflineTests):
         self.assertNotIn("未發布的新站", str(index))
 
     def test_evaluation_sources_resolve_and_stay_public(self):
-        cases = json.loads((Path(__file__).resolve().parents[1] / "rag_cases.json").read_text(encoding="utf-8"))
+        cases = json.loads((Path(__file__).resolve().parents[1] / "evaluations" / "rag_cases.json").read_text(encoding="utf-8"))
         self.assertEqual(len({case["id"] for case in cases}), len(cases))
         for case in cases:
             available = {p["段落ID"] for key in case["editions"] for p in published_passages(key)}
@@ -133,7 +133,7 @@ class GuideTests(OfflineTests):
         self.assertNotEqual(edition_hash(corpus), edition_hash(rewritten))
 
     def test_search_and_legacy_eligibility_return_the_same_passages(self):
-        cases = json.loads((Path(__file__).resolve().parents[1] / "rag_cases.json").read_text(encoding="utf-8"))
+        cases = json.loads((Path(__file__).resolve().parents[1] / "evaluations" / "rag_cases.json").read_text(encoding="utf-8"))
         for case in cases:
             for edition in case["editions"]:
                 with self.subTest(case=case["id"], edition=edition):

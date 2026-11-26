@@ -7,7 +7,7 @@ from unittest.mock import patch
 from agent import legacy_answer as answer
 from answer_quality import REVIEW_SCHEMA
 from answering import DIRECT_REPLIES
-from eval_rag import live_source_coverage
+from evaluations.eval_rag import live_source_coverage
 from guide import CATALOG, published_passages
 from evidence import source_alias
 from tests.test_bounded_agent import (abstain, call, select, original, packet, response,

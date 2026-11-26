@@ -22,7 +22,7 @@
 | 初始玩家餘額未恢復 | 初始化不覆寫既有資料；使用獨立空白測試資料庫重現預設紀錄，切勿直接重設正式資料 |
 | Docker 名稱或 port 衝突 | 已建立的 PG19 容器用 `docker start event-support-agent-pg19`；先找出占用 55432 的服務並安全處理，詳見下方步驟 |
 | 無法取得 bge-m3 向量 | ollama list、ollama pull bge-m3；確認 EVENT_SUPPORT_AGENT_EMBED_URL 為 http://localhost:11434，不加 /v1 |
-| 索引缺失或公告版本不符 | 停止舊程序，確認 DSN、嵌入模型及資料，執行 python vector_search.py、python eval_rag.py --hybrid；成功才啟動 hybrid |
+| 索引缺失或公告版本不符 | 停止舊程序，確認 DSN、嵌入模型及資料，執行 python vector_search.py、python -m evaluations.eval_rag --hybrid；成功才啟動 hybrid |
 | 更新資料後仍是舊內容 | 確認已使用最新專案檔案、停止舊 Streamlit 並重新啟動；公開公告變更須重建 hybrid 索引 |
 | unittest 找不到舊 test 模組 | 現在位於 tests/；python -m unittest discover -s tests -t . -v，指定類別使用 tests.test_live_agent 等完整路徑 |
 | 快速提問文字不同 | 新版應提交按鈕原文；若仍使用舊版，確認專案檔案與程序是否已更新 |
@@ -112,4 +112,6 @@ docker exec -it event-support-agent-pg19 psql -U postgres -d postgres
 
 查詢失敗、沒有新證據、商品不存在、權限不足、服務不具操作能力是不同原因。不要以更多檢索或無限補查當成通用解法。若向量索引或嵌入服務暫時不可用，可切回 BM25；玩家查詢仍依賴 PostgreSQL。工程紀錄只能使用模擬或已遮罩資料分享。
 
-新版引用不再要求模型逐字複製：若短 ID 不存在，僅拒絕受影響的需求。優先檢查 `Python 回答上下文` 來源對照及 `Python 子問題驗證失敗`；可將工程 Log 另存於本機，使用 eval_answer.py 固定證據重播，勿重跑整個 RAG 來診斷回答契約。詳見 EVALUATION。
+新版引用不再要求模型逐字複製：若短 ID 不存在，僅拒絕受影響的需求。優先檢查 `Python 回答上下文` 來源對照及 `Python 子問題驗證失敗`；可將工程 Log 另存於本機，使用 evaluations/eval_answer.py 固定證據重播，勿重跑整個 RAG 來診斷回答契約。詳見 EVALUATION。
+
+評測腳本已移至 `evaluations/`。若找不到根目錄的舊腳本，從專案根目錄改用 `python -m evaluations.eval_intent`、`python -m evaluations.eval_rag` 或 `python -m evaluations.eval_answer`；參見 [TESTING](TESTING.md)。

@@ -142,7 +142,7 @@ def turn_metrics(events, trace, elapsed):
 
 def report_metadata(provider):
     try:
-        commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=Path(__file__).parent,
+        commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=Path(__file__).resolve().parents[1],
             capture_output=True, text=True, check=True, timeout=5).stdout.strip()
     except (OSError, subprocess.SubprocessError):
         commit = None

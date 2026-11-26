@@ -6,14 +6,14 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
-from eval_intent import classify, compare, evaluate_cases, load_cases, main, matches
+from evaluations.eval_intent import classify, compare, evaluate_cases, load_cases, main, matches
 from intent_analysis import INTENT_PROMPT, INTENT_SCHEMA, SimpleIntentPlan, anchor_intents
 from task_runtime import IntentRuntime
 
 
 class IntentAnalysisTests(unittest.TestCase):
     def test_fixture_labels_and_exact_spans_are_valid(self):
-        cases = json.loads((Path(__file__).resolve().parents[1] / "intent_cases.json").read_text(encoding="utf-8"))
+        cases = json.loads((Path(__file__).resolve().parents[1] / "evaluations" / "intent_cases.json").read_text(encoding="utf-8"))
         self.assertEqual(len({c["id"] for c in cases}), len(cases))
         self.assertEqual({i["type"] for c in cases for i in c["expected"]},
                          {"knowledge", "query", "analysis", "operation", "other"})
@@ -129,7 +129,7 @@ class IntentAnalysisTests(unittest.TestCase):
             {"type": "query", "request": "查點數。"}], "rationale": "既有紀錄"}
         good = {"question": case["question"], "contract_valid": True, "intents": case["expected"]}
         classify_mock = AsyncMock(side_effect=[good, RuntimeError("模型服務無法使用")])
-        with patch("eval_intent.classify", classify_mock), patch("eval_intent.print_result"), patch("builtins.print"):
+        with patch("evaluations.eval_intent.classify", classify_mock), patch("evaluations.eval_intent.print_result"), patch("builtins.print"):
             report = asyncio.run(evaluate_cases([case], "ollama", 2))
         self.assertEqual(report["summary"]["total"], 2)
         self.assertEqual(report["summary"]["exact_match"], 1)
@@ -166,6 +166,6 @@ class IntentAnalysisTests(unittest.TestCase):
         args = SimpleNamespace(cases=True, case=None, suite="holdout",
                                provider="ollama", repeat=1, report=None, question=None)
         evaluator = AsyncMock(return_value={"summary": {"total": 20, "exact_match": 20}})
-        with patch("eval_intent.evaluate_cases", evaluator), patch("builtins.print"):
+        with patch("evaluations.eval_intent.evaluate_cases", evaluator), patch("builtins.print"):
             self.assertEqual(asyncio.run(main(args)), 0)
         evaluator.assert_awaited_once_with(load_cases(suite="holdout"), "ollama", 1)

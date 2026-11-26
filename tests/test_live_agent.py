@@ -12,7 +12,7 @@ from pathlib import Path
 from agent import answer
 from answering import ANSWER_VERIFICATION_FAILED, DIRECT_REPLIES
 from guide import CATALOG, published_passages, shop_catalog
-from eval_rag import live_source_coverage
+from evaluations.eval_rag import live_source_coverage
 
 
 @unittest.skipUnless(os.getenv("EVENT_SUPPORT_AGENT_LIVE_OLLAMA") == "1", "需啟用本機 Ollama 實測")
@@ -59,7 +59,7 @@ class LiveOllamaTests(unittest.TestCase):
                     for part in checks[-1]["子問題"]), reply)
 
     def test_fixture_retrieval_and_account_scope(self):
-        cases = json.loads((Path(__file__).resolve().parents[1] / "rag_cases.json").read_text(encoding="utf-8"))
+        cases = json.loads((Path(__file__).resolve().parents[1] / "evaluations" / "rag_cases.json").read_text(encoding="utf-8"))
         for case in cases:
             with self.subTest(case=case["id"]):
                 history = []

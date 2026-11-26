@@ -20,7 +20,9 @@
 
 ## 第一層意圖測試
 
-第一層五類意圖各自具有定義、適用、不適用、判斷原則及對照範例。只理解語意與拆分需求，不接收工具能力及權限清單。先執行 `python -m unittest tests.test_intent_analysis -v`（離線契約測試），再執行 `python eval_intent.py`（自由提問），或 `python eval_intent.py --cases`（真實模型標記題集）。可用 `--case diagnosis --repeat 3 --report reports/intent.json` 單獨重跑；不執行 Audit 或任何資料工具，不需資料庫。已通過原題庫時，可用 `python eval_intent.py --cases --suite holdout --report reports/intent-holdout.json` 只跑新增的 20 題。詳見 [EVALUATION](docs/EVALUATION.md#第一層意圖獨立驗收)。
+測試及評測入口總覽：[測試使用指南](docs/TESTING.md)。所有指令從專案根目錄執行。
+
+第一層五類意圖各自具有定義、適用、不適用、判斷原則及對照範例。只理解語意與拆分需求，不接收工具能力及權限清單。先執行 `python -m unittest tests.test_intent_analysis -v`（離線契約測試），再執行 `python -m evaluations.eval_intent`（自由提問），或 `python -m evaluations.eval_intent --cases`（真實模型標記題集）。可用 `--case diagnosis --repeat 3 --report reports/intent.json` 單獨重跑；不執行 Audit 或任何資料工具，不需資料庫。已通過原題庫時，可用 `python -m evaluations.eval_intent --cases --suite holdout --report reports/intent-holdout.json` 只跑新增的 20 題。詳見 [EVALUATION](docs/EVALUATION.md#第一層意圖獨立驗收)。
 
 ## 操作展示
 
@@ -58,11 +60,8 @@ agent.py               # Graph 節點
 agent_runtime.py       # 共用工具、證據、基準工作流
 intent_analysis.py    # 五類意圖與原問錨定、業務綁定
 task_contracts.py      # 意圖、證據評估、生成與驗證契約
-eval_intent.py         # 獨立執行正式第一層分類
-intent_cases.json      # 第一層標記題集
 task_business.py       # 主機能力、必要欄位及結構化呈現
 task_runtime.py        # 新的逐需求 LangGraph 工作流
-task_cases.json        # 新分支的實機業務案例
 tool_selection.py      # 工具選擇介接
 model_client.py        # LangChain 原生模型介接、Structured Output 與紀錄
 request_context.py     # 可信多輪指涉
@@ -77,11 +76,15 @@ answer_quality.py      # 有界品質審查
 starter_questions.py   # 快速提問 UI
 events.json            # 公開活動公告及商城
 player_progress_seed.json # 玩家初始示範資料
-rag_cases.json         # 27 個評測情境
-eval_rag.py            # 檢索評測、實機重播及結構驗收
-eval_answer.py         # 固定 Log 證據，單獨重播回答階段
 requirements.txt
-tests/                 # 回歸測試模組
+tests/                 # unittest 單元、整合及 opt-in 實機測試
+evaluations/           # 評測腳本與標記題庫
+  eval_intent.py       # 第一層真實模型評測
+  eval_rag.py          # RAG、端到端實機重播
+  eval_answer.py       # 固定證據回答評測
+  intent_cases.json / intent_holdout_cases.json
+  rag_cases.json / task_cases.json
+reports/               # 本機評測報告（Git 忽略）
 docs/                  # 技術文件及展示資產
 AGENTS.md              # 開發規範
 ```
@@ -93,6 +96,7 @@ AGENTS.md              # 開發規範
 | [QUICKSTART](docs/QUICKSTART.md) | 從零安裝、RAG 索引、啟動及更新 |
 | [ARCHITECTURE](docs/ARCHITECTURE.md) | 架構、節點、生命週期及信任邊界 |
 | [DATA_AND_TOOLS](docs/DATA_AND_TOOLS.md) | 資料、檢索、工具及輸出契約 |
+| [TESTING](docs/TESTING.md) | 測試目錄、各類型指令及環境需求 |
 | [EVALUATION](docs/EVALUATION.md) | 測試分層、實際數據及驗收方式 |
 | [DESIGN_DECISIONS](docs/DESIGN_DECISIONS.md) | 現行技術設計原則 |
 | [REFERENCES](docs/REFERENCES.md) | 官方參考來源、採用與研究範圍 |

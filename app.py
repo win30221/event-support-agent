@@ -29,7 +29,7 @@ def workers():
 
 @st.cache_data
 def practice_cases():
-    path = Path(__file__).with_name("rag_cases.json")
+    path = Path(__file__).resolve().parent / "evaluations" / "rag_cases.json"
     return {case["label"]: case for case in json.loads(path.read_text(encoding="utf-8"))}
 
 

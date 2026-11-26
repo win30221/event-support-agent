@@ -8,7 +8,7 @@ from time import perf_counter
 from answering import ANSWER_PROMPT, ANSWER_SCHEMA, ANSWER_VERIFICATION_FAILED, decode_response, render_response
 from backend import compact_json
 from evidence import model_sources
-from eval_rag import report_metadata, turn_metrics
+from evaluations.eval_rag import report_metadata, turn_metrics
 from model_client import completion, model_step
 
 

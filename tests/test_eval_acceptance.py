@@ -1,5 +1,5 @@
 import unittest
-from eval_rag import structural_gate
+from evaluations.eval_rag import structural_gate
 
 
 class AcceptanceTests(unittest.TestCase):

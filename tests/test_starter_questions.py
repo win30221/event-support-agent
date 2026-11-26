@@ -23,7 +23,7 @@ class ClickableUI:
 
 class StarterQuestionTests(unittest.TestCase):
     def setUp(self):
-        rows = json.loads((Path(__file__).resolve().parents[1] / "rag_cases.json").read_text(encoding="utf-8"))
+        rows = json.loads((Path(__file__).resolve().parents[1] / "evaluations" / "rag_cases.json").read_text(encoding="utf-8"))
         self.cases = {row["label"]: row for row in rows}
 
     def test_every_rendered_button_submits_its_visible_text(self):

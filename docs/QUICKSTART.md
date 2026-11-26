@@ -133,8 +133,8 @@ Windows PowerShell：
 $env:EVENT_SUPPORT_AGENT_EMBED_MODEL = "bge-m3"
 $env:EVENT_SUPPORT_AGENT_EMBED_URL = "http://localhost:11434"
 .\.venv\Scripts\python.exe vector_search.py
-.\.venv\Scripts\python.exe eval_rag.py --hybrid --case ranked-slang
-.\.venv\Scripts\python.exe eval_rag.py --hybrid
+.\.venv\Scripts\python.exe -m evaluations.eval_rag --hybrid --case ranked-slang
+.\.venv\Scripts\python.exe -m evaluations.eval_rag --hybrid
 $env:EVENT_SUPPORT_AGENT_RETRIEVAL = "hybrid"
 .\.venv\Scripts\python.exe -m streamlit run app.py
 ```
@@ -145,8 +145,8 @@ macOS/Linux：
 export EVENT_SUPPORT_AGENT_EMBED_MODEL=bge-m3
 export EVENT_SUPPORT_AGENT_EMBED_URL=http://localhost:11434
 ./.venv/bin/python vector_search.py
-./.venv/bin/python eval_rag.py --hybrid --case ranked-slang
-./.venv/bin/python eval_rag.py --hybrid
+./.venv/bin/python -m evaluations.eval_rag --hybrid --case ranked-slang
+./.venv/bin/python -m evaluations.eval_rag --hybrid
 export EVENT_SUPPORT_AGENT_RETRIEVAL=hybrid
 ./.venv/bin/python -m streamlit run app.py
 ```
@@ -160,14 +160,14 @@ vector_search.py 自動建立 extension、資料表及公開公告向量（本�
 ```powershell
 $env:OLLAMA_MODEL = "qwen3:8b"
 $env:EVENT_SUPPORT_AGENT_RETRIEVAL = "bm25"
-.\.venv\Scripts\python.exe eval_rag.py
+.\.venv\Scripts\python.exe -m evaluations.eval_rag
 .\.venv\Scripts\python.exe -m streamlit run app.py
 ```
 
 ```bash
 export OLLAMA_MODEL=qwen3:8b
 export EVENT_SUPPORT_AGENT_RETRIEVAL=bm25
-./.venv/bin/python eval_rag.py
+./.venv/bin/python -m evaluations.eval_rag
 ./.venv/bin/python -m streamlit run app.py
 ```
 
@@ -245,6 +245,8 @@ ChatOllama 直接透過 Ollama SDK 的原生 /api/chat。舊 OLLAMA_BASE_URL 末
 
 ## 8. 測試
 
+測試目錄與指令總覽見 [TESTING](TESTING.md)。評測模組一律從專案根目錄使用 `python -m evaluations.eval_*`（以實際模組名稱取代星號），不要切換至 evaluations/ 執行。
+
 本機完整回歸使用 PostgreSQL 19 的獨立空白測試資料庫，勿使用正式或已修改的 demo 資料。先完成第 4 節服務就緒及 DSN 驗證，再執行以下建立專用測試資料庫的指令（兩種平台皆可，僅首次建立時執行；若同名資料庫已存在，先確認其為未修改的測試資料庫，否則另取新測試庫名稱及 DSN，不要刪除 demo 資料）。
 
 ```bash
@@ -258,7 +260,7 @@ $env:EVENT_SUPPORT_AGENT_PG_DSN = "postgresql://postgres:event-support-agent-dem
 .\.venv\Scripts\python.exe player_progress.py
 .\.venv\Scripts\python.exe -m unittest discover -s tests -t . -v
 .\.venv\Scripts\python.exe -m pip check
-.\.venv\Scripts\python.exe eval_rag.py
+.\.venv\Scripts\python.exe -m evaluations.eval_rag
 $env:EVENT_SUPPORT_AGENT_PG_DSN = "postgresql://postgres:event-support-agent-demo@127.0.0.1:55432/event_support_agent"
 ```
 
@@ -269,7 +271,7 @@ export EVENT_SUPPORT_AGENT_PG_DSN='postgresql://postgres:event-support-agent-dem
 ./.venv/bin/python player_progress.py
 ./.venv/bin/python -m unittest discover -s tests -t . -v
 ./.venv/bin/python -m pip check
-./.venv/bin/python eval_rag.py
+./.venv/bin/python -m evaluations.eval_rag
 export EVENT_SUPPORT_AGENT_PG_DSN='postgresql://postgres:event-support-agent-demo@127.0.0.1:55432/event_support_agent'
 ```
 
@@ -280,8 +282,8 @@ Ollama 請選用支援 tool calling 的模型。兩個供應商的工具選擇�
 
 ## 單獨測試第一層意圖
 
-完成 Python 套件安裝並啟動 Ollama 後，即可執行 `.\.venv\Scripts\python.exe eval_intent.py`（macOS/Linux：`./.venv/bin/python eval_intent.py`）。不需先啟動 PostgreSQL 或 Streamlit。逐題輸入，空白行結束。完整題集加 `--cases`，詳見 [EVALUATION](EVALUATION.md#第一層意圖獨立驗收)。
+完成 Python 套件安裝並啟動 Ollama 後，即可執行 `.\.venv\Scripts\python.exe -m evaluations.eval_intent`（macOS/Linux：`./.venv/bin/python -m evaluations.eval_intent`）。不需先啟動 PostgreSQL 或 Streamlit。逐題輸入，空白行結束。完整題集加 `--cases`，詳見 [EVALUATION](EVALUATION.md#第一層意圖獨立驗收)。
 
-離線契約測試：`python -m unittest tests.test_intent_analysis -v`（不需 Ollama 或 PostgreSQL）。真實模型指定單題 ID：`python eval_intent.py --case diagnosis --repeat 3 --report reports/intent-diagnosis.json`。完整題集：`python eval_intent.py --cases --report reports/intent-all.json`。Windows 使用同一虛擬環境的 `.\.venv\Scripts\python.exe`；macOS/Linux 使用 `./.venv/bin/python`。報告放 reports/，預設不納入 Git。
+離線契約測試：`python -m unittest tests.test_intent_analysis -v`（不需 Ollama 或 PostgreSQL）。真實模型指定單題 ID：`python -m evaluations.eval_intent --case diagnosis --repeat 3 --report reports/intent-diagnosis.json`。完整題集：`python -m evaluations.eval_intent --cases --report reports/intent-all.json`。Windows 使用同一虛擬環境的 `.\.venv\Scripts\python.exe`；macOS/Linux 使用 `./.venv/bin/python`。報告放 reports/，預設不納入 Git。
 
-原 36 題已通過且 Prompt 不變時，只執行新增 20 題：`.\.venv\Scripts\python.exe eval_intent.py --cases --suite holdout --report reports/intent-holdout.json`（macOS/Linux：`./.venv/bin/python` 取代 Python 路徑）。失敗題可用 `--case ID --suite holdout` 單獨重測。
+原 36 題已通過且 Prompt 不變時，只執行新增 20 題：`.\.venv\Scripts\python.exe -m evaluations.eval_intent --cases --suite holdout --report reports/intent-holdout.json`（macOS/Linux：`./.venv/bin/python` 取代 Python 路徑）。失敗題可用 `--case ID --suite holdout` 單獨重測。

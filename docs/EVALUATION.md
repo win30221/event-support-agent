@@ -4,11 +4,11 @@
 
 ## Intent-first 實驗分支驗收
 
-新流程的腳本測試位於 tests/test_intent_workflow.py；原有針對舊回答契約的測試明確使用 legacy_answer，保留基準，不代表新流程通過所有舊案例。真實模型測試及 eval_rag.py 使用新預設入口。task_cases.json 增加操作拒絕、混合需求、不存在的商品與差額案例；只加入實機重播，原 27 題離線檢索基準不變。
+新流程的腳本測試位於 tests/test_intent_workflow.py；原有針對舊回答契約的測試明確使用 legacy_answer，保留基準，不代表新流程通過所有舊案例。真實模型測試及 evaluations/eval_rag.py 使用新預設入口。evaluations/task_cases.json 增加操作拒絕、混合需求、不存在的商品與差額案例；只加入實機重播，原 27 題離線檢索基準不變。
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest tests.test_intent_workflow -v
-.\.venv\Scripts\python.exe eval_rag.py --live ollama --case unsupported-operation --gate --report reports/intent-operation.json
+.\.venv\Scripts\python.exe -m evaluations.eval_rag --live ollama --case unsupported-operation --gate --report reports/intent-operation.json
 ```
 
 檢查需求覆蓋、工具範圍、逐需求終止狀態、實際來源與最終正文。線上模型 verifier 通過不等於人工語意驗收；尚未完成此分支完整回歸及實機驗證。CI 結果以對應 commit 的 Actions 為準。
@@ -57,15 +57,15 @@
 python player_progress.py
 python -m unittest discover -s tests -t . -v
 python -m pip check
-python eval_rag.py
-python eval_rag.py --case ranked-slang
+python -m evaluations.eval_rag
+python -m evaluations.eval_rag --case ranked-slang
 ```
 
 先依 [QUICKSTART](QUICKSTART.md) 建好 hybrid 索引，再執行：
 
 ```bash
-python eval_rag.py --hybrid
-python eval_rag.py --hybrid --case ranked-slang
+python -m evaluations.eval_rag --hybrid
+python -m evaluations.eval_rag --hybrid --case ranked-slang
 ```
 
 Hybrid 離線評測會使用嵌入模型與 pgvector，不使用聊天模型。本機完整回歸使用真實 PostgreSQL 19，但不需 Ollama 或 pgvector extension；純 BM25 檢索評測仍不需資料庫連線。
@@ -75,8 +75,8 @@ Hybrid 離線評測會使用嵌入模型與 pgvector，不使用聊天模型。�
 先啟動模型服務及 PostgreSQL 19，依 QUICKSTART 設定環境變數、驗證 DSN、初始化玩家進度並查詢玩家 A 餘額。聊天檢索模式由 EVENT_SUPPORT_AGENT_RETRIEVAL 指定；--hybrid 與 --live 不可同時使用。
 
 ```bash
-python eval_rag.py --case first-night --live ollama --strict --report reports/first-night.json
-python eval_rag.py --live ollama --report reports/ollama.json
+python -m evaluations.eval_rag --case first-night --live ollama --strict --report reports/first-night.json
+python -m evaluations.eval_rag --live ollama --report reports/ollama.json
 ```
 
 OpenAI 使用 --live openai 並設定 API key。完整題集耗時依模型及設備而異，建議先跑代表案例。
@@ -97,7 +97,7 @@ macOS/Linux 可用 EVENT_SUPPORT_AGENT_LIVE_OLLAMA=1 ./.venv/bin/python -m unitt
 
 | 指標 | 現況 |
 | --- | --- |
-| 檢索召回及必要來源找齊 | eval_rag.py 自動計算 |
+| 檢索召回及必要來源找齊 | evaluations/eval_rag.py 自動計算 |
 | 實機可用證據、最終引用採用 | 逐案例分開計算，排除不適用段落 |
 | 模型呼叫、Token、耗時 | JSON report；供應商缺計數保留 null，非 0 |
 | 工具選擇與參數正確率 | 部分測試有斷言；完整比例未建立 |
@@ -119,9 +119,9 @@ macOS/Linux 可用 EVENT_SUPPORT_AGENT_LIVE_OLLAMA=1 ./.venv/bin/python -m unitt
 使用本機現存的完整工程 Log（勿提交私人資料）。先用固定證據比較 legacy（舊 quote 契約）、ids（新 ID 契約、保留完整證據欄位）、compact（精簡證據）。這三組為逐步設計比較，不是只變更單一欄位的嚴格因果實驗。legacy 只適用包含舊 quote schema 的 Log。
 
 ```powershell
-.\.venv\Scripts\python.exe eval_answer.py --log path/to/turn.json --provider ollama --variant legacy --repeat 3 --report reports/legacy.json
-.\.venv\Scripts\python.exe eval_answer.py --log path/to/turn.json --provider ollama --variant ids --repeat 3 --report reports/ids.json
-.\.venv\Scripts\python.exe eval_answer.py --log path/to/turn.json --provider ollama --variant compact --repeat 3 --report reports/compact.json
+.\.venv\Scripts\python.exe -m evaluations.eval_answer --log path/to/turn.json --provider ollama --variant legacy --repeat 3 --report reports/legacy.json
+.\.venv\Scripts\python.exe -m evaluations.eval_answer --log path/to/turn.json --provider ollama --variant ids --repeat 3 --report reports/ids.json
+.\.venv\Scripts\python.exe -m evaluations.eval_answer --log path/to/turn.json --provider ollama --variant compact --repeat 3 --report reports/compact.json
 ```
 
 macOS/Linux 將 Python 路徑改為 `./.venv/bin/python`。先固定模型、資料、硬體與設定，再逐次比較 EVENT_SUPPORT_AGENT_OLLAMA_REASONING=false、其他模型或 OpenAI；使用 `ollama ps` 記錄 CPU/GPU、模型與 Context。報告包含實際 Token、供應商時間與回答，無須再次選工具或做 RAG。
@@ -129,8 +129,8 @@ macOS/Linux 將 Python 路徑改為 `./.venv/bin/python`。先固定模型、資
 端到端結構門檻：每個選定案例、每次重跑均不能拒絕應回答的問題、遺漏必要標記來源、超出檔期或本人查詢範圍；應拒答案例需正確標示限制。以下命令失敗回傳非零，不等同完整語意證明。
 
 ```powershell
-.\.venv\Scripts\python.exe eval_rag.py --live ollama --case first-night --gate --repeat 3 --report reports/first-night.json
-.\.venv\Scripts\python.exe eval_rag.py --live ollama --gate --repeat 3 --report reports/full.json
+.\.venv\Scripts\python.exe -m evaluations.eval_rag --live ollama --case first-night --gate --repeat 3 --report reports/first-night.json
+.\.venv\Scripts\python.exe -m evaluations.eval_rag --live ollama --gate --repeat 3 --report reports/full.json
 ```
 
 人工語意門檻：對照每題 reference，確認事實正確、必要限制完整、沒有捏造資料、拒答及部分回答合理；三次重跑均通過才能認定該案例驗收。比較模型與 Reasoning 時記錄延遲、Token、任務成功率與失敗原因，不能把安全降級當作成功。未執行真實模型或人工審查時，不可宣稱新版已達語意品質門檻。
@@ -143,17 +143,17 @@ macOS/Linux 將 Python 路徑改為 `./.venv/bin/python`。先固定模型、資
 啟動 Ollama 並使用原有模型設定，在專案根目錄執行：
 
 ```powershell
-.\.venv\Scripts\python.exe eval_intent.py
+.\.venv\Scripts\python.exe -m evaluations.eval_intent
 ```
 
-macOS/Linux：`./.venv/bin/python eval_intent.py`。逐題輸入，空白行離開；各題獨立，不需要 PostgreSQL 或 Streamlit。工具與後續節點不執行。輸出 type、原問片段、契約是否有效、模型呼叫及耗時。格式錯誤維持既有最多一次修正；契約有效不表示分類正確。
+macOS/Linux：`./.venv/bin/python -m evaluations.eval_intent`。逐題輸入，空白行離開；各題獨立，不需要 PostgreSQL 或 Streamlit。工具與後續節點不執行。輸出 type、原問片段、契約是否有效、模型呼叫及耗時。格式錯誤維持既有最多一次修正；契約有效不表示分類正確。
 
-單題可加 `--question "你的問題"`；`--cases` 逐一執行 intent_cases.json（保留原 23 題及預期答案，補充分類理由和 13 個邊界案例，共 36 題），`--case ID` 單獨執行指定題目。標記題集獨立於 Prompt；expected/rationale 不會傳送模型。
+單題可加 `--question "你的問題"`；`--cases` 逐一執行 evaluations/intent_cases.json（保留原 23 題及預期答案，補充分類理由和 13 個邊界案例，共 36 題），`--case ID` 單獨執行指定題目。標記題集獨立於 Prompt；expected/rationale 不會傳送模型。
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest tests.test_intent_analysis -v
-.\.venv\Scripts\python.exe eval_intent.py --case diagnosis --repeat 3 --report reports/intent-diagnosis.json
-.\.venv\Scripts\python.exe eval_intent.py --cases --report reports/intent-all.json
+.\.venv\Scripts\python.exe -m evaluations.eval_intent --case diagnosis --repeat 3 --report reports/intent-diagnosis.json
+.\.venv\Scripts\python.exe -m evaluations.eval_intent --cases --report reports/intent-all.json
 ```
 
 離線單元測試不需要模型、PostgreSQL 或 Streamlit，只驗證共用入口、契約、標記資料、第一層與 Audit 輸入邊界和評測統計。真實模型驗收另外執行。報告分開統計 contract_valid、count_match、type_sequence_match、span_match、exact_match，並記錄模型設定、Prompt 雜湊、原始輸出、耗時及供應商資訊；連線錯誤計入失敗，未知呼叫數保留 null。任何嚴格比對不符回傳非零。多輪題的歷史僅在題集中明確提供；標點或等價切分須人工複核，不能只看總分。固定同一模型、設定及題集比較版本，再以未見問句驗證泛化。
@@ -162,12 +162,12 @@ macOS/Linux：`./.venv/bin/python eval_intent.py`。逐題輸入，空白行離�
 
 ### 新題泛化驗收（20 題）
 
-原 36 題已於 Qwen3:8b 的一次實機驗收達到 36/36（Prompt SHA-256：162ce182352501066f1e84c52d70a2a0ee3c4b7c9eb769f11ce637ac85e2469b）。保留原題庫作為回歸基準；目前同一 Prompt 不需要再次執行這 36 題。獨立 `intent_holdout_cases.json` 有 20 個新問句及預期答案，涵蓋五類意圖、服務主題邊界、知識與結論、同句複合需求及歷史指涉。新題沒有加入 Prompt，預期答案與理由仍只供主機比對。
+原 36 題已於 Qwen3:8b 的一次實機驗收達到 36/36（Prompt SHA-256：162ce182352501066f1e84c52d70a2a0ee3c4b7c9eb769f11ce637ac85e2469b）。保留原題庫作為回歸基準；目前同一 Prompt 不需要再次執行這 36 題。獨立 `evaluations/intent_holdout_cases.json` 有 20 個新問句及預期答案，涵蓋五類意圖、服務主題邊界、知識與結論、同句複合需求及歷史指涉。新題沒有加入 Prompt，預期答案與理由仍只供主機比對。
 
 ```powershell
-.\.venv\Scripts\python.exe eval_intent.py --cases --suite holdout --report reports/intent-holdout.json
+.\.venv\Scripts\python.exe -m evaluations.eval_intent --cases --suite holdout --report reports/intent-holdout.json
 ```
 
-macOS/Linux：`./.venv/bin/python eval_intent.py --cases --suite holdout --report reports/intent-holdout.json`。此指令只執行新題庫一次；執行時會顯示選用題庫與題數，結果 JSON 記錄 suite、case_file。若某題失敗，可用 `--case holdout-boundary-match --suite holdout`（將 ID 換成報告中的 case）單獨重測，不用重跑已通過案例。若沒有任何 --suite，既有 --cases 及 --case 繼續使用 baseline；不修改原分類器或輸出契約。若 Prompt 或模型設定後續改變，仍需要重新考慮舊案例回歸風險。
+macOS/Linux：`./.venv/bin/python -m evaluations.eval_intent --cases --suite holdout --report reports/intent-holdout.json`。此指令只執行新題庫一次；執行時會顯示選用題庫與題數，結果 JSON 記錄 suite、case_file。若某題失敗，可用 `--case holdout-boundary-match --suite holdout`（將 ID 換成報告中的 case）單獨重測，不用重跑已通過案例。若沒有任何 --suite，既有 --cases 及 --case 繼續使用 baseline；不修改原分類器或輸出契約。若 Prompt 或模型設定後續改變，仍需要重新考慮舊案例回歸風險。
 
-新題尚未經真實模型驗收，不能預先宣稱通過；一次全部通過代表此批新題成功，不等於任意問句或多次試驗都穩定。由維護者核對標記及語意等價拆分後，再決定是否結束第一層。
+2026-11-26 使用者提供 Qwen3:8b、相同 Prompt 雜湊、holdout 單次實機報告：20/20 完全一致，24/24 拆分後意圖正確；每題一次模型呼叫，無契約修正。原 36 題與新 20 題各自單次共 56/56，足以凍結本輪第一層調整，但不能證明任意問句或多次試驗均穩定。不因目錄整理而重跑已通過的真實模型案例。

@@ -9,7 +9,7 @@
 - 每次變更維持模組邊界；呈現、檢索、模型介接、業務與流程問題分開修正。
 - 工具及引用必須使用本輪可核對資料；不將歷史回答當成新事實。保護原始公告、品名、代碼及私人資料。
 - 不刪測試以取得綠燈，不把離線 fixture 成功當成實機準確率。新增跨案例測試並執行完整回歸。
-- 先準備獨立測試 PostgreSQL 並執行 python player_progress.py 初始化，再執行 python -m unittest discover -s tests -t . -v、python -m pip check、python eval_rag.py；涉及模型或 hybrid 時另做實機驗收，無法執行則明示。
+- 先準備獨立測試 PostgreSQL 並執行 python player_progress.py 初始化，再執行 python -m unittest discover -s tests -t . -v、python -m pip check、python -m evaluations.eval_rag；涉及模型或 hybrid 時另做實機驗收，無法執行則明示。
 - 更新 README、QUICKSTART、相關架構、工具與評測文件；指令須符合實際模組路徑和環境變數。
 - 註解以繁體中文說明重要設計原因、信任邊界及取捨，不逐行翻譯。程式、Prompt、測試及文件應一致。
 - 保留既有測試基準及可重現評測；勿在專案檔案中保存 API key 或私人紀錄。

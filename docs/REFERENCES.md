@@ -23,7 +23,7 @@
 | [PostgreSQL Docker 官方映像](https://hub.docker.com/_/postgres) | PostgreSQL 18 起使用版本化 PGDATA 及 `/var/lib/postgresql` 掛載；初始化環境變數只對空白資料目錄生效，舊大版本資料卷須保留並另行遷移 |
 | [pg_isready](https://www.postgresql.org/docs/19/app-pg-isready.html) | 檢查服務是否接受連線；不取代以應用程式 DSN 實際驗證帳密 |
 | [Anthropic Contextual Retrieval](https://www.anthropic.com/research/contextual-retrieval) | 參考詞彙/向量互補及段落背景；保留 BM25 基準，未宣稱實作其完整 contextual embedding 方法 |
-| [Microsoft Azure RAG preparation](https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/rag/rag-preparation-phase) | 參考標記問題、來源及參考答案；rag_cases.json |
+| [Microsoft Azure RAG preparation](https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/rag/rag-preparation-phase) | 參考標記問題、來源及參考答案；evaluations/rag_cases.json |
 | [Microsoft RAG evaluators](https://learn.microsoft.com/en-us/azure/foundry/concepts/evaluation-evaluators/rag-evaluators) | 參考檢索與回答品質分開評估；未使用 Azure 評測服務 |
 | [Anthropic Building Effective Agents](https://www.anthropic.com/research/building-effective-agents) | 參考 agent/workflow、工具及有界迭代的取捨 |
 | [OpenAI Codex agent loop](https://openai.com/index/unrolling-the-codex-agent-loop/) | 參考模型/工具/上下文迴圈；未整合 Codex |
