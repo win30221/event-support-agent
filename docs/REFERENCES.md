@@ -5,7 +5,7 @@
 
 本分支 `refactor/single-agent-loop` 從 `refactor/intent-task-simple` 的 8b6fdd0 建立。預設 `agent.answer` 改為 `single_agent.py`：同一模型角色以 native tool_calls 取得工具結果，或直接輸出最終回答。保留 LangGraph ToolNode、ToolRegistry、資料庫、RAG、參數驗證、快取、適用條件及引用驗證；不呼叫原分類、Audit、獨立證據評估、停止審查或回答品質審查。舊 `intent_answer`、`legacy_answer` 與歷史題庫保留，以下舊流程章節只供歷史參考。
 
-工具輪數 3、單批 6、累計嘗試 12、模型請求 5（含最多一次格式修正）、Ollama 每次 num_predict 2048。這是本專案實驗上限，不是官方推薦通用數值。原生工具結果以短 ID 回傳，calculate 的來源 ID 經主機對照；最終 JSON 由相同模型直接產生，主機驗證引用、運算依據及格式，不代表語意完整性。帳號仍由主機選定，不接受任意帳號 ID；明示 other/unclear 拒絕，但模型誤標 self、漏查商品或漏答的語意問題尚未被確定性驗證。商品依賴順序由 Agent 指引，不再有舊的逐需求槽位強制控制。正式認證與語意驗收仍需補足。
+工具輪數 3、單批 6、累計嘗試 12、模型請求 5（含最多一次格式修正）、Ollama 每次 num_predict 2048。這是本專案實驗上限，不是官方推薦通用數值。原生工具結果以短 ID 回傳，calculate 的來源 ID 經主機對照。正常路徑以同一 Agent 的原生終止工具 submit_answer（JSON Schema）提交 results，移除 action/missing，將 unavailable 合併至 no_evidence；不計入資料工具預算。終止工具不得與資料工具同批，混合批次不執行。只有回傳契約失敗、重複查詢停止或達到預算時，使用無工具的供應商 JSON Schema 結構化回答，仍受原有模型呼叫上限及一次格式修正限制。主機驗證引用、運算依據及格式，不代表語意完整性。帳號仍由主機選定，不接受任意帳號 ID；明示 other/unclear 拒絕，但模型誤標 self、漏查商品或漏答的語意問題尚未被確定性驗證。商品依賴順序由 Agent 指引，不再有舊的逐需求槽位強制控制。正式認證與語意驗收仍需補足。
 
 測試（已啟動原有 PostgreSQL/Ollama 並沿用原 DSN，無需重新建立資料庫）：
 
@@ -89,3 +89,8 @@
 - [OpenAI Function Calling](https://developers.openai.com/api/docs/guides/function-calling)：參考程式持有的已知參數不交給模型；唯一待辦 ID 由主機綁定。strict schema 相容性下保留 query 宣告，僅非檢索模式允許主機補空字串。
 - [Anthropic Writing Effective Tools](https://www.anthropic.com/research/writing-tools-for-agents) 與 [Effective Context Engineering](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)：參考減少工具歧義與重複上下文，不增加問句特例。
 - [ChatOllama API](https://reference.langchain.com/python/langchain-ollama/chat_models/ChatOllama)：num_predict 是生成限制；2048 為本專案實驗值，不是官方建議閾值。
+
+
+## Single Agent 終止契約（V2）
+
+實機紀錄顯示自由文字 JSON 多出結尾大括號、查無狀態誤用，以及單一商品被完整清單取代。依 [LangChain Structured Output](https://docs.langchain.com/oss/python/langchain/structured-output) 的 ToolStrategy 概念，將輸出契約表達為原生終止工具；並參考 [Ollama Structured Outputs](https://docs.ollama.com/capabilities/structured-outputs) 與 [Tool Calling](https://docs.ollama.com/capabilities/tool-calling)、[OpenAI Function Calling](https://developers.openai.com/api/docs/guides/function-calling)。本專案保留既有 LangGraph，不新增 SDK；不假設所有 Ollama 版本支援同時啟用工具及 format 約束。OpenAI 原生工具沿用 strict；Ollama 原生工具的 Schema 為模型介面，不保證嚴格遵守，仍由 Pydantic 驗證並使用既有 provider schema-only 介接備援。精簡重複狀態與終止欄位；商品工具描述依資料用途區分，不依特定題目硬編碼。已驗證查無的既有保守恢復只採本輪引用的可信查無原文，不能保證模型必然引用正確來源。沒有新增語意審查或固定模型呼叫；工具依賴順序仍是語意指引，而非主機強制。18 項單一 Agent 腳本回歸含新增終止混批、無效契約、結構化備援及查無證據恢復；須另行執行完整回歸與實機驗收。
