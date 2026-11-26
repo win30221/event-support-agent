@@ -141,6 +141,8 @@ def turn_metrics(events, trace, elapsed):
 
 
 def report_metadata(provider):
+    from hashlib import sha256
+    from single_agent import MAX_MODEL_CALLS, NUM_PREDICT, SINGLE_AGENT_PROMPT
     try:
         commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=Path(__file__).resolve().parents[1],
             capture_output=True, text=True, check=True, timeout=5).stdout.strip()
@@ -152,13 +154,15 @@ def report_metadata(provider):
                                 else os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
             "retrieval": os.getenv("EVENT_SUPPORT_AGENT_RETRIEVAL", "bm25"),
             "tool_selection": "native", "agent_framework": "langgraph",
-            "answer_review": os.getenv("EVENT_SUPPORT_AGENT_ANSWER_REVIEW", "off"),
+            "answer_review": "off",
             "ollama_num_ctx": os.getenv("EVENT_SUPPORT_AGENT_OLLAMA_NUM_CTX"),
             "ollama_reasoning": os.getenv("EVENT_SUPPORT_AGENT_OLLAMA_REASONING"),
             "ollama_timeout": os.getenv("EVENT_SUPPORT_AGENT_OLLAMA_TIMEOUT_SECONDS", "120"),
-            "stop_gate": os.getenv("EVENT_SUPPORT_AGENT_STOP_GATE", "auto"),
-            "semantic_review": "not_run", "workflow": "intent-task",
-            "online_verifier": "on"}
+            "stop_gate": "not_used",
+            "semantic_review": "not_run", "workflow": "single-agent-loop",
+            "online_verifier": "off", "max_model_calls": MAX_MODEL_CALLS,
+            "num_predict": NUM_PREDICT if provider == "ollama" else None,
+            "prompt_sha256": sha256(SINGLE_AGENT_PROMPT.encode()).hexdigest()}
 
 
 # 真實模型重播同一題集及多輪歷史，記錄證據覆蓋、工具及人工驗收要點。

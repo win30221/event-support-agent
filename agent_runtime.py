@@ -78,13 +78,14 @@ def native_call(call, arguments):
 class TurnRuntime:
     """Dependencies live outside graph state; each answer owns one runtime and registry."""
 
-    def __init__(self, player, provider, history, question, complete, observe):
+    def __init__(self, player, provider, history, question, complete, observe, *, stop_mode=None):
         self.provider, self.question = provider, question
         self.complete, self.observe = complete, observe
         self.context = RequestContext.build(question, history)
         self.registry = ToolRegistry(player)
         self.definitions = self.registry.definitions()
-        self.stop_mode = os.getenv("EVENT_SUPPORT_AGENT_STOP_GATE", "auto").strip().lower()
+        self.stop_mode = (os.getenv("EVENT_SUPPORT_AGENT_STOP_GATE", "auto").strip().lower()
+                          if stop_mode is None else stop_mode)
         if self.stop_mode not in ("auto", "off"):
             raise ValueError("EVENT_SUPPORT_AGENT_STOP_GATE 請填 auto 或 off。")
         self.conversation = [*self.context.history, {"role": "user", "content": question}]

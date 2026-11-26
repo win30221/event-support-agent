@@ -45,8 +45,8 @@ async def legacy_answer(player, provider, history, question, complete=completion
     return result["result"], result["trace"]
 
 
-async def answer(player, provider, history, question, complete=completion, observe=ignore_event):
-    """Default: intent-first workflow; legacy_answer remains an explicit baseline."""
+async def intent_answer(player, provider, history, question, complete=completion, observe=ignore_event):
+    """Historical intent-first workflow, kept as an explicit comparison baseline."""
     from task_runtime import IntentRuntime, build_intent_graph
     runtime = IntentRuntime(player, provider, list(history), question, complete, observe)
     with tracing_context(enabled=False):
@@ -54,3 +54,9 @@ async def answer(player, provider, history, question, complete=completion, obser
             runtime.initial_state(), config={"recursion_limit": 64}
         )
     return result["result"], result["trace"]
+
+
+async def answer(player, provider, history, question, complete=completion, observe=ignore_event):
+    """Default: one Agent, native tools, and a bounded tool-result loop."""
+    from single_agent import single_answer
+    return await single_answer(player, provider, history, question, complete, observe)

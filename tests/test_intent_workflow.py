@@ -1,11 +1,11 @@
-"""Exercise the new default graph with real local tools and scripted model contracts."""
+"""Regression for the historical intent-first graph; its contracts remain unchanged."""
 import asyncio
 import json
 import unittest
 from datetime import date
 from unittest.mock import patch
 
-from agent import answer
+from agent import intent_answer as answer
 from answering import DIRECT_REPLIES, ANSWER_VERIFICATION_FAILED
 from evidence import source_alias
 from guide import CATALOG, published_passages, shop_catalog

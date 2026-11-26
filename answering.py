@@ -13,6 +13,7 @@ from guide import mentions_identifier
 DIRECT_REPLIES = {
     "service_help": "我可以協助查詢遊戲活動玩法、商城獎勵和目前帳號的活動進度。",
     "account_limit": "我只能查詢目前登入帳號的活動紀錄。",
+    "unsupported": "目前客服只能查詢資料，無法替您修改活動紀錄、發放或兌換獎勵。",
     "clarify": "還需要更多資訊才能確認，請補充要查的活動、品項或畫面提示。",
     "no_evidence": "目前資料不足以確認這個問題，無法據此推論。",
     "unavailable": "目前無法取得或確認所需的資料。",
@@ -27,7 +28,7 @@ ANSWER_MARKDOWN_GUIDANCE = (
     "並列事項用條列，每項另起一行，清單與段落間留空行。"
     "保留必要條件、日期、數值及代碼；正文不重複列來源。"
 )
-Status = Literal["supported", "service_help", "account_limit", "clarify", "no_evidence", "unavailable"]
+Status = Literal["supported", "service_help", "account_limit", "clarify", "no_evidence", "unavailable", "unsupported"]
 
 
 class AnswerPart(BaseModel):
