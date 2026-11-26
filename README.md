@@ -4,19 +4,31 @@
 
 本作品著重後端業務與 LLM 的整合、可靠性、可觀測性及可重現評測。星夜祭是示範活動名稱；所有公告、商品、角色和玩家資料皆為原創模擬資料。系統僅提供唯讀查詢及運算，不是正式營運客服，不具備發幣、兌換或退款功能。
 
-## 實驗分支：Intent-first Task Workflow
+## Single Agent Loop 分支（目前預設）
 
-本分支自 `refactor/langgraph-agent` 的 3ea6e67 建立，預設入口 `agent.answer` 使用新流程。舊工作流仍保留在 `agent.legacy_answer` 供離線比較，原分支不變。優先驗證語意及業務結果，暫不以延遲為優化目標。
+本分支 `refactor/single-agent-loop` 從 `refactor/intent-task-simple` 的 8b6fdd0 建立。預設 `agent.answer` 改為 `single_agent.py`：同一模型角色以 native tool_calls 取得工具結果，或直接輸出最終回答。保留 LangGraph ToolNode、ToolRegistry、資料庫、RAG、參數驗證、快取、適用條件及引用驗證；不呼叫原分類、Audit、獨立證據評估、停止審查或回答品質審查。舊 `intent_answer`、`legacy_answer` 與歷史題庫保留，以下舊流程章節只供歷史參考。
 
-意圖拆分 → 主機核定需求及必要資料 → 原生工具 → 獨立證據評估 → 主機呈現結構化事實／LLM 生成知識回答 → 語意驗證 → 分項完成或降級。無全域 action/missing；不支援的操作、權限限制與資料不足分開處理。驗證模型可能判斷錯誤，尚未完成真實模型驗收。現有畫面為基準版本展示，不代表本分支實測成果。
+工具輪數 3、單批 6、累計嘗試 12、模型請求 5（含最多一次格式修正）、Ollama 每次 num_predict 2048。這是本專案實驗上限，不是官方推薦通用數值。原生工具結果以短 ID 回傳，calculate 的來源 ID 經主機對照；最終 JSON 由相同模型直接產生，主機驗證引用、運算依據及格式，不代表語意完整性。帳號仍由主機選定，不接受任意帳號 ID；明示 other/unclear 拒絕，但模型誤標 self、漏查商品或漏答的語意問題尚未被確定性驗證。商品依賴順序由 Agent 指引，不再有舊的逐需求槽位強制控制。正式認證與語意驗收仍需補足。
 
-既有虛擬環境及 PostgreSQL 19 不變；已安裝基準版本依賴時不必重裝。停止 Streamlit 後切換本分支，再從同一設定好的終端啟動。
+測試（已啟動原有 PostgreSQL/Ollama 並沿用原 DSN，無需重新建立資料庫）：
+
+```powershell
+ git fetch origin
+ git switch --track origin/refactor/single-agent-loop
+ .\.venv\Scripts\python.exe -m unittest tests.test_single_agent -v
+ .\.venv\Scripts\python.exe -m evaluations.eval_rag --live ollama --case redemption-gap --report reports/single-agent-gap.json
+ .\.venv\Scripts\python.exe -m evaluations.eval_rag --live ollama --report reports/single-agent-all.json
+```
+
+已存在本機分支時用 `git switch refactor/single-agent-loop` 與 `git pull --ff-only`。macOS/Linux 改用 `./.venv/bin/python`。新單元測試使用腳本模型，不代表實機理解正確；實機以既有 RAG/業務端到端題庫驗證，包含實際查詢及最終回答、呼叫次數、耗時、來源及人工驗收要點。原第一、二層獨立評測不必重跑；其分數不可與端到端結果直接比較。實機結果尚未驗證。
+
+參考：[OpenAI Function Calling](https://developers.openai.com/api/docs/guides/function-calling)、[OpenAI Agents SDK: running agents](https://openai.github.io/openai-agents-python/running_agents/)、[Anthropic 客服範例](https://github.com/anthropics/claude-cookbooks/blob/main/tool_use/customer_service_agent.ipynb)、[Anthropic Building effective agents](https://www.anthropic.com/engineering/building-effective-agents)。參考工具循環而非複製特定 SDK；現有 LangChain / LangGraph 依賴不變。
 
 ## 回覆完成音效
 
 回覆音效及左側「顯示工程檢視」預設開啟，可自行關閉。正常送出問題或操作頁面時，會嘗試解除瀏覽器 Web Audio 播放限制，不必先按音效開關。新回覆進入聊天室時播放三聲上行提示音，查詢失敗則為下行音；同一回覆不因 rerun 重播。整頁重載後恢復預設開啟。瀏覽器背景分頁節流、靜音及自動播放政策仍可能影響播放或提醒時間，不保證關閉頁面後也能收到通知。不需額外音檔或套件。
 
-本實驗分支採用精簡意圖：先回傳五類 type 與原問 request，再做意圖覆蓋與業務綁定審查，工具前確認必要欄位。仍需實機驗收。
+下列第一、二層的測試入口僅供歷史基準研究；不進入本分支預設聊天流程。
 
 ## 第一層意圖測試
 
@@ -44,7 +56,7 @@
 
 | 功能 | 技術及設計 |
 | --- | --- |
-| Agent Harness | LangGraph StateGraph / MessagesState / ToolNode、逐需求狀態與有界工具循環 |
+| Agent Harness | LangGraph StateGraph / MessagesState / ToolNode、單一 Agent 有界工具循環 |
 | RAG | BM25；選用 Ollama bge-m3 + PostgreSQL/pgvector，RRF 排名融合 |
 | 工具 | 公開公告、商城、指定商品、本人 PostgreSQL 進度及四則運算 |
 | LLM | Ollama / OpenAI；ChatOllama / ChatOpenAI、共用工具登錄與結構化回答契約 |

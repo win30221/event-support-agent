@@ -2,6 +2,27 @@
 
 [返回 README](../README.md) · [資料與工具](DATA_AND_TOOLS.md) · [設計決策](DESIGN_DECISIONS.md)
 
+
+## Single Agent Loop 分支（目前預設）
+
+本分支 `refactor/single-agent-loop` 從 `refactor/intent-task-simple` 的 8b6fdd0 建立。預設 `agent.answer` 改為 `single_agent.py`：同一模型角色以 native tool_calls 取得工具結果，或直接輸出最終回答。保留 LangGraph ToolNode、ToolRegistry、資料庫、RAG、參數驗證、快取、適用條件及引用驗證；不呼叫原分類、Audit、獨立證據評估、停止審查或回答品質審查。舊 `intent_answer`、`legacy_answer` 與歷史題庫保留，以下舊流程章節只供歷史參考。
+
+工具輪數 3、單批 6、累計嘗試 12、模型請求 5（含最多一次格式修正）、Ollama 每次 num_predict 2048。這是本專案實驗上限，不是官方推薦通用數值。原生工具結果以短 ID 回傳，calculate 的來源 ID 經主機對照；最終 JSON 由相同模型直接產生，主機驗證引用、運算依據及格式，不代表語意完整性。帳號仍由主機選定，不接受任意帳號 ID；明示 other/unclear 拒絕，但模型誤標 self、漏查商品或漏答的語意問題尚未被確定性驗證。商品依賴順序由 Agent 指引，不再有舊的逐需求槽位強制控制。正式認證與語意驗收仍需補足。
+
+測試（已啟動原有 PostgreSQL/Ollama 並沿用原 DSN，無需重新建立資料庫）：
+
+```powershell
+ git fetch origin
+ git switch --track origin/refactor/single-agent-loop
+ .\.venv\Scripts\python.exe -m unittest tests.test_single_agent -v
+ .\.venv\Scripts\python.exe -m evaluations.eval_rag --live ollama --case redemption-gap --report reports/single-agent-gap.json
+ .\.venv\Scripts\python.exe -m evaluations.eval_rag --live ollama --report reports/single-agent-all.json
+```
+
+已存在本機分支時用 `git switch refactor/single-agent-loop` 與 `git pull --ff-only`。macOS/Linux 改用 `./.venv/bin/python`。新單元測試使用腳本模型，不代表實機理解正確；實機以既有 RAG/業務端到端題庫驗證，包含實際查詢及最終回答、呼叫次數、耗時、來源及人工驗收要點。原第一、二層獨立評測不必重跑；其分數不可與端到端結果直接比較。實機結果尚未驗證。
+
+參考：[OpenAI Function Calling](https://developers.openai.com/api/docs/guides/function-calling)、[OpenAI Agents SDK: running agents](https://openai.github.io/openai-agents-python/running_agents/)、[Anthropic 客服範例](https://github.com/anthropics/claude-cookbooks/blob/main/tool_use/customer_service_agent.ipynb)、[Anthropic Building effective agents](https://www.anthropic.com/engineering/building-effective-agents)。參考工具循環而非複製特定 SDK；現有 LangChain / LangGraph 依賴不變。
+
 ## 1. 設計目標
 
 LLM 負責理解意圖、選擇工具與生成回答；Python 負責工具權限、參數、業務條件、證據與停止預算。實際採用 LangGraph 1.2.24 編排既有 Agent，不是完整 Pydantic AI Agent、Codex SDK 或 Claude Agent SDK。參考來源及採用範圍見 [REFERENCES](REFERENCES.md)。
@@ -23,9 +44,9 @@ LLM 負責理解意圖、選擇工具與生成回答；Python 負責工具權限
 | answer_quality.py | 審查候選、修訂及保護既有回答 |
 | evaluations/eval_rag.py / tests | 檢索評測、腳本回歸、實機重播 |
 
-## 3. 新分支的預設 Agent 生命週期
+## 3. 歷史 Intent-first Agent 生命週期（intent_answer）
 
-`agent.answer` 建立 IntentRuntime，沿用共用 ToolNode、registry、證據與傳輸，改用以下節點：
+`agent.intent_answer` 建立 IntentRuntime，沿用共用 ToolNode、registry、證據與傳輸，改用以下節點：
 
 1. Intent：第一個 LLM 呼叫依最終目的分類五類 type，逐字保留 request；主機驗證片段並配置 T1 等 ID。第二個 LLM 呼叫 Audit 驗證需求覆蓋及業務綁定；主機驗證業務能力、檔期、商品指涉及帳號。寫入操作為 unsupported、其他帳號為 account_limit。第一層不接收工具能力及權限清單；原能力資訊留給 Audit。第一層可由 evaluations/eval_intent.py 獨立執行，不進入第二層或工具。
 2. Select / Prepare tools / ToolNode / Collect：根據未完成需求選原生工具；主機核對工具範圍及必要資料，先核對依賴的指定商品再查本人紀錄。保留本輪原始結果及來源。以新增來源判斷檢索進展。
