@@ -314,3 +314,8 @@ Ollama 請選用支援 tool calling 的模型。兩個供應商的工具選擇�
 新第二層候選實驗（只驗首輪工具規劃）：`.\.venv\Scripts\python.exe -m evaluations.eval_task_tools --cases --report reports/task-tools-all.json`，macOS/Linux 換成 `./.venv/bin/python`。舊 eval_audit 為歷史對照，正式 UI 暫未切換。詳見 [TESTING](TESTING.md)。
 
 第二層獨立新題庫：`python -m evaluations.eval_task_tools --cases --suite holdout --report reports/task-tools-holdout.json`（20 輪、33 任務），預設 baseline 不變。詳見 TESTING 文件。
+
+
+## Single Agent：證據依賴展開
+
+最終回答可只引用已取得的計算結果短 ID。主機依本輪可信證據內的 `運算依據` 展開多層來源，去重並保留穩定順序，再執行原有引用及適用條件驗證。未知 ID、缺失原文、循環或不合法依賴會使受影響的子問題降級；不新增模型呼叫，不自動引入未被引用的計算。舊 `legacy_answer`、`intent_answer` 的引用契約不變。此機制僅保證來源追溯，不證明運算式選擇、數字來源或回答語意正確。測試：`python -m unittest tests.test_evidence_dependencies tests.test_single_agent -v`。

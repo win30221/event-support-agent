@@ -94,3 +94,10 @@
 ## Single Agent 終止契約（V2）
 
 實機紀錄顯示自由文字 JSON 多出結尾大括號、查無狀態誤用，以及單一商品被完整清單取代。依 [LangChain Structured Output](https://docs.langchain.com/oss/python/langchain/structured-output) 的 ToolStrategy 概念，將輸出契約表達為原生終止工具；並參考 [Ollama Structured Outputs](https://docs.ollama.com/capabilities/structured-outputs) 與 [Tool Calling](https://docs.ollama.com/capabilities/tool-calling)、[OpenAI Function Calling](https://developers.openai.com/api/docs/guides/function-calling)。本專案保留既有 LangGraph，不新增 SDK；不假設所有 Ollama 版本支援同時啟用工具及 format 約束。OpenAI 原生工具沿用 strict；Ollama 原生工具的 Schema 為模型介面，不保證嚴格遵守，仍由 Pydantic 驗證並使用既有 provider schema-only 介接備援。精簡重複狀態與終止欄位；商品工具描述依資料用途區分，不依特定題目硬編碼。已驗證查無的既有保守恢復只採本輪引用的可信查無原文，不能保證模型必然引用正確來源。沒有新增語意審查或固定模型呼叫；工具依賴順序仍是語意指引，而非主機強制。18 項單一 Agent 腳本回歸含新增終止混批、無效契約、結構化備援及查無證據恢復；須另行執行完整回歸與實機驗收。
+
+
+## Single Agent：證據依賴展開
+
+最終回答可只引用已取得的計算結果短 ID。主機依本輪可信證據內的 `運算依據` 展開多層來源，去重並保留穩定順序，再執行原有引用及適用條件驗證。未知 ID、缺失原文、循環或不合法依賴會使受影響的子問題降級；不新增模型呼叫，不自動引入未被引用的計算。舊 `legacy_answer`、`intent_answer` 的引用契約不變。此機制僅保證來源追溯，不證明運算式選擇、數字來源或回答語意正確。測試：`python -m unittest tests.test_evidence_dependencies tests.test_single_agent -v`。
+
+依 [OpenAI Function Calling](https://developers.openai.com/api/docs/guides/function-calling) 減少模型重複填寫主機已知資料的原則，以及 [W3C PROV-DM](https://www.w3.org/TR/prov-dm/) 的衍生來源概念。這是本專案實作取捨，不是供應商強制規定。舊分類、審查、工具規劃仍被歷史入口及獨立評測引用，不視為無用程式；共用 TurnRuntime 仍為現行工具派發的基底。避免刪除歷史測試或改動其基準。此次移除 single_output.py 未使用的 json import。完整回歸與實機仍需驗證。
