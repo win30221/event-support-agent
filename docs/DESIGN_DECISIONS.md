@@ -70,3 +70,9 @@ LLM 理解需求、選擇資料工具及生成回答；Python 管理工具契約
 ## 測試及評測目錄整理
 
 2026-11-26：相同 Qwen3:8b Prompt 下，原題庫 36/36、新題庫 20/20，均單次實機通過。凍結第一層 Prompt 及業務流程。依使用者要求將三個評測器及四份題庫移至 evaluations/，既有 unittest 保留 tests/。以 Python package 的 `-m` 從根目錄執行，避免 sys.path 修改；題庫以模組路徑定位。同步調整測試匯入、mock 目標、CI、UI 練習題資料路徑及文件，保留原資料內容、測試斷言、CLI 參數、報告位置及行為。此次不重跑已通過的真實模型 56 題；目錄移動須獨立確認 CLI、離線測試與 CI，既有全流程四個回歸失敗仍留待後續階段處理。
+
+## 第二層 Audit 的明確邊界與獨立評測
+
+2026-11-26：第一層兩批真實模型測試共 56/56，凍結 INTENT_PROMPT、原有題庫與第一層契約。原 AUDIT_PROMPT 允許跨期比較為 knowledge 或 calculation，與 CAPABILITIES 及第一層 analysis 定義矛盾；「他人紀錄填 other」未明確區分 kind 與 account。此次在原第二層 Prompt 內按意圖審查、業務類型及參數擷取三部分澄清，不增加模型呼叫，不修改 Schema、CAPABILITIES 或主機權限規則。比較結論為 analysis/calculation；他人紀錄保留語意 kind 並 account=other；缺參數及不可執行仍是有效意圖。LLM 的帳號範圍判斷可能出錯，主機現有的 account=other 拒絕並不能單獨證明任意錯誤 self 提案均會被阻擋；獨立評測特別檢查此類錯綁。後續工具與帳號授權不在本次修改範圍。
+
+正式流程抽出共用 audit_packet/audit_intents，保留既有封包、審查回饋及重試行為；新增 24 題獨立 Audit 評測（19 accept、5 revise）與離線測試，涵蓋 18 種 kind。對故意不正確的第一層輸入只驗證 Audit 決策，不啟動第一層重提案。核對主機狀態與原始 binding，避免安全降級或欄位被丟棄掩蓋語意錯誤。標記為依現有業務契約預先制定，合理等價答案與 revise issues 必須人工複核。新 Prompt 真實模型尚未驗收；既有全流程四項回歸失敗不藉此刪除或弱化。

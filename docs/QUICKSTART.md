@@ -287,3 +287,5 @@ Ollama 請選用支援 tool calling 的模型。兩個供應商的工具選擇�
 離線契約測試：`python -m unittest tests.test_intent_analysis -v`（不需 Ollama 或 PostgreSQL）。真實模型指定單題 ID：`python -m evaluations.eval_intent --case diagnosis --repeat 3 --report reports/intent-diagnosis.json`。完整題集：`python -m evaluations.eval_intent --cases --report reports/intent-all.json`。Windows 使用同一虛擬環境的 `.\.venv\Scripts\python.exe`；macOS/Linux 使用 `./.venv/bin/python`。報告放 reports/，預設不納入 Git。
 
 原 36 題已通過且 Prompt 不變時，只執行新增 20 題：`.\.venv\Scripts\python.exe -m evaluations.eval_intent --cases --suite holdout --report reports/intent-holdout.json`（macOS/Linux：`./.venv/bin/python` 取代 Python 路徑）。失敗題可用 `--case ID --suite holdout` 單獨重測。
+
+第二層獨立評測（只需已安裝依賴、啟動模型）：`.\.venv\Scripts\python.exe -m evaluations.eval_audit --cases --report reports/audit-all.json`；macOS/Linux 換成 `./.venv/bin/python`。詳見 [TESTING](TESTING.md)。

@@ -7,6 +7,7 @@
 ```text
 tests/                           # unittest：單元、整合及 opt-in 實機測試
   test_intent_analysis.py        # 第一層契約與評測器測試
+  test_intent_audit.py           # 第二層契約與評測器測試
   test_intent_workflow.py        # 意圖工作流及後續節點
   test_player_progress.py        # PostgreSQL 整合
   test_live_agent.py             # opt-in 真實模型
@@ -14,6 +15,8 @@ tests/                           # unittest：單元、整合及 opt-in 實機�
 evaluations/
   __init__.py
   eval_intent.py                 # 第一層 LLM 分類
+  eval_audit.py                  # 第二層 LLM 審查與業務綁定
+  audit_cases.json               # 第二層 24 題
   eval_rag.py                    # BM25 / hybrid / 端到端重播
   eval_answer.py                 # 固定證據的回答重播
   intent_cases.json              # 原 36 題
@@ -33,6 +36,8 @@ reports/                         # 本機產生，Git 忽略
 | --- | --- | --- | --- |
 | 第一層離線 unittest | 不需 | 不需 | 不需 |
 | 第一層實機評測 | 需（或 OpenAI） | 不需 | 不需 |
+| 第二層離線 unittest | 不需 | 不需 | 不需 |
+| 第二層實機評測 | 需（或 OpenAI） | 不需 | 不需 |
 | 完整 unittest（預設） | 不需 | 需獨立測試庫 | 不需 |
 | 純 BM25 評測 | 不需 | 不需 | 不需 |
 | Hybrid 評測 | 不需 | 需 pgvector 索引 | 需 |
@@ -96,3 +101,22 @@ Hybrid 須先建好向量索引；端到端須啟動模型及測試資料庫；�
 ## 6. 報告與 CI
 
 JSON 報告預設由使用者指定 --report 寫到本機 reports/，不納入 Git。不要提交含私人資料、工程 Log 或 API key 的紀錄。區分單元測試、資料庫整合、真實模型語意驗收；CI 不會自動執行第一層的 56 題實機評測。題庫或 Prompt 變更時，保留原基準並重新考慮回歸風險。
+
+## 第二層意圖審查與業務綁定測試
+
+第一層已凍結（原 36 題與新 20 題各單次通過）；第二層使用預先標記的第一層需求，不重新呼叫第一層模型。評測共用正式 Audit Prompt、Schema、輸入封包、契約修正及 Python 業務核定，不執行工具、證據評估或回答生成，也不需要 PostgreSQL 或 Streamlit。
+
+先啟動 Ollama（原本的 qwen3:8b 及設定），從專案根目錄執行：
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest tests.test_intent_audit -v
+.\.venv\Scripts\python.exe -m evaluations.eval_audit --cases --report reports/audit-all.json
+```
+
+macOS/Linux 將 Python 路徑換成 `./.venv/bin/python`。指定案例：`python -m evaluations.eval_audit --case other-account --report reports/audit-single.json`；可加 --repeat 3 重複驗證。OpenAI 使用 --provider openai 並配置 API key。
+
+題庫 `evaluations/audit_cases.json`：24 題，19 題為正確意圖（預期 accept），5 題故意提供錯誤分類、漏拆或多拆（預期 revise）；涵蓋所有 18 種現行 kind。預期答案及分類理由僅供主機比對，不傳入 LLM。revise 不會觸發第一層重跑。
+
+報告分開記錄 contract_valid、decision_match、accept_decision_match、revise_decision_match；正確意圖另比較 identity、kind、edition、product、account、status，分母為 accept_cases（19）。exact_match 是各案例所有適用欄位均符合。檔期以主機解析後 ID 集合比對，商品接受同一商品的正式名稱、ID 或已登錄精確別名；終止任務的檔期為主機清空後的結果，不評估不必要的原始檔期欄位。商品仍核對原始 binding，避免不適用欄位被主機丟棄後算正確。revise 的 issues 是否真正指出問題需人工核對，不能僅依 decision 或非空 issues 宣稱語意通過。模型呼叫次數計算實際送出請求（包含契約修正），原始輸出與錯誤一併保留。
+
+先完成第二層離線及真實模型驗收，才考慮第三層；不因格式正確或主機安全拒絕就宣稱模型判斷正確。若同一案例的合理等價解讀與標記不一致，先討論業務定義再修改，禁止為單一案例硬編碼。

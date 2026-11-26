@@ -69,3 +69,5 @@ Select 對暫時性傳輸錯誤使用 RetryPolicy（至多 2 次嘗試）；其�
 工程檢視顯示 Graph 節點、模型請求/回傳、用量、工具、證據與停止原因。正式系統需補認證、授權、日誌遮罩及保留政策。正文透過共用 Markdown 指引與 Streamlit 渲染；沒有新增排版模型呼叫或正規表示式重排。
 
 模型選工具時使用完整來源 ID（供 calculate 引用）；回答及審查階段使用本輪短 ID，由主機對照完整 ID。短 ID 只有本輪證據集合中存在才有效。完整工具資料留存工程紀錄；模型只取得必要原文、狀態、檔期、日期及條件。單一子問題格式或來源錯誤不會抹除其他有效子問題。
+
+第二層可透過 `python -m evaluations.eval_audit --cases` 注入固定第一層輸出，與正式流程共用 `IntentRuntime.audit_intents` 和 `bind_intents`，不啟動後續節點。LLM 提案 kind、editions、product、account；Python 核定初始狀態。跨期公開比較為 analysis/calculation；他人紀錄保留 query 及具體 kind，account=other。模型提案不構成資料授權。

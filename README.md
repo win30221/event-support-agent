@@ -24,6 +24,10 @@
 
 第一層五類意圖各自具有定義、適用、不適用、判斷原則及對照範例。只理解語意與拆分需求，不接收工具能力及權限清單。先執行 `python -m unittest tests.test_intent_analysis -v`（離線契約測試），再執行 `python -m evaluations.eval_intent`（自由提問），或 `python -m evaluations.eval_intent --cases`（真實模型標記題集）。可用 `--case diagnosis --repeat 3 --report reports/intent.json` 單獨重跑；不執行 Audit 或任何資料工具，不需資料庫。已通過原題庫時，可用 `python -m evaluations.eval_intent --cases --suite holdout --report reports/intent-holdout.json` 只跑新增的 20 題。詳見 [EVALUATION](docs/EVALUATION.md#第一層意圖獨立驗收)。
 
+## 第二層意圖審查測試
+
+第一層固定輸出，獨立評測第二層 Audit 與 Python 業務核定。執行 `python -m unittest tests.test_intent_audit -v` 或 `python -m evaluations.eval_audit --cases --report reports/audit-all.json`（真實模型，24 題）。不需資料庫，不重跑第一層 56 題。詳見 [TESTING](docs/TESTING.md)。
+
 ## 操作展示
 
 本機 qwen3:8b 對話：活動玩法 → 商城價格 → 本人餘額 → 要求客服贈送星星幣。
@@ -80,6 +84,8 @@ requirements.txt
 tests/                 # unittest 單元、整合及 opt-in 實機測試
 evaluations/           # 評測腳本與標記題庫
   eval_intent.py       # 第一層真實模型評測
+  eval_audit.py        # 第二層審查與業務綁定評測
+  audit_cases.json     # 第二層標記題庫
   eval_rag.py          # RAG、端到端實機重播
   eval_answer.py       # 固定證據回答評測
   intent_cases.json / intent_holdout_cases.json

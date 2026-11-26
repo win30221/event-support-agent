@@ -124,6 +124,20 @@ class IntentRuntime(TurnRuntime):
             self.observe("Python 原問需求錨定", {"需求": intents})
         return intents
 
+    def audit_packet(self, packet, intents):
+        from intent_analysis import CAPABILITIES
+        return {"玩家原問": packet["玩家原問"], "服務上下文": packet["服務上下文"],
+                "能力": "公開公告、公開商城、本人活動紀錄及運算；無寫入或其他帳號工具。",
+                "修正回饋": packet["修正回饋"], "需求": intents,
+                "允許業務能力": {k: sorted(v) for k, v in CAPABILITIES.items()}}
+
+    async def audit_intents(self, packet, intents):
+        # 正式工作流及第二層獨立評測共用契約、輸入與主機核定，不重跑第一層。
+        def checked(audit):
+            return audit, bind_intents(audit, intents, self.context, self.observe)
+        return await self.ask(AUDIT_PROMPT, self.audit_packet(packet, intents), AUDIT_SCHEMA,
+                              IntentAudit, "意圖與業務範圍驗證", checked)
+
     async def intent(self, state):
         self.node(state, "intent")
         packet = self.intent_packet(state["feedback"])
@@ -133,15 +147,7 @@ class IntentRuntime(TurnRuntime):
             intents = await self.classify_intents(packet)
             if intents is None:
                 break
-            from intent_analysis import CAPABILITIES
-            audit_packet = {"玩家原問": packet["玩家原問"], "服務上下文": packet["服務上下文"],
-                "能力": "公開公告、公開商城、本人活動紀錄及運算；無寫入或其他帳號工具。",
-                "修正回饋": packet["修正回饋"], "需求": intents,
-                "允許業務能力": {k: sorted(v) for k, v in CAPABILITIES.items()}}
-            def checked(audit):
-                return audit, bind_intents(audit, intents, self.context, self.observe)
-            reviewed = await self.ask(AUDIT_PROMPT, audit_packet, AUDIT_SCHEMA, IntentAudit,
-                                      "意圖與業務範圍驗證", checked)
+            reviewed = await self.audit_intents(packet, intents)
             if reviewed is None:
                 break
             audit, plan = reviewed

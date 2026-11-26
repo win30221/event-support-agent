@@ -1,0 +1,632 @@
+[
+  {
+    "id": "overview",
+    "question": "我是新手，能完整介紹這期活動怎麼玩嗎？",
+    "intents": [
+      {
+        "type": "knowledge",
+        "request": "我是新手，能完整介紹這期活動怎麼玩嗎？"
+      }
+    ],
+    "expected": {
+      "decision": "accept",
+      "tasks": [
+        {
+          "task_id": "T1",
+          "kind": "overview",
+          "editions": [
+            "2026-11"
+          ],
+          "account": "none",
+          "product": "",
+          "status": "pending"
+        }
+      ]
+    },
+    "rationale": "完整入門而非單一規則。"
+  },
+  {
+    "id": "public-rule",
+    "question": "本期活動每天的有效場次上限是多少？",
+    "intents": [
+      {
+        "type": "knowledge",
+        "request": "本期活動每天的有效場次上限是多少？"
+      }
+    ],
+    "expected": {
+      "decision": "accept",
+      "tasks": [
+        {
+          "task_id": "T1",
+          "kind": "knowledge",
+          "editions": [
+            "2026-11"
+          ],
+          "account": "none",
+          "product": "",
+          "status": "pending"
+        }
+      ]
+    },
+    "rationale": "固定公開規則，不是個人場次。"
+  },
+  {
+    "id": "catalog-variants",
+    "question": "列出上期商城的全部商品與價格。本期全部商品的價格及用途也列給我。",
+    "intents": [
+      {
+        "type": "query",
+        "request": "列出上期商城的全部商品與價格。"
+      },
+      {
+        "type": "query",
+        "request": "本期全部商品的價格及用途也列給我。"
+      }
+    ],
+    "expected": {
+      "decision": "accept",
+      "tasks": [
+        {
+          "task_id": "T1",
+          "kind": "catalog",
+          "editions": [
+            "2026-10"
+          ],
+          "account": "none",
+          "product": "",
+          "status": "pending"
+        },
+        {
+          "task_id": "T2",
+          "kind": "catalog_details",
+          "editions": [
+            "2026-11"
+          ],
+          "account": "none",
+          "product": "",
+          "status": "pending"
+        }
+      ]
+    },
+    "rationale": "區別兩種清單及檔期，兩個獨立結果。"
+  },
+  {
+    "id": "item-variants",
+    "question": "上期的守燈人要多少星星幣？本期的海圖航線框有什麼用途、價格多少？",
+    "intents": [
+      {
+        "type": "query",
+        "request": "上期的守燈人要多少星星幣？"
+      },
+      {
+        "type": "query",
+        "request": "本期的海圖航線框有什麼用途、價格多少？"
+      }
+    ],
+    "expected": {
+      "decision": "accept",
+      "tasks": [
+        {
+          "task_id": "T1",
+          "kind": "item_price",
+          "editions": [
+            "2026-10"
+          ],
+          "account": "none",
+          "product": "守燈人",
+          "status": "pending"
+        },
+        {
+          "task_id": "T2",
+          "kind": "item_details",
+          "editions": [
+            "2026-11"
+          ],
+          "account": "none",
+          "product": "海圖航線框",
+          "status": "pending"
+        }
+      ]
+    },
+    "rationale": "指定商品、價格與用途，不可猜測其他商品。"
+  },
+  {
+    "id": "own-balance",
+    "question": "我現在本期還有多少活動點數？",
+    "intents": [
+      {
+        "type": "query",
+        "request": "我現在本期還有多少活動點數？"
+      }
+    ],
+    "expected": {
+      "decision": "accept",
+      "tasks": [
+        {
+          "task_id": "T1",
+          "kind": "balance",
+          "editions": [
+            "2026-11"
+          ],
+          "account": "self",
+          "product": "",
+          "status": "pending"
+        }
+      ]
+    },
+    "rationale": "既有本人餘額，不查他人。"
+  },
+  {
+    "id": "match-variants",
+    "question": "我今天已經計入活動的場次有幾場？上期進度紀錄當日的已計入場次是多少？",
+    "intents": [
+      {
+        "type": "query",
+        "request": "我今天已經計入活動的場次有幾場？"
+      },
+      {
+        "type": "query",
+        "request": "上期進度紀錄當日的已計入場次是多少？"
+      }
+    ],
+    "expected": {
+      "decision": "accept",
+      "tasks": [
+        {
+          "task_id": "T1",
+          "kind": "counted_matches",
+          "editions": [
+            "2026-11"
+          ],
+          "account": "self",
+          "product": "",
+          "status": "pending"
+        },
+        {
+          "task_id": "T2",
+          "kind": "recorded_matches",
+          "editions": [
+            "2026-10"
+          ],
+          "account": "self",
+          "product": "",
+          "status": "pending"
+        }
+      ]
+    },
+    "rationale": "今日與紀錄當日不同，不要求任意日期戰績。"
+  },
+  {
+    "id": "participation",
+    "question": "我上期是否有報名成功？",
+    "intents": [
+      {
+        "type": "query",
+        "request": "我上期是否有報名成功？"
+      }
+    ],
+    "expected": {
+      "decision": "accept",
+      "tasks": [
+        {
+          "task_id": "T1",
+          "kind": "participation",
+          "editions": [
+            "2026-10"
+          ],
+          "account": "self",
+          "product": "",
+          "status": "pending"
+        }
+      ]
+    },
+    "rationale": "參加狀態是紀錄，不是資格。"
+  },
+  {
+    "id": "other-progress",
+    "question": "我的本期歷次兌換交易明細是什麼？",
+    "intents": [
+      {
+        "type": "query",
+        "request": "我的本期歷次兌換交易明細是什麼？"
+      }
+    ],
+    "expected": {
+      "decision": "accept",
+      "tasks": [
+        {
+          "task_id": "T1",
+          "kind": "progress_query",
+          "editions": [
+            "2026-11"
+          ],
+          "account": "self",
+          "product": "",
+          "status": "pending"
+        }
+      ]
+    },
+    "rationale": "目前可能沒有明細欄位，但依語意綁定。"
+  },
+  {
+    "id": "redemption-gap",
+    "question": "我距離換到霧港領航員還差多少星星幣？",
+    "intents": [
+      {
+        "type": "analysis",
+        "request": "我距離換到霧港領航員還差多少星星幣？"
+      }
+    ],
+    "expected": {
+      "decision": "accept",
+      "tasks": [
+        {
+          "task_id": "T1",
+          "kind": "redemption_gap",
+          "editions": [
+            "2026-11"
+          ],
+          "account": "self",
+          "product": "霧港領航員",
+          "status": "pending"
+        }
+      ]
+    },
+    "rationale": "單一商品價格與本人餘額的差額。"
+  },
+  {
+    "id": "hypothetical-eligibility",
+    "question": "假設只參加自訂房，這種對局算有效場次嗎？",
+    "intents": [
+      {
+        "type": "analysis",
+        "request": "假設只參加自訂房，這種對局算有效場次嗎？"
+      }
+    ],
+    "expected": {
+      "decision": "accept",
+      "tasks": [
+        {
+          "task_id": "T1",
+          "kind": "eligibility",
+          "editions": [
+            "2026-11"
+          ],
+          "account": "none",
+          "product": "",
+          "status": "pending"
+        }
+      ]
+    },
+    "rationale": "假設資格判定不需要真實帳號紀錄。"
+  },
+  {
+    "id": "diagnosis-unknown-item",
+    "question": "為什麼我的帳號換不到銀河飛船模型？",
+    "intents": [
+      {
+        "type": "analysis",
+        "request": "為什麼我的帳號換不到銀河飛船模型？"
+      }
+    ],
+    "expected": {
+      "decision": "accept",
+      "tasks": [
+        {
+          "task_id": "T1",
+          "kind": "diagnosis",
+          "editions": [
+            "2026-11"
+          ],
+          "account": "self",
+          "product": "銀河飛船模型",
+          "status": "pending"
+        }
+      ]
+    },
+    "rationale": "異常診斷；未知商品保留原詞，不偷換也不先宣稱存在。"
+  },
+  {
+    "id": "public-comparison",
+    "question": "比較上期與本期活動的玩法以及獎勵差異。",
+    "intents": [
+      {
+        "type": "analysis",
+        "request": "比較上期與本期活動的玩法以及獎勵差異。"
+      }
+    ],
+    "expected": {
+      "decision": "accept",
+      "tasks": [
+        {
+          "task_id": "T1",
+          "kind": "calculation",
+          "editions": [
+            "2026-10",
+            "2026-11"
+          ],
+          "account": "none",
+          "product": "",
+          "status": "pending"
+        }
+      ]
+    },
+    "rationale": "跨期公開比較屬 analysis/calculation，account=none。"
+  },
+  {
+    "id": "unsupported-operation",
+    "question": "麻煩直接替我的帳號補發本期點數。",
+    "intents": [
+      {
+        "type": "operation",
+        "request": "麻煩直接替我的帳號補發本期點數。"
+      }
+    ],
+    "expected": {
+      "decision": "accept",
+      "tasks": [
+        {
+          "task_id": "T1",
+          "kind": "operation",
+          "editions": [],
+          "account": "self",
+          "product": "",
+          "status": "unsupported"
+        }
+      ]
+    },
+    "rationale": "意圖正確但主機拒絕寫入，不能轉成查詢。"
+  },
+  {
+    "id": "out-of-scope",
+    "question": "幫我取消明天的火車訂票。",
+    "intents": [
+      {
+        "type": "other",
+        "request": "幫我取消明天的火車訂票。"
+      }
+    ],
+    "expected": {
+      "decision": "accept",
+      "tasks": [
+        {
+          "task_id": "T1",
+          "kind": "other",
+          "editions": [],
+          "account": "none",
+          "product": "",
+          "status": "service_help"
+        }
+      ]
+    },
+    "rationale": "明確超出活動客服，無需帳號資料。"
+  },
+  {
+    "id": "unclear",
+    "question": "那個怎樣？",
+    "intents": [
+      {
+        "type": "other",
+        "request": "那個怎樣？"
+      }
+    ],
+    "expected": {
+      "decision": "accept",
+      "tasks": [
+        {
+          "task_id": "T1",
+          "kind": "clarification",
+          "editions": [],
+          "account": "none",
+          "product": "",
+          "status": "clarify"
+        }
+      ]
+    },
+    "rationale": "無歷史可理解目的，應補問。"
+  },
+  {
+    "id": "other-account",
+    "question": "請查 B 玩家的本期活動餘額。",
+    "intents": [
+      {
+        "type": "query",
+        "request": "請查 B 玩家的本期活動餘額。"
+      }
+    ],
+    "expected": {
+      "decision": "accept",
+      "tasks": [
+        {
+          "task_id": "T1",
+          "kind": "balance",
+          "editions": [],
+          "account": "other",
+          "product": "",
+          "status": "account_limit"
+        }
+      ]
+    },
+    "rationale": "查詢他人仍為 balance，account=other，主機拒絕。"
+  },
+  {
+    "id": "missing-product",
+    "question": "這個商品要多少點數？",
+    "intents": [
+      {
+        "type": "query",
+        "request": "這個商品要多少點數？"
+      }
+    ],
+    "expected": {
+      "decision": "accept",
+      "tasks": [
+        {
+          "task_id": "T1",
+          "kind": "item_price",
+          "editions": [
+            "2026-11"
+          ],
+          "account": "none",
+          "product": "",
+          "status": "clarify"
+        }
+      ]
+    },
+    "rationale": "目的明確、缺商品參數，由 Python 補問，不 revise。"
+  },
+  {
+    "id": "unknown-edition",
+    "question": "幫我查 2024-01 那期的本人點數餘額。",
+    "intents": [
+      {
+        "type": "query",
+        "request": "幫我查 2024-01 那期的本人點數餘額。"
+      }
+    ],
+    "expected": {
+      "decision": "accept",
+      "tasks": [
+        {
+          "task_id": "T1",
+          "kind": "balance",
+          "editions": [],
+          "account": "self",
+          "product": "",
+          "status": "unavailable"
+        }
+      ]
+    },
+    "rationale": "明示不存在檔期應用 unavailable，不替換本期。"
+  },
+  {
+    "id": "history-product",
+    "question": "那它需要多少星星幣？",
+    "intents": [
+      {
+        "type": "query",
+        "request": "那它需要多少星星幣？"
+      }
+    ],
+    "history": [
+      {
+        "role": "user",
+        "content": "上期的守燈人是什麼獎勵？"
+      },
+      {
+        "role": "assistant",
+        "content": "守燈人是上期活動的限定頭像。",
+        "trace": [
+          {
+            "參數": {
+              "edition": "2026-10"
+            },
+            "商品參照": [
+              "lantern-keeper"
+            ]
+          }
+        ]
+      }
+    ],
+    "expected": {
+      "decision": "accept",
+      "tasks": [
+        {
+          "task_id": "T1",
+          "kind": "item_price",
+          "editions": [
+            "2026-10"
+          ],
+          "account": "none",
+          "product": "守燈人",
+          "status": "pending"
+        }
+      ]
+    },
+    "rationale": "承接可信唯一商品及上期檔期；不得用本期商品替代。"
+  },
+  {
+    "id": "wrong-analysis",
+    "question": "如果活動開始前就完成對局，這場可以計入嗎？",
+    "intents": [
+      {
+        "type": "knowledge",
+        "request": "如果活動開始前就完成對局，這場可以計入嗎？"
+      }
+    ],
+    "expected": {
+      "decision": "revise",
+      "tasks": []
+    },
+    "rationale": "規則套用於假設應為 analysis，要求第一層修正。"
+  },
+  {
+    "id": "wrong-operation",
+    "question": "請直接幫我的帳號領取活動獎勵。",
+    "intents": [
+      {
+        "type": "query",
+        "request": "請直接幫我的帳號領取活動獎勵。"
+      }
+    ],
+    "expected": {
+      "decision": "revise",
+      "tasks": []
+    },
+    "rationale": "實際代辦應為 operation，不能當查詢。"
+  },
+  {
+    "id": "wrong-domain",
+    "question": "教我怎麼申請銀行信用卡。",
+    "intents": [
+      {
+        "type": "knowledge",
+        "request": "教我怎麼申請銀行信用卡。"
+      }
+    ],
+    "expected": {
+      "decision": "revise",
+      "tasks": []
+    },
+    "rationale": "服務範圍外應為 other。"
+  },
+  {
+    "id": "omitted-intent",
+    "question": "活動何時結束？我有多少點數？幫我補發獎勵。",
+    "intents": [
+      {
+        "type": "knowledge",
+        "request": "活動何時結束？"
+      },
+      {
+        "type": "query",
+        "request": "我有多少點數？"
+      }
+    ],
+    "expected": {
+      "decision": "revise",
+      "tasks": []
+    },
+    "rationale": "原問三個獨立目的，遺漏代辦。"
+  },
+  {
+    "id": "over-split",
+    "question": "我想換霧港領航員，還差多少點數？",
+    "intents": [
+      {
+        "type": "operation",
+        "request": "我想換霧港領航員，"
+      },
+      {
+        "type": "analysis",
+        "request": "還差多少點數？"
+      }
+    ],
+    "expected": {
+      "decision": "revise",
+      "tasks": []
+    },
+    "rationale": "第一句是差額判斷的目的及對象，不是獨立代辦。"
+  }
+]
