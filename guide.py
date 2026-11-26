@@ -161,7 +161,8 @@ def rank_passages(query, passages, limit=3):
 
 
 def search_rules(query, edition="本期", mode="search", catalog=CATALOG, *, retriever=None,
-                 alternate_queries=(), include_overview=False, retrieve_once=None, embedding=None):
+                 alternate_queries=(), include_overview=False, retrieve_once=None, embedding=None,
+                 embed_once=None):
     """Rank details inside one edition; optionally attach its canonical activity context.
 
     The raw retrieval benchmark can still measure lexical/hybrid ranking alone.
@@ -193,7 +194,8 @@ def search_rules(query, edition="本期", mode="search", catalog=CATALOG, *, ret
         if method == "hybrid":
             from vector_search import hybrid_search
             lexical = rank_passages(text, candidates, limit=6)
-            return hybrid_search(text, candidates, passages, lexical, limit=3, settings=embedding)
+            return hybrid_search(text, candidates, passages, lexical, limit=3, settings=embedding,
+                                 embed_once=embed_once)
         raise ValueError("EVENT_SUPPORT_AGENT_RETRIEVAL 可使用 bm25 或 hybrid。")
 
     queries = list(dict.fromkeys(text.strip() for text in (query, *alternate_queries) if text.strip()))

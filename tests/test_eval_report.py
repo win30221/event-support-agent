@@ -65,6 +65,28 @@ class EvalReportTests(unittest.TestCase):
                 self.assertEqual(r["turns"][-1]["reference"], case["reference"])
                 self.assertEqual(r["turns"][-1]["editions"], case["editions"])
 
+    def test_retrieval_diagnostics_unknown_and_observed(self):
+        from evaluations.eval_report import retrieval_summary
+        old = grade_turn(turn(), rule())
+        self.assertIsNone(old["efficiency"]["retrieval_diagnostics"])
+        self.assertIsNone(retrieval_summary([old])["observed_cache"])
+        counts = {"requests": 3, "computations": 2, "reuses": 1, "failures": 0}
+        events = [
+            event("Python 檢索快取統計", {"version": 1, "ranking": counts, "query_vector": counts}),
+            event("Python 查詢進展", {"version": 1, "rule_queries": 1, "new_rule_ids": 0}),
+            event("Python 查詢進展", {"version": 1, "rule_queries": 0, "new_rule_ids": 0}),
+            event("Python 單一 Agent 輪次", {"模型呼叫": 3, "停止資料工具原因": ["terminal_repair"]}),
+            event("Python 單一 Agent 回傳驗證失敗", {"錯誤代碼": "INVALID_FINAL_SCHEMA"}),
+        ]
+        new = grade_turn(turn(events=events), rule())
+        summary = retrieval_summary([old, new])
+        self.assertEqual(summary["observed_turns"], 1)
+        self.assertEqual(summary["unknown_turns"], 1)
+        self.assertEqual(summary["observed_cache"]["query_vector"], counts)
+        self.assertEqual(summary["observed_rule_batches_without_new_ids"], 1)
+        self.assertEqual(summary["observed_schema_reasons"], {"terminal_repair": 1})
+        self.assertEqual(summary["observed_repair_codes"], {"INVALID_FINAL_SCHEMA": 1})
+
     def test_empty_alternative_rejected(self):
         rubric = {"version": "2.0.0", "cases": [{"id": "a", "turns": [rule([group(())])]}]}
         with self.assertRaises(ValueError):

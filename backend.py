@@ -66,23 +66,36 @@ def calculate(expression):
 
 
 class QueryMemo:
-    """Request-scoped single-flight cache for identical retrieval subqueries."""
+    """Request-scoped single-flight memo; failed computations are not retained."""
     def __init__(self):
         self.lock = Lock()
         self.pending = {}
+        self.counts = {"requests": 0, "computations": 0, "reuses": 0, "failures": 0}
 
     def get(self, key, compute):
         with self.lock:
+            self.counts["requests"] += 1
             leader = key not in self.pending
-            future = self.pending.setdefault(key, Future())
+            if leader:
+                self.pending[key] = Future()
+                self.counts["computations"] += 1
+            else:
+                self.counts["reuses"] += 1
+            future = self.pending[key]
         if leader:
             try:
                 future.set_result(compute())
             except BaseException as error:
                 future.set_exception(error)
                 with self.lock:
+                    self.counts["failures"] += 1
                     self.pending.pop(key, None)
         return future.result()
+
+    def stats(self):
+        # 只提供計數；不記錄查詢文字、向量、模型金鑰或快取鍵。
+        with self.lock:
+            return dict(self.counts)
 
 
 # 工具登錄表同時定義模型可見契約及後端處理器；帳號綁定於建立時的 player。
@@ -92,6 +105,8 @@ class ToolRegistry:
     def __init__(self, player, *, provider=None, embedding=None):
         from embedding_client import resolve_embedding
         self.retrieval = QueryMemo()
+        # 同輪不同檔期可重用完全相同的 query vector，排名與資料範圍仍各自計算。
+        self.query_vectors = QueryMemo()
         self.embedding = embedding or resolve_embedding(provider)
         self.retriever = os.getenv("EVENT_SUPPORT_AGENT_RETRIEVAL", "bm25")
         self._tools = {tool.name: tool for tool in (
@@ -173,7 +188,7 @@ class ToolRegistry:
                 raise ValueError("公告模式不符。")
             return tool.handler(**args, alternate_queries=alternates, include_overview=True,
                                 retrieve_once=self.retrieval.get, retriever=self.retriever,
-                                embedding=self.embedding)
+                                embedding=self.embedding, embed_once=self.query_vectors.get)
         return tool.handler(**args)
 
 

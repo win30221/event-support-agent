@@ -91,6 +91,23 @@ def proposals(turn):
                 yield name, args if isinstance(args, dict) else {}
 
 
+def retrieval_diagnostics(events):
+    """New host diagnostics only; old traces must not be treated as measured zero."""
+    cache = next((e["data"] for e in reversed(events or [])
+                  if e["title"] == "Python 檢索快取統計" and e["data"].get("version") == 1), None)
+    if cache is None:
+        return None
+    return {"cache": cache,
+            "progress": [e["data"] for e in events if e["title"] == "Python 查詢進展"
+                         and e["data"].get("version") == 1],
+            "schema_steps": [{"model_call": e["data"].get("模型呼叫"),
+                              "reasons": e["data"]["停止資料工具原因"]}
+                             for e in events if e["title"] == "Python 單一 Agent 輪次"
+                             and e["data"].get("停止資料工具原因")],
+            "repair_codes": [e["data"].get("錯誤代碼") for e in events
+                             if e["title"] == "Python 單一 Agent 回傳驗證失敗"]}
+
+
 def grade_turn(turn, rule):
     events = turn.get("events")
     trace_present = isinstance(events, list) and bool(events)
@@ -155,6 +172,7 @@ def grade_turn(turn, rule):
                        "proposals_status": "fail" if forbidden_proposals else "pass" if trace_present else "unknown"},
             "efficiency": {"extra_public_dispatches": extra if trace_present else None,
                            "duplicate_reuse": sum(e["title"] == "Python 重用工具結果" for e in (events or [])) if trace_present else None,
+                           "retrieval_diagnostics": retrieval_diagnostics(events),
                            "model_requests": metrics.get("model_requests"), "total_tokens": metrics.get("total_tokens"),
                            "tool_attempts": metrics.get("tool_attempts"), "elapsed_seconds": metrics.get("elapsed_seconds")},
             "reliability": {"transport": transport if isinstance(transport, dict) else None,
@@ -176,6 +194,21 @@ def transport_summary(turns):
                 if e["event"] == "pacing"), 3) if observed else None,
             "retry_sleep_seconds_sum": round(sum(e.get("seconds", 0) for e in events
                 if e["event"] == "retry"), 3) if observed else None}
+
+
+def retrieval_summary(turns):
+    rows = [t["efficiency"]["retrieval_diagnostics"] for t in turns
+            if t["efficiency"].get("retrieval_diagnostics") is not None]
+    return {"observed_turns": len(rows), "unknown_turns": len(turns) - len(rows),
+            "observed_cache": {kind: {key: sum(r["cache"][kind][key] for r in rows)
+                                      for key in ("requests", "computations", "reuses", "failures")}
+                               for kind in ("ranking", "query_vector")} if rows else None,
+            "observed_rule_batches_without_new_ids": sum(p["rule_queries"] > 0 and p["new_rule_ids"] == 0
+                for r in rows for p in r["progress"]) if rows else None,
+            "observed_schema_reasons": dict(Counter(reason for r in rows for step in r["schema_steps"]
+                for reason in step["reasons"])) if rows else None,
+            "observed_repair_codes": dict(Counter(code for r in rows for code in r["repair_codes"]
+                if code is not None)) if rows else None}
 
 
 def aggregate(rows):
@@ -202,7 +235,8 @@ def aggregate(rows):
             "semantic_review": {k: dict(Counter(t["semantic"][k] for t in turns)) for k in CRITERIA},
             "model_requests": sum_known([t["efficiency"]["model_requests"] for t in turns]),
             "total_tokens": sum_known([t["efficiency"]["total_tokens"] for t in turns]),
-            "transport": transport_summary(turns)}
+            "transport": transport_summary(turns),
+            "retrieval_diagnostics": retrieval_summary(turns)}
 
 
 def grade_report(report, rubric=None, review=None):

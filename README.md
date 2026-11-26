@@ -216,3 +216,7 @@ Single Agent 第一階段統一證據及結論強度、部分條件、未知資�
 ### 資料不足的安全呈現
 
 現行 Single Agent 以本輪可信工具狀態補充 no_evidence 的限制說明，合併純未知需求且保留各需求，無額外模型呼叫、不接收模型自由拒答正文。見 [EVALUATION](docs/EVALUATION.md)。
+
+### 查詢效率
+
+同輪完全相同的 query vector 可重用，公開檔期仍獨立檢索；新增查詢進展、快取統計與停止原因觀測。不強制以證據重疊停止，不增加模型或工具預算。見 [EVALUATION](docs/EVALUATION.md)。

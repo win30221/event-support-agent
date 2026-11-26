@@ -39,6 +39,8 @@ class SingleState(SupportState, total=False):
     pending_text: str
     repair_feedback: str
     repair_candidate: dict | None
+    stop_reason: str
+    retrieval_feedback: bool
 
 
 class SingleAgentRuntime(TurnRuntime):
@@ -53,10 +55,10 @@ class SingleAgentRuntime(TurnRuntime):
             fn = definition["function"]
             # 描述僅調整目前 Single Agent 的模型指引；共用工具及歷史流程的執行契約不變。
             if fn["name"] == "find_rules":
-                fn["description"] = ("查單期公開公告。search：具體規則、條件或代碼，包含核心背景與相關細節；"
+                fn["description"] = ("查單期公開公告。search：具體規則、條件或代碼，已含核心背景；"
                     "overview：核心參加、玩法及兌換流程；compare：單期全部有效公告，僅完整盤點所需。"
-                    "只選必要模式及檔期；其他檔期不能代替指定檔期。搜尋結果未提及不證明政策不存在；"
-                    "沒有個人訂單或實際入帳紀錄。")
+                    "同一檔期成功的 search 已含 overview，不需另查 overview。"
+                    "其他檔期不能代替指定檔期。搜尋結果未提及不證明政策不存在；沒有個人訂單或實際入帳紀錄。")
             elif fn["name"] == "get_my_event_progress":
                 fn["description"] += " 僅能確認實際回傳的欄位與紀錄日期，不證明未記錄的個人結果或全部資格。"
                 props = fn["parameters"]["properties"]
@@ -84,7 +86,7 @@ class SingleAgentRuntime(TurnRuntime):
             {"role": "system", "content": SINGLE_AGENT_PROMPT + "\n服務上下文："
              + compact_json(self.context.public_summary())}, *self.conversation]),
             model_calls=0, format_retry_used=False, stop_queries=False, pending_text="",
-            repair_feedback="", repair_candidate=None)
+            repair_feedback="", repair_candidate=None, stop_reason="", retrieval_feedback=False)
         return state
 
     def validate_call(self, state, name, raw):
@@ -124,6 +126,7 @@ class SingleAgentRuntime(TurnRuntime):
         # 主機不冒充玩家，也不把任意工具內容提升成 system 指令。
         updates = {"model_calls": number, "format_retry_used": True, "next_step": "model",
                    "stop_queries": state["stop_queries"] or final_only,
+                   "stop_reason": state.get("stop_reason") or ("terminal_repair" if final_only else ""),
                    "repair_feedback": reason if terminal is None else "",
                    "repair_candidate": fallback}
         if terminal is not None:
@@ -143,14 +146,26 @@ class SingleAgentRuntime(TurnRuntime):
         number = state["model_calls"] + 1
         if number > MAX_MODEL_CALLS:
             return {"data": None, "next_step": "finalize"}
-        allow_tools = (not state["stop_queries"] and state["round_number"] < MAX_TOOL_ROUNDS
-                       and state["attempts"] < MAX_TOOL_CALLS and number < MAX_MODEL_CALLS)
+        stop_reasons = []
+        if state["stop_queries"]:
+            stop_reasons.append(state.get("stop_reason") or "host_stop")
+        if state["round_number"] >= MAX_TOOL_ROUNDS:
+            stop_reasons.append("tool_round_limit")
+        if state["attempts"] >= MAX_TOOL_CALLS:
+            stop_reasons.append("tool_attempt_limit")
+        if number >= MAX_MODEL_CALLS:
+            stop_reasons.append("model_call_limit")
+        allow_tools = not stop_reasons
         messages = convert_to_openai_messages(state["messages"])
         # 僅在本次請求的開頭 system 訊息附加主機控制狀態；不修改儲存的對話歷史。
         instructions = []
         if state["repair_feedback"]:
             instructions.append("主機回傳契約檢查：" + state["repair_feedback"]
                                 + "。請依原問及已有工具結果完成合法回傳。")
+        if allow_tools and state.get("retrieval_feedback"):
+            # 無新增段落是可觀測事實，不是語意充分性判決；仍允許真正需要的新查詢。
+            instructions.append("主機觀測：上一批成功公告查詢沒有新增可採用段落。"
+                                "只有明確尚缺且不同查詢可能取得的新證據才補查；否則依現有證據回答或保留未知。")
         if not allow_tools:
             instructions.append("主機已停止新工具查詢。不要呼叫 submit_answer；依相同回答契約直接輸出 Schema 要求的 JSON。"
                                 "本輪證據支持的肯定或否定結論都用 supported 並附來源；"
@@ -159,7 +174,8 @@ class SingleAgentRuntime(TurnRuntime):
         if instructions:
             messages[0] = {**messages[0], "content": messages[0]["content"] + "\n" + "\n".join(instructions)}
         self.observe("Python 單一 Agent 輪次", {"模型呼叫": number, "工具輪次": state["round_number"],
-                     "工具嘗試": state["attempts"], "允許工具": allow_tools})
+                     "工具嘗試": state["attempts"], "允許工具": allow_tools,
+                     "停止資料工具原因": stop_reasons})
         reply = await model_step(self.provider, messages,
                                  [*self.definitions, FINAL_DEFINITION] if allow_tools else [],
                                  self.complete, self.observe, "單一 Agent",
@@ -232,12 +248,24 @@ class SingleAgentRuntime(TurnRuntime):
                 payload["已回傳段落ID"] = [source_alias(i) for i in payload["已回傳段落ID"]]
             messages.append(ToolMessage(content=compact_json(payload), tool_call_id=message.tool_call_id,
                                         name=message.name))
-        # 全批只重複既有工具時不再查詢；錯誤可在剩餘預算中由同一 Agent 修正。
+        # 只計算本批新增、已成功且通過適用條件的公告來源；不將快取重用當新查詢。
+        fresh_sources = updates["sources"][len(state["sources"]):]
+        rule_sources = [source for source in fresh_sources if source.get("工具") == "find_rules"]
+        rule_ids = [row["段落ID"] for source in rule_sources for row in source["段落"]]
+        unique_ids = set(rule_ids)
+        new_ids = unique_ids - set(state["evidence"])
+        self.observe("Python 查詢進展", {"version": 1, "round": state["round_number"],
+                     "rule_queries": len(rule_sources), "unique_rule_ids": len(unique_ids),
+                     "new_rule_ids": len(new_ids), "already_known_rule_ids": len(unique_ids - new_ids),
+                     "repeated_rule_rows": len(rule_ids) - len(unique_ids)})
+        # 全批只重複既有工具時不再查詢；不同查詢即使沒有新段落也只提示，不強制停止。
         data_plans = [p for p in state["plans"] if p["name"] != FINAL_TOOL]
         duplicate_only = bool(data_plans) and all(p.get("reused") for p in data_plans)
         if duplicate_only:
             self.observe("Python 單一 Agent 停止查詢", {"原因": "整批重複既有工具，無新增查詢"})
         updates.update(messages=messages, stop_queries=state["stop_queries"] or duplicate_only,
+                       stop_reason=state.get("stop_reason") or ("duplicate_only" if duplicate_only else ""),
+                       retrieval_feedback=bool(rule_sources) and not new_ids,
                        next_step="model")
         return updates
 
@@ -246,6 +274,9 @@ class SingleAgentRuntime(TurnRuntime):
         if data is None:
             data = {"action": "answer", "missing": "", "results": [
                 rejected_part({"question": self.question}, 0, "模型未提交有效最終回答")]}
+        self.observe("Python 檢索快取統計", {"version": 1,
+                     "ranking": self.registry.retrieval.stats(),
+                     "query_vector": self.registry.query_vectors.stats()})
         limitations = build_limitations(state["sources"], state["errors"])
         return {"result": render_response(data, state["evidence"], self.observe,
                                           limitations=limitations)}

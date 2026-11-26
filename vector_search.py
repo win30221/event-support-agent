@@ -71,7 +71,7 @@ def has_provider_column(db):
 
 
 # 詞彙與向量排名使用 RRF 融合；過期或缺失索引不能當成有效資料。
-def hybrid_search(query, candidates, corpus, lexical, limit, *, settings=None):
+def hybrid_search(query, candidates, corpus, lexical, limit, *, settings=None, embed_once=None):
     """Fuse lexical and dense shortlists within one embedding space and edition."""
     settings = settings or resolve_embedding()
     by_id = {p["段落ID"]: p for p in candidates}
@@ -95,7 +95,13 @@ def hybrid_search(query, candidates, corpus, lexical, limit, *, settings=None):
             "FROM event_support_agent_embeddings WHERE " + where, args).fetchone()
         if count != len(candidates):
             raise EmbeddingError(missing)
-        vector = embed([query], settings=settings, input_type="query")[0]
+        def compute_vector():
+            return embed([query], settings=settings, input_type="query")[0]
+
+        # 嵌入只依賴完全相同的文字、模型與介接設定；不可用語意相似度合併查詢。
+        # 只重用 query vector，不重用其他檔期的 SQL 排名、適用條件或證據。
+        key = (settings.provider, settings.model, settings.endpoint, "query", query)
+        vector = embed_once(key, compute_vector) if embed_once is not None else compute_vector()
         if min_dim != max_dim or min_dim != len(vector):
             raise EmbeddingError("Embedding dimension mismatch; rebuild the selected model index.")
         matches = db.execute(

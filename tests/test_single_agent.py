@@ -537,3 +537,47 @@ class SingleAgentTests(OfflineTests):
         self.assertEqual(len(trace), 1)
         checks = [d for t, d in events if t == "Python 檢查回答依據"][-1]
         self.assertEqual(checks["子問題"][0]["判定"], "no_evidence")
+
+
+
+    def test_repeated_rule_results_are_feedback_not_forced_semantic_stop(self):
+        from guide import published_passages
+        q = "活動還有哪些需要確認的規則？"
+        rows = published_passages(CATALOG.current)
+        first, second = rows[0], rows[1]
+        queries = [call("find_rules", edition="current", mode="search", query=x)
+                   for x in ("第一種查詢", "第二種查詢", "第三種查詢")]
+        def second_query(provider, messages, tools):
+            self.assertNotIn("主機觀測：上一批成功公告查詢沒有新增", messages[0]["content"])
+            return select(queries[1])
+        def third_query(provider, messages, tools):
+            self.assertIn("主機觀測：上一批成功公告查詢沒有新增", messages[0]["content"])
+            self.assertTrue(tools)
+            return select(queries[2])
+        def finish(provider, messages, tools, *, response_schema):
+            self.assertEqual(tools, [])
+            self.assertEqual(response_schema, FINAL_SCHEMA)
+            return structured(abstain(q))
+        with patch("backend.search_rules", side_effect=[[first], [first], [first, second]]):
+            text, trace, events, _ = self.run_case(q, select(queries[0]), second_query, third_query, finish)
+        self.assertEqual(len(trace), 3)
+        progress = [d for title, d in events if title == "Python 查詢進展"]
+        self.assertEqual([p["new_rule_ids"] for p in progress], [1, 0, 1])
+        self.assertEqual([p["already_known_rule_ids"] for p in progress], [0, 1, 1])
+        rounds = [d for title, d in events if title == "Python 單一 Agent 輪次"]
+        self.assertEqual(rounds[-1]["停止資料工具原因"], ["tool_round_limit"])
+        self.assertEqual([d for title, d in events if title == "Python 檢索快取統計"][-1]["version"], 1)
+
+    def test_terminal_repair_stop_reason_is_observable(self):
+        q = "其他帳號可以代查嗎？"
+        def finish(provider, messages, tools, *, response_schema):
+            self.assertEqual(tools, [])
+            self.assertEqual(response_schema, FINAL_SCHEMA)
+            return structured(abstain(q, "account_limit"))
+        text, trace, events, _ = self.run_case(q, {"content": "未提交終止工具"}, finish)
+        self.assertEqual(text, DIRECT_REPLIES["account_limit"])
+        self.assertEqual(trace, [])
+        rounds = [d for title, d in events if title == "Python 單一 Agent 輪次"]
+        self.assertEqual(rounds[-1]["停止資料工具原因"], ["terminal_repair"])
+        self.assertEqual([d["錯誤代碼"] for title, d in events
+                          if title == "Python 單一 Agent 回傳驗證失敗"], ["INVALID_FINAL_SCHEMA"])

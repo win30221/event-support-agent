@@ -140,3 +140,13 @@
 - [AWS Bedrock contextual grounding](https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails-contextual-grounding-check.html)：證據支持度和問題相關性分別處理。本次不引入自動語意驗證。
 
 本專案以確定性主機呈現補充已知查詢範圍，非外部服務強制架構；全輪摘要不代表個別需求的原因已確認。
+
+## 查詢效率及停止條件
+
+- [Anthropic — Effective context engineering for AI agents](https://www.anthropic.com/research/effective-context-engineering-for-ai-agents)：保持高訊號上下文、漸進取得資訊，避免重疊工具與多餘回傳；過度壓縮可能犧牲證據。
+- [Anthropic — Writing effective tools for AI agents](https://www.anthropic.com/research/writing-tools-for-agents)：明確工具用途、降低重疊並用評測觀測工具表現。
+- [OpenAI — Running agents](https://developers.openai.com/api/docs/guides/agents/running-agents)：區分實際終止、工具迴圈與執行限制/錯誤。
+- [Microsoft — RAG information retrieval](https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/rag/rag-information-retrieval)：查詢改寫及分解可改善檢索，不應任意改變原問。
+- [Google Agent Search — retrieval and ranking](https://docs.cloud.google.com/generative-ai-app-builder/docs/ranking-overview)：檢索、排名與範圍限制分開。
+
+本專案選擇完全相同 query vector 的同輪 single-flight 重用、保守無新增證據提示與停止原因觀測；不是以上供應商規定的唯一演算法，不聲稱已判定語意充分性。

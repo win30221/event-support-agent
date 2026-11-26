@@ -165,3 +165,13 @@ Single Agent 在 finalize 依本輪 sources、errors 產生限制資訊，僅在
 
 另將沒有玩家進度紀錄的證據段落標記為 unavailable，與原有商城未確認狀態的主機驗證一致。單獨引用僅能呈現可信查詢狀態原文，不允許模型將其改寫為餘額；與一般規則混合仍走原有拒絕規則。不將 unavailable 自動判為 not_found 或餘額為零。
 基準 e52c3cb；40 項既有指定單元測試通過，六題實機結構驗收均通過，但 unrecorded-days 及 missing-policy 仍制式拒答。新增的限制模組只改呈現，不能解決 supported 內的資格推論，也不能確定哪個工具結果足以回答自然語言問題。工具能力欄位變更時須同步更新限制說明及測試。原始 Trace 保留並新增 Python 呈現資料限制（只記分類碼及合併數）。
+
+## 查詢效率與停止條件（保守最佳化）
+
+保留相同 RAG 候選、BM25/向量排名、RRF、適用條件、原問與改寫查詢、來源引用及安全契約。既有 request-scoped 排名 single-flight 按候選範圍重用；新增同輪 query vector single-flight，完全相同的 provider/model/endpoint/input_type/query 可跨公開檔期重用向量，但 SQL 仍逐檔期核對索引版本、候選與維度並獨立排名。不將語意相似的查詢合併，不跨使用者或回合快取，不新增 SDK、批次服務請求、重試預算或語意審查模型。失敗的向量計算不留在 memo。原工具執行錯誤快取及既有完全重複批次停止規則不變。
+
+Single Agent 的 find_rules 描述明示成功 search 已含 overview；不在主機預先跳過不同查詢（例如 search 失敗仍可能需要 overview）。每批成功公告工具回傳後由 Python 計算可採用來源的唯一、已知、新增數；沒有新段落只給下一次模型請求簡短的主機觀測提示，不當作證據充分或強制拒答。新段落存在也不證明足以回答。MAX_TOOL_ROUNDS、MAX_TOOL_CALLS、MAX_MODEL_CALLS、終止 Schema、原有 Guardrails、20 RPM 不變。
+
+新 Trace：Python 查詢進展、Python 檢索快取統計、Python 單一 Agent 輪次的停止資料工具原因；終止契約修復保留既有錯誤代碼並於終端機顯示。Evaluation V2 另列 retrieval_diagnostics，舊報告無新欄位標記未知；聚合只計觀測到的輪次，不變更評分門檻。快取重用包含等待相同 in-flight 計算，不能直接等同節省 HTTP 次數；HTTP 實際觀測仍看 transport。未新增證據批次也不代表無效查詢或模型語意正確。
+
+基準 cf03a48：第二階段三題的機械驗收均通過，但 missing-policy 的兩次公告搜尋有重疊且仍有新增段落；終端輸出只能確認走 Schema 備援，沒有完整原始 Trace 無法定位確切修復原因。先做不改檢索品質的重用與診斷，不以重疊率、任意閾值或案例特例硬停，也不降低模型預算。以相同配置的回歸及人工語意驗收衡量實際效益。

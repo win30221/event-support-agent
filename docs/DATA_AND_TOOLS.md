@@ -109,3 +109,11 @@ action 可為 retrieve（missing 說明必要的新證據）；否則 answer。a
 Single Agent 在 finalize 依本輪 sources、errors 產生限制資訊，僅在經驗證的 no_evidence 存在時附上本輪查詢摘要；同輪純未知需求合併一段拒答但保留各需求標題。狀態分類與固定的工具能力說明由 Python 管理，不輸出工具參數、紀錄值、原文、例外或模型自由理由。沒有可信執行資訊時保留通用拒答；無效參數提案不是已執行查詢。搜尋無段落與背景資料不證明政策不存在，精確商城查無只限該次品名及檔期。摘要只描述全輪，不能將任一次查詢或失敗硬配到個別子問題。不更改 Prompt、Schema、工具派發、RAG、模型預算、NVIDIA 節流或評測門檻；原有 supported、account_limit、其他拒答與歷史 renderer 路徑保留。no_evidence 的正文與來源仍須留空，限制資訊不算作採用證據或語意證明。
 
 另將沒有玩家進度紀錄的證據段落標記為 unavailable，與原有商城未確認狀態的主機驗證一致。單獨引用僅能呈現可信查詢狀態原文，不允許模型將其改寫為餘額；與一般規則混合仍走原有拒絕規則。不將 unavailable 自動判為 not_found 或餘額為零。
+
+## 查詢效率與停止條件（保守最佳化）
+
+保留相同 RAG 候選、BM25/向量排名、RRF、適用條件、原問與改寫查詢、來源引用及安全契約。既有 request-scoped 排名 single-flight 按候選範圍重用；新增同輪 query vector single-flight，完全相同的 provider/model/endpoint/input_type/query 可跨公開檔期重用向量，但 SQL 仍逐檔期核對索引版本、候選與維度並獨立排名。不將語意相似的查詢合併，不跨使用者或回合快取，不新增 SDK、批次服務請求、重試預算或語意審查模型。失敗的向量計算不留在 memo。原工具執行錯誤快取及既有完全重複批次停止規則不變。
+
+Single Agent 的 find_rules 描述明示成功 search 已含 overview；不在主機預先跳過不同查詢（例如 search 失敗仍可能需要 overview）。每批成功公告工具回傳後由 Python 計算可採用來源的唯一、已知、新增數；沒有新段落只給下一次模型請求簡短的主機觀測提示，不當作證據充分或強制拒答。新段落存在也不證明足以回答。MAX_TOOL_ROUNDS、MAX_TOOL_CALLS、MAX_MODEL_CALLS、終止 Schema、原有 Guardrails、20 RPM 不變。
+
+新 Trace：Python 查詢進展、Python 檢索快取統計、Python 單一 Agent 輪次的停止資料工具原因；終止契約修復保留既有錯誤代碼並於終端機顯示。Evaluation V2 另列 retrieval_diagnostics，舊報告無新欄位標記未知；聚合只計觀測到的輪次，不變更評分門檻。快取重用包含等待相同 in-flight 計算，不能直接等同節省 HTTP 次數；HTTP 實際觀測仍看 transport。未新增證據批次也不代表無效查詢或模型語意正確。

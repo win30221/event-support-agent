@@ -453,3 +453,22 @@ $env:EVENT_SUPPORT_AGENT_RETRIEVAL = "hybrid"
 ```
 
 人工確認未知需求的限制說明只反映本輪工具狀態、不洩漏值、不宣稱全庫查無；多個未知需求不重複拒答。保留 supported 的正確答案與引用。舊評測規則不變，勿把限制摘要當成語意驗收通過。此次不需為了呈現改動重新建向量索引。
+
+### 效率改善回歸
+
+先執行無模型 API 的測試：
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest tests.test_retrieval_efficiency tests.test_single_agent tests.test_eval_report tests.test_guide -v
+```
+
+部分 guide/Agent 測試需要已初始化的獨立 PostgreSQL；依 AGENTS.md 再執行完整回歸。確認通過後使用相同模型及 Hybrid 設定測試（舊報告保留；不需重建索引）：
+
+```powershell
+$env:EVENT_SUPPORT_AGENT_EMBED_PROVIDER = "nvidia"
+$env:EVENT_SUPPORT_AGENT_RETRIEVAL = "hybrid"
+.\.venv\Scripts\python.exe -m evaluations.eval_rag --live nvidia --case compare-months --case incident --case wallet-a --case wallet-b --case missing-policy --case unrecorded-days --nvidia-rpm 20 --report reports/nvidia-efficiency-smoke.json
+.\.venv\Scripts\python.exe -m evaluations.eval_report reports/nvidia-efficiency-smoke.json --out reports/nvidia-efficiency-smoke-v2.json
+```
+
+逐題比對必要來源、狀態及語意；檢查 retrieval_diagnostics 的 query_vector reuses、ranking reuses、新段落數、schema reasons、repair codes，以及 transport 的實際請求數和延遲。一次試驗不能證明 Token 或模型呼叫降低；以相同案例、模型、配置及重複試驗比較，禁止因少查而過度拒答。舊資料不存在的觀測欄位保持未知。
