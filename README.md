@@ -116,3 +116,5 @@ AGENTS.md              # 開發規範
 ## 回答品質與實機驗收
 
 模型只回傳本輪短來源 ID，由程式取得原文；未知 ID 或壞格式只拒絕受影響的獨立需求。共用工具的查詢模式精簡為 overview/search/compare；同輪重複子查詢共享檢索。預設關閉額外品質審查，以離線及實機評測比較。CI 不代表語意驗收，詳見 [EVALUATION](docs/EVALUATION.md)。
+
+第二層獨立新題庫：`python -m evaluations.eval_task_tools --cases --suite holdout --report reports/task-tools-holdout.json`（20 輪、33 任務），預設 baseline 不變。詳見 TESTING 文件。

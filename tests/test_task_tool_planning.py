@@ -253,3 +253,26 @@ class TaskToolPlanningTests(unittest.TestCase):
             self.assertNotIn("num_predict", constructor.call_args.kwargs)
             model_for("ollama", num_predict=2048)
             self.assertEqual(constructor.call_args.kwargs["num_predict"], 2048)
+
+    def test_independent_holdout_fixture_contracts(self):
+        baseline, cases = load_cases(), load_cases(suite="holdout")
+        self.assertEqual(len(cases), 20)
+        self.assertEqual(len({c["id"] for c in cases}), 20)
+        self.assertEqual(len({c["question"] for c in cases}), 20)
+        self.assertEqual(sum(len(c["intents"]) for c in cases), 33)
+        self.assertEqual([sum(c["group"] == group for c in cases)
+                          for group in ("single", "same", "mixed")], [10, 5, 5])
+        self.assertFalse({c["question"] for c in baseline} & {c["question"] for c in cases})
+        self.assertFalse({c["id"] for c in baseline} & {c["id"] for c in cases})
+        for case in cases:
+            with self.subTest(case=case["id"]):
+                self.assertNotIn(case["question"], TASK_TOOL_PROMPT)
+                result = self.check(case, fixture_calls(case))
+                self.assertTrue(result["contract_valid"], result)
+                self.assertTrue(compare(result, case["expected"])["exact_match"], result)
+
+    def test_holdout_selection_is_explicit(self):
+        case = load_cases(suite="holdout")[0]
+        self.assertEqual(load_cases(case["id"], suite="holdout"), [case])
+        with self.assertRaises(ValueError):
+            load_cases(case["id"])

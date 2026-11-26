@@ -1,0 +1,846 @@
+[
+  {
+    "id": "holdout-single-existence-alias",
+    "group": "single",
+    "question": "這期商店有霧潮表情這件商品嗎？只要確認有沒有。",
+    "intents": [
+      {
+        "type": "query",
+        "request": "這期商店有霧潮表情這件商品嗎？只要確認有沒有。"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_shop_item",
+            "arguments": {
+              "edition": "2026-11",
+              "name": "霧潮貼圖"
+            },
+            "fields": [
+              "existence"
+            ]
+          }
+        ]
+      }
+    ],
+    "rationale": "已知別名也需查存在性，不能多選價格和用途；別名與正名等價。"
+  },
+  {
+    "id": "holdout-single-absent-item",
+    "group": "single",
+    "question": "十一月商城有銀翼坐騎可以兌換嗎？",
+    "intents": [
+      {
+        "type": "query",
+        "request": "十一月商城有銀翼坐騎可以兌換嗎？"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_shop_item",
+            "arguments": {
+              "edition": "2026-11",
+              "name": "銀翼坐騎"
+            },
+            "fields": [
+              "existence"
+            ]
+          }
+        ]
+      }
+    ],
+    "rationale": "未登錄商品仍先查存在性，不得改查其他商品。"
+  },
+  {
+    "id": "holdout-single-price",
+    "group": "single",
+    "question": "十月的守夜燈語兌換價是多少？",
+    "intents": [
+      {
+        "type": "query",
+        "request": "十月的守夜燈語兌換價是多少？"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_shop_item",
+            "arguments": {
+              "edition": "2026-10",
+              "name": "守夜燈語"
+            },
+            "fields": [
+              "price"
+            ]
+          }
+        ]
+      }
+    ],
+    "rationale": "明示檔期及單一商品價格；不需本人紀錄。"
+  },
+  {
+    "id": "holdout-single-item-usage",
+    "group": "single",
+    "question": "本期月港夜色是做什麼用的？",
+    "intents": [
+      {
+        "type": "query",
+        "request": "本期月港夜色是做什麼用的？"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_shop_item",
+            "arguments": {
+              "edition": "2026-11",
+              "name": "月港夜色"
+            },
+            "fields": [
+              "description"
+            ]
+          }
+        ]
+      }
+    ],
+    "rationale": "單一商品用途，不需價格或公告。"
+  },
+  {
+    "id": "holdout-single-recorded-count",
+    "group": "single",
+    "question": "請查我十月活動帳號摘要中，紀錄當日已計入的場次。",
+    "intents": [
+      {
+        "type": "query",
+        "request": "請查我十月活動帳號摘要中，紀錄當日已計入的場次。"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "get_my_event_progress",
+            "arguments": {
+              "edition": "2026-10"
+            },
+            "fields": [
+              "recorded_matches"
+            ],
+            "account_scope": "self"
+          }
+        ]
+      }
+    ],
+    "rationale": "紀錄當日場次不等於現在的今日場次；不能跨期。"
+  },
+  {
+    "id": "holdout-single-monthly-days",
+    "group": "single",
+    "question": "能查出我本月實際玩了幾天冒險嗎？",
+    "intents": [
+      {
+        "type": "query",
+        "request": "能查出我本月實際玩了幾天冒險嗎？"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "no_evidence",
+        "calls": []
+      }
+    ],
+    "rationale": "本人摘要沒有累計遊玩天數，不能以紀錄日場次代替。"
+  },
+  {
+    "id": "holdout-single-error-code",
+    "group": "single",
+    "question": "本期兌換時出現 SG-204 代表什麼？",
+    "intents": [
+      {
+        "type": "knowledge",
+        "request": "本期兌換時出現 SG-204 代表什麼？"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_rules",
+            "arguments": {
+              "edition": "2026-11",
+              "mode": "search"
+            },
+            "query_terms": [
+              "SG-204|sg-204"
+            ]
+          }
+        ]
+      }
+    ],
+    "rationale": "公開公告的明示錯誤代碼必須保留；不是查訂單明細或操作。"
+  },
+  {
+    "id": "holdout-single-previous-overview",
+    "group": "single",
+    "question": "請完整介紹十月星夜祭的活動玩法，包含參與、計次及兌換流程。",
+    "intents": [
+      {
+        "type": "knowledge",
+        "request": "請完整介紹十月星夜祭的活動玩法，包含參與、計次及兌換流程。"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_rules",
+            "arguments": {
+              "edition": "2026-10",
+              "mode": "overview"
+            },
+            "query_terms": []
+          }
+        ]
+      }
+    ],
+    "rationale": "單期核心活動介紹，不是查商品明細，也不是跨期完整比較。"
+  },
+  {
+    "id": "holdout-single-item-gap",
+    "group": "single",
+    "question": "以我本期目前的點數，要換月港夜色還缺幾枚星星幣？",
+    "intents": [
+      {
+        "type": "analysis",
+        "request": "以我本期目前的點數，要換月港夜色還缺幾枚星星幣？"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_shop_item",
+            "arguments": {
+              "edition": "2026-11",
+              "name": "月港夜色"
+            },
+            "fields": [
+              "price"
+            ]
+          }
+        ]
+      }
+    ],
+    "rationale": "首輪先確認指定商品及價格，依賴其存在性的本人查詢與計算留下一輪。"
+  },
+  {
+    "id": "holdout-single-compare-notices",
+    "group": "single",
+    "question": "請逐項比較十月和十一月星夜祭的完整有效公告，包括玩法、計次、兌換限制及補充公告。",
+    "intents": [
+      {
+        "type": "analysis",
+        "request": "請逐項比較十月和十一月星夜祭的完整有效公告，包括玩法、計次、兌換限制及補充公告。"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_rules",
+            "arguments": {
+              "edition": "2026-10",
+              "mode": "compare"
+            },
+            "query_terms": []
+          },
+          {
+            "tool": "find_rules",
+            "arguments": {
+              "edition": "2026-11",
+              "mode": "compare"
+            },
+            "query_terms": []
+          }
+        ]
+      }
+    ],
+    "rationale": "明確要求完整跨期公告；兩期各自取 compare，不用 overview 代替。"
+  },
+  {
+    "id": "holdout-same-account-boundary",
+    "group": "same",
+    "question": "幫我確認我自己本期有沒有參加活動。另外查一下 C 玩家的十一月活動點數。",
+    "intents": [
+      {
+        "type": "query",
+        "request": "幫我確認我自己本期有沒有參加活動。"
+      },
+      {
+        "type": "query",
+        "request": "另外查一下 C 玩家的十一月活動點數。"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "get_my_event_progress",
+            "arguments": {
+              "edition": "2026-11"
+            },
+            "fields": [
+              "participation"
+            ],
+            "account_scope": "self"
+          }
+        ]
+      },
+      {
+        "task_id": "T2",
+        "status": "account_limit",
+        "calls": []
+      }
+    ],
+    "rationale": "本人合法查詢與他人帳號限制並存，不得混淆對象。"
+  },
+  {
+    "id": "holdout-same-different-editions-items",
+    "group": "same",
+    "question": "十月秋港暮色需要多少星星幣？十一月霧港守燈者的用途是什麼？",
+    "intents": [
+      {
+        "type": "query",
+        "request": "十月秋港暮色需要多少星星幣？"
+      },
+      {
+        "type": "query",
+        "request": "十一月霧港守燈者的用途是什麼？"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_shop_item",
+            "arguments": {
+              "edition": "2026-10",
+              "name": "秋港暮色"
+            },
+            "fields": [
+              "price"
+            ]
+          }
+        ]
+      },
+      {
+        "task_id": "T2",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_shop_item",
+            "arguments": {
+              "edition": "2026-11",
+              "name": "霧港守燈者"
+            },
+            "fields": [
+              "description"
+            ]
+          }
+        ]
+      }
+    ],
+    "rationale": "不同檔期、不同商品、不同欄位，各自綁定任務。"
+  },
+  {
+    "id": "holdout-same-two-rules",
+    "group": "same",
+    "question": "十月活動的跨日對局按開場還是結算日期計次？十一月冒險掉線後重連，怎樣才算有效場次？",
+    "intents": [
+      {
+        "type": "knowledge",
+        "request": "十月活動的跨日對局按開場還是結算日期計次？"
+      },
+      {
+        "type": "knowledge",
+        "request": "十一月冒險掉線後重連，怎樣才算有效場次？"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_rules",
+            "arguments": {
+              "edition": "2026-10",
+              "mode": "search"
+            },
+            "query_terms": [
+              "跨日|跨午夜|跨天|跨日期",
+              "開場|开场|結算|结算|計次|计次|歸日|归日"
+            ]
+          }
+        ]
+      },
+      {
+        "task_id": "T2",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_rules",
+            "arguments": {
+              "edition": "2026-11",
+              "mode": "search"
+            },
+            "query_terms": [
+              "掉線|掉线|斷線|断线|重連|重连|重返戰場|重返战场"
+            ]
+          }
+        ]
+      }
+    ],
+    "rationale": "兩個公開規則檢索各保留檔期與條件；避免將跨日條件帶入重連規則。"
+  },
+  {
+    "id": "holdout-same-two-gap-analyses",
+    "group": "same",
+    "question": "我離兌換霧潮貼圖還差多少點？我上期的星星幣離換星航相框還差多少？",
+    "intents": [
+      {
+        "type": "analysis",
+        "request": "我離兌換霧潮貼圖還差多少點？"
+      },
+      {
+        "type": "analysis",
+        "request": "我上期的星星幣離換星航相框還差多少？"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_shop_item",
+            "arguments": {
+              "edition": "2026-11",
+              "name": "霧潮貼圖"
+            },
+            "fields": [
+              "price"
+            ]
+          }
+        ]
+      },
+      {
+        "task_id": "T2",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_shop_item",
+            "arguments": {
+              "edition": "2026-10",
+              "name": "星航相框"
+            },
+            "fields": [
+              "price"
+            ]
+          }
+        ]
+      }
+    ],
+    "rationale": "兩個相同意圖的獨立依賴分析；各自先查指定商品價格，不先查本人或計算。"
+  },
+  {
+    "id": "holdout-same-history-and-catalog",
+    "group": "same",
+    "question": "剛才那個要多少星星幣？另外列出本期所有商品的名稱。",
+    "intents": [
+      {
+        "type": "query",
+        "request": "剛才那個要多少星星幣？"
+      },
+      {
+        "type": "query",
+        "request": "另外列出本期所有商品的名稱。"
+      }
+    ],
+    "history": [
+      {
+        "role": "user",
+        "content": "上期的潮聲招呼是什麼用途？"
+      },
+      {
+        "role": "assistant",
+        "content": "潮聲招呼是聊天室貼圖。",
+        "trace": [
+          {
+            "參數": {
+              "edition": "2026-10"
+            },
+            "商品參照": [
+              "tide-greeting-sticker"
+            ]
+          }
+        ]
+      }
+    ],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_shop_item",
+            "arguments": {
+              "edition": "2026-10",
+              "name": "潮聲招呼"
+            },
+            "fields": [
+              "price"
+            ]
+          }
+        ]
+      },
+      {
+        "task_id": "T2",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "list_shop_items",
+            "arguments": {
+              "edition": "2026-11"
+            },
+            "fields": [
+              "name"
+            ]
+          }
+        ]
+      }
+    ],
+    "rationale": "前輪可信商品與檔期指涉；另一任務明示本期商城，不能套用上一輪檔期。"
+  },
+  {
+    "id": "holdout-mixed-terminal-first",
+    "group": "mixed",
+    "question": "幫我直接把這期活動報名取消。本期星星幣在活動結束後會保留嗎？我今天計入幾場冒險？",
+    "intents": [
+      {
+        "type": "operation",
+        "request": "幫我直接把這期活動報名取消。"
+      },
+      {
+        "type": "knowledge",
+        "request": "本期星星幣在活動結束後會保留嗎？"
+      },
+      {
+        "type": "query",
+        "request": "我今天計入幾場冒險？"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "unsupported",
+        "calls": []
+      },
+      {
+        "task_id": "T2",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_rules",
+            "arguments": {
+              "edition": "2026-11",
+              "mode": "search"
+            },
+            "query_terms": [
+              "結束|结束|關店|关店|到期|失效|保留|餘幣|余币"
+            ]
+          }
+        ]
+      },
+      {
+        "task_id": "T3",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "get_my_event_progress",
+            "arguments": {
+              "edition": "2026-11"
+            },
+            "fields": [
+              "counted_matches"
+            ],
+            "account_scope": "self"
+          }
+        ]
+      }
+    ],
+    "rationale": "終止任務在前，仍使用原有 T2/T3，不重編 ID；知識與本人查詢互相獨立。"
+  },
+  {
+    "id": "holdout-mixed-gap-and-public-item",
+    "group": "mixed",
+    "question": "用我本期的餘幣換霧港守燈者還差幾枚？上期潮聲招呼的兌換價格是多少？",
+    "intents": [
+      {
+        "type": "analysis",
+        "request": "用我本期的餘幣換霧港守燈者還差幾枚？"
+      },
+      {
+        "type": "query",
+        "request": "上期潮聲招呼的兌換價格是多少？"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_shop_item",
+            "arguments": {
+              "edition": "2026-11",
+              "name": "霧港守燈者"
+            },
+            "fields": [
+              "price"
+            ]
+          }
+        ]
+      },
+      {
+        "task_id": "T2",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_shop_item",
+            "arguments": {
+              "edition": "2026-10",
+              "name": "潮聲招呼"
+            },
+            "fields": [
+              "price"
+            ]
+          }
+        ]
+      }
+    ],
+    "rationale": "分析任務首輪商品價格與另一公開商品查詢可同批；兩個商品不能互相代替。"
+  },
+  {
+    "id": "holdout-mixed-compare-and-catalog",
+    "group": "mixed",
+    "question": "把上期和本期的所有有效公告逐項比較，包含補充及異動規則。再列出本期所有商城商品名稱與價格。",
+    "intents": [
+      {
+        "type": "analysis",
+        "request": "把上期和本期的所有有效公告逐項比較，包含補充及異動規則。"
+      },
+      {
+        "type": "query",
+        "request": "再列出本期所有商城商品名稱與價格。"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_rules",
+            "arguments": {
+              "edition": "2026-10",
+              "mode": "compare"
+            },
+            "query_terms": []
+          },
+          {
+            "tool": "find_rules",
+            "arguments": {
+              "edition": "2026-11",
+              "mode": "compare"
+            },
+            "query_terms": []
+          }
+        ]
+      },
+      {
+        "task_id": "T2",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "list_shop_items",
+            "arguments": {
+              "edition": "2026-11"
+            },
+            "fields": [
+              "name",
+              "price"
+            ]
+          }
+        ]
+      }
+    ],
+    "rationale": "完整跨期公告與單期商城清單分工；不以公告取代商城。"
+  },
+  {
+    "id": "holdout-mixed-hypothetical-private-and-unsupported",
+    "group": "mixed",
+    "question": "假設週末打四場正式冒險且已報名，能否四場都領到活動獎勵？查我本期的參加狀態。查我這個月每一筆商城兌換訂單的明細。",
+    "intents": [
+      {
+        "type": "analysis",
+        "request": "假設週末打四場正式冒險且已報名，能否四場都領到活動獎勵？"
+      },
+      {
+        "type": "query",
+        "request": "查我本期的參加狀態。"
+      },
+      {
+        "type": "query",
+        "request": "查我這個月每一筆商城兌換訂單的明細。"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_rules",
+            "arguments": {
+              "edition": "2026-11",
+              "mode": "search"
+            },
+            "query_terms": [
+              "週末|周末|週六|周六|週日|周日",
+              "四場|四场|第四|4場|4场|前3|前 3|三場|三场|3場|3场|額度|额度|上限"
+            ]
+          }
+        ]
+      },
+      {
+        "task_id": "T2",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "get_my_event_progress",
+            "arguments": {
+              "edition": "2026-11"
+            },
+            "fields": [
+              "participation"
+            ],
+            "account_scope": "self"
+          }
+        ]
+      },
+      {
+        "task_id": "T3",
+        "status": "no_evidence",
+        "calls": []
+      }
+    ],
+    "rationale": "假設情境只需公開規則，獨立本人資料才查帳號，明細不支援。"
+  },
+  {
+    "id": "holdout-mixed-unknown-gap-and-other",
+    "group": "mixed",
+    "question": "順便推薦一部科幻電影。我還缺多少星星幣才能兌換本期銀月坐騎？替我把本期餘額轉給朋友。",
+    "intents": [
+      {
+        "type": "other",
+        "request": "順便推薦一部科幻電影。"
+      },
+      {
+        "type": "analysis",
+        "request": "我還缺多少星星幣才能兌換本期銀月坐騎？"
+      },
+      {
+        "type": "operation",
+        "request": "替我把本期餘額轉給朋友。"
+      }
+    ],
+    "history": [],
+    "expected": [
+      {
+        "task_id": "T1",
+        "status": "outside_or_unclear",
+        "calls": []
+      },
+      {
+        "task_id": "T2",
+        "status": "planned",
+        "calls": [
+          {
+            "tool": "find_shop_item",
+            "arguments": {
+              "edition": "2026-11",
+              "name": "銀月坐騎"
+            },
+            "fields": [
+              "price"
+            ]
+          }
+        ]
+      },
+      {
+        "task_id": "T3",
+        "status": "unsupported",
+        "calls": []
+      }
+    ],
+    "rationale": "只有 T2 是待辦且商品未知；先查商品，不查本人、不把未知商品直接判無證據；主機保留原 T2 ID。"
+  }
+]

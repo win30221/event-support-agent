@@ -12,12 +12,13 @@ from intent_analysis import INTENT_PROMPT
 from task_tool_planning import DEFAULT_NUM_PREDICT, TASK_TOOL_PROMPT, plan_tools
 
 
-CASE_FILE = Path(__file__).with_name("task_tool_cases.json")
+CASE_FILES = {"baseline": "task_tool_cases.json", "holdout": "task_tool_holdout_cases.json"}
+CASE_FILE = Path(__file__).with_name(CASE_FILES["baseline"])
 METRICS = ("status_match", "tool_match", "argument_match")
 
 
-def load_cases(case_id=None):
-    cases = json.loads(CASE_FILE.read_text(encoding="utf-8"))
+def load_cases(case_id=None, *, suite="baseline"):
+    cases = json.loads(Path(__file__).with_name(CASE_FILES[suite]).read_text(encoding="utf-8"))
     selected = [c for c in cases if case_id is None or c["id"] == case_id]
     if not selected:
         raise ValueError(f"找不到案例：{case_id}")
@@ -86,7 +87,7 @@ def compare(result, expected):
                                 and all(t["exact_match"] for t in comparisons))}
 
 
-async def evaluate_cases(cases, provider, repeat, num_predict=DEFAULT_NUM_PREDICT):
+async def evaluate_cases(cases, provider, repeat, num_predict=DEFAULT_NUM_PREDICT, *, suite="baseline"):
     results = []
     for run in range(1, repeat + 1):
         for case in cases:
@@ -114,7 +115,7 @@ async def evaluate_cases(cases, provider, repeat, num_predict=DEFAULT_NUM_PREDIC
     print(json.dumps(summary, ensure_ascii=False, indent=2), flush=True)
     print("此評測只驗證首輪工具提案與主機核定，不執行工具或驗證最終回答；限制理由及檢索語意仍需人工複核。", flush=True)
     model = os.getenv("OLLAMA_MODEL", "qwen3:8b") if provider == "ollama" else os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-    return {"provider": provider, "configured_model": model, "case_file": CASE_FILE.name,
+    return {"provider": provider, "configured_model": model, "suite": suite, "case_file": CASE_FILES[suite],
             "prompt_sha256": hashlib.sha256(TASK_TOOL_PROMPT.encode()).hexdigest(),
             "first_layer_prompt_sha256": hashlib.sha256(INTENT_PROMPT.encode()).hexdigest(),
             "num_predict": num_predict if provider == "ollama" else None,
@@ -122,9 +123,9 @@ async def evaluate_cases(cases, provider, repeat, num_predict=DEFAULT_NUM_PREDIC
 
 
 async def main(args):
-    cases = load_cases(args.case)
+    cases = load_cases(args.case, suite=args.suite)
     print(f"第二層工具規劃：{len(cases)} 題，重跑 {args.repeat} 次。", flush=True)
-    report = await evaluate_cases(cases, args.provider, args.repeat, args.num_predict)
+    report = await evaluate_cases(cases, args.provider, args.repeat, args.num_predict, suite=args.suite)
     if args.report:
         path = Path(args.report)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -139,6 +140,7 @@ if __name__ == "__main__":
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--cases", action="store_true")
     mode.add_argument("--case", help="單一案例 ID")
+    parser.add_argument("--suite", choices=tuple(CASE_FILES), default="baseline")
     parser.add_argument("--repeat", type=int, default=1)
     parser.add_argument("--num-predict", type=int, default=DEFAULT_NUM_PREDICT,
                         help="僅 Ollama 第二層輸出上限；-1 不限制（對照用）")
