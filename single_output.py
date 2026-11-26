@@ -1,5 +1,4 @@
 """Single-agent terminal output contract; the host still owns evidence validation."""
-import json
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -39,4 +38,5 @@ def decode_final(raw, *, evidence, original_question, observe):
         raise ValueError("最終回答契約不符：" + contract_error(error)) from error
     # action/missing 是歷史呈現介面的主機欄位，不再讓模型決定。
     return decode_response({"action": "answer", "missing": "", **data.model_dump()},
-                           evidence=evidence, original_question=original_question, observe=observe)
+                           evidence=evidence, original_question=original_question, observe=observe,
+                           expand_dependencies=True)

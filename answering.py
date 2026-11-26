@@ -5,7 +5,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from evidence import source_map
+from evidence import expand_evidence_dependencies, source_map
 
 from guide import mentions_identifier
 
@@ -114,7 +114,8 @@ def rejected_part(raw, index, reason):
             "status": "rejected", "answer": "", "citations": [], "reason": reason}
 
 
-def decode_response(raw, *, observe=None, evidence=None, original_question="", stop_candidates=None):
+def decode_response(raw, *, observe=None, evidence=None, original_question="", stop_candidates=None,
+                    expand_dependencies=False):
     """Model IDs -> canonical host citations. Never trust model-authored quotes."""
     try:
         data = json.loads(raw) if isinstance(raw, str) else raw
@@ -152,8 +153,15 @@ def decode_response(raw, *, observe=None, evidence=None, original_question="", s
             ids = list(dict.fromkeys(part.pop("source_ids")))
             valid_ids = bool(ids) and all(i in aliases for i in ids)
             # 不刪掉部分壞 ID 後放行正文；受影響的獨立需求安全降級。
-            part["citations"] = ([{"id": aliases[i], "quote": evidence[aliases[i]]["原文"]}
-                                  for i in ids] if valid_ids else [])
+            canonical_ids = [aliases[i] for i in ids] if valid_ids else []
+            if expand_dependencies and part["status"] == "supported" and valid_ids:
+                expanded = expand_evidence_dependencies(canonical_ids, evidence)
+                added = [i for i in expanded if i not in canonical_ids]
+                if added and observe is not None:
+                    observe("Python 展開證據依賴", {"問題": part["question"],
+                            "模型引用": canonical_ids, "主機補齊": added})
+                canonical_ids = expanded
+            part["citations"] = [{"id": i, "quote": evidence[i]["原文"]} for i in canonical_ids]
             if recover_verified_absence(part, evidence, original_question):
                 if observe is not None:
                     observe("Python 正規化查詢狀態", {"問題": part["question"],

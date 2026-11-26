@@ -14,6 +14,45 @@ def source_map(evidence):
     return aliases
 
 
+def expand_evidence_dependencies(identifiers, evidence):
+    """Return the current-turn dependency closure in stable first-visit order.
+
+    Only host evidence supplies edges. Reject invalid references or cycles
+    instead of treating an incomplete provenance chain as verified.
+    """
+    ordered, active, visited = [], set(), set()
+    # 以顯式堆疊展開 DAG；不信任模型補寫依賴，也不修改既有證據。
+    stack = [(identifier, False) for identifier in reversed(list(identifiers))]
+    while stack:
+        identifier, leaving = stack.pop()
+        if leaving:
+            active.remove(identifier)
+            visited.add(identifier)
+            continue
+        if not isinstance(identifier, str) or not identifier.strip():
+            raise ValueError("證據依賴 ID 格式不合法。")
+        if identifier in active:
+            raise ValueError("本輪證據存在循環依賴。")
+        if identifier in visited:
+            continue
+        row = evidence.get(identifier)
+        if not isinstance(row, dict):
+            raise ValueError("證據依賴不屬於本輪有效來源。")
+        original = row.get("原文")
+        if not isinstance(original, str) or not original.strip():
+            raise ValueError("證據依賴缺少有效原文。")
+        dependencies = row.get("運算依據", ())
+        if ("運算依據" in row and
+                (not isinstance(dependencies, (list, tuple)) or not dependencies
+                 or any(not isinstance(i, str) or not i.strip() for i in dependencies))):
+            raise ValueError("證據依賴格式不合法。")
+        ordered.append(identifier)
+        active.add(identifier)
+        stack.append((identifier, True))
+        stack.extend((dependency, False) for dependency in reversed(dependencies))
+    return ordered
+
+
 def model_sources(sources, *, aliases=False, compact=True, seen=None):
     """Project without mutating full host evidence; preserve scope and conditions.
 

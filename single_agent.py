@@ -25,7 +25,7 @@ SINGLE_AGENT_PROMPT = """你是唯讀的遊戲活動客服。完整處理玩家�
 獨立查詢可同批；若本人資料的用途依賴指定商品，先核對商品，確認存在後才查本人資料。公開規則、假設及其他帳號不查本人。只查目前登入帳號，不能修改紀錄或執行兌換。運算用 calculate 並引用本輪來源。
 已有足夠資料或無合法新查詢時，單獨呼叫 submit_answer，提交所有獨立需求，結束本輪。不與資料工具同批。不自行輸出 JSON 或文字作為工具呼叫。
 查無是已確認的查詢事實：用 supported，引用該 not_found 的段落，只回答原指定對象。資料不足或工具失敗用 no_evidence，不宣稱查無；明確其他帳號用 account_limit，不用 unsupported。unsupported 只用於無法執行的操作。非 supported 的 answer 與 source_ids 留空。
-supported 的正文必須有本輪證據，使用短段落 ID；引用計算結果須同時引用其原始依據。價格門檻不代表全部兌換資格。不要新增玩家沒問的商品或需求。""" + "\n" + ANSWER_MARKDOWN_GUIDANCE
+supported 的正文必須有本輪證據，使用短段落 ID；引用計算結果的短 ID 即可，主機會展開已記錄的運算依據。價格門檻不代表全部兌換資格。不要新增玩家沒問的商品或需求。""" + "\n" + ANSWER_MARKDOWN_GUIDANCE
 
 
 class SingleState(SupportState, total=False):

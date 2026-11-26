@@ -148,6 +148,29 @@ class SingleAgentTests(OfflineTests):
         self.assertEqual([t["工具"] for t in trace], ["find_shop_item", "find_shop_item", "calculate"])
         self.assertIn("55 枚", text)
 
+    def test_computed_source_only_expands_dependencies_without_another_model_call(self):
+        q = "霧潮貼圖加海圖航線框要多少點數？"
+        def calculate_next(provider, messages, tools):
+            rows = [p for r in tool_results(messages) for p in r["段落"]]
+            return select(call("calculate", expression="20+35",
+                               source_ids=[p["段落ID"] for p in rows]))
+        def finish(provider, messages, tools):
+            row = tool_results(messages)[-1]["段落"][0]
+            return response({"question": q, "status": "supported", "answer": "合計 55 枚。",
+                             "source_ids": [row["段落ID"]]})
+        text, trace, events, model = self.run_case(q,
+            select(item("霧潮貼圖"), item("海圖航線框")), calculate_next, finish)
+        self.assertEqual(model.call_count, 3)
+        self.assertEqual([t["工具"] for t in trace], ["find_shop_item", "find_shop_item", "calculate"])
+        self.assertIn("55 枚", text)
+        checks = [d for title, d in events if title == "Python 檢查回答依據"][-1]
+        ids = [c["id"] for c in checks["子問題"][0]["採用段落"]]
+        self.assertEqual(len(ids), 3)
+        self.assertEqual(set(ids[1:]), {f"{CATALOG.current}/shop-items/mist-tide-sticker",
+                                        f"{CATALOG.current}/shop-items/sea-chart-frame"})
+        self.assertEqual(checks["判定"], "supported")
+        self.assertTrue(any(title == "Python 展開證據依賴" for title, _ in events))
+
     def test_fake_citation_is_not_rendered(self):
         q = "我的餘額是多少？"
         text, trace, _, _ = self.run_case(q,
