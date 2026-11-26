@@ -321,3 +321,7 @@ Ollama 請選用支援 tool calling 的模型。兩個供應商的工具選擇�
 ## Single Agent：證據依賴展開
 
 最終回答可只引用已取得的計算結果短 ID。主機依本輪可信證據內的 `運算依據` 展開多層來源，去重並保留穩定順序，再執行原有引用及適用條件驗證。未知 ID、缺失原文、循環或不合法依賴會使受影響的子問題降級；不新增模型呼叫，不自動引入未被引用的計算。舊 `legacy_answer`、`intent_answer` 的引用契約不變。此機制僅保證來源追溯，不證明運算式選擇、數字來源或回答語意正確。測試：`python -m unittest tests.test_evidence_dependencies tests.test_single_agent -v`。
+
+### NVIDIA NIM 批次驗收
+
+使用原 Demo PostgreSQL 環境與 NVIDIA_API_KEY；不需要啟動 Streamlit。參考 [評測與驗收](EVALUATION.md#nvidia-端到端批次評測) 的代表案例及完整 31 題指令。報告保存在本機 reports/，請勿提交私人資料。

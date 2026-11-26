@@ -121,6 +121,8 @@ def turn_metrics(events, trace, elapsed):
     responses = [d for t, d in events if t.startswith("收到模型回傳 · ")]
     metadata = [d.get("_provider_meta") or {} for d in responses]
     usage = [m.get("usage") or {} for m in metadata]
+    model_metrics = [d for t, d in events if t.startswith("Python 模型請求指標 · ")]
+    tool_metrics = [d for t, d in events if t == "Python 工具執行指標"]
     def token_sum(key):
         values = [u.get(key) for u in usage]
         return sum(values) if len(values) == len(requests) and values and all(
@@ -135,6 +137,10 @@ def turn_metrics(events, trace, elapsed):
             "tool_successes": len(trace),
             "stop_rechecks": sum(t == "Python 停止檢查" for t, _ in events),
             "elapsed_seconds": round(elapsed, 3),
+            "model_request_ms": round(sum(d["耗時毫秒"] for d in model_metrics), 2) if model_metrics else None,
+            "tool_execution_ms": round(sum(d["耗時毫秒"] for d in tool_metrics), 2) if tool_metrics else None,
+            "model_steps": model_metrics,
+            "tool_steps": tool_metrics,
             "provider_timing": [{k: m[k] for k in ("total_duration", "load_duration",
                 "prompt_eval_duration", "eval_duration", "prompt_eval_count", "eval_count") if k in m}
                 for m in metadata]}
@@ -142,6 +148,7 @@ def turn_metrics(events, trace, elapsed):
 
 def report_metadata(provider):
     from hashlib import sha256
+    from model_client import configured_model
     from single_agent import MAX_MODEL_CALLS, NUM_PREDICT, SINGLE_AGENT_PROMPT
     from single_output import FINAL_SCHEMA
     try:
@@ -151,8 +158,7 @@ def report_metadata(provider):
         commit = None
     return {"timestamp_utc": datetime.now(timezone.utc).isoformat(), "commit": commit,
             "python": platform.python_version(), "os": platform.platform(), "provider": provider,
-            "configured_model": os.getenv("OLLAMA_MODEL", "qwen3:8b") if provider == "ollama"
-                                else os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+            "configured_model": configured_model(provider),
             "retrieval": os.getenv("EVENT_SUPPORT_AGENT_RETRIEVAL", "bm25"),
             "tool_selection": "native", "agent_framework": "langgraph",
             "answer_review": "off",
@@ -196,7 +202,8 @@ async def replay(case, provider, report_turns=None):
         if report_turns is not None:
             report_turns.append({"question": question, "reply": reply, "metrics": metrics,
                 "tools": [{"name": t["工具"], "arguments": t["參數"]} for t in trace],
-                "checks": [d for t, d in events if t == "Python 檢查回答依據"]})
+                "checks": [d for t, d in events if t == "Python 檢查回答依據"],
+                "events": [{"title": t, "data": d} for t, d in events]})
         history.extend([{"role": "user", "content": question},
                         {"role": "assistant", "content": reply, "trace": trace}])
     print("期望來源", case["sources"])
@@ -248,11 +255,23 @@ def structural_gate(case, turns, coverage):
     return issues
 
 
+def save_report(path, run, details, expected_trials):
+    """Write a complete JSON checkpoint after each trial, including failures."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_suffix(path.suffix + ".tmp")
+    temp.write_text(json.dumps({"run": run, "expected_trials": expected_trials,
+                                "completed_trials": len(details),
+                                "complete": len(details) == expected_trials,
+                                "cases": details}, ensure_ascii=False, indent=2), encoding="utf-8")
+    temp.replace(path)
+
+
 def main():
+    from model_client import PROVIDERS
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--case", help="用案例 ID 查看來源與驗收要點")
+    parser.add_argument("--case", action="append", help="指定案例 ID；可重複指定")
     parser.add_argument("--hybrid", action="store_true", help="用已建好的 pgvector 索引額外比較混合檢索")
-    parser.add_argument("--live", choices=("ollama", "openai"), help="透過指定模型重播所選情境")
+    parser.add_argument("--live", choices=PROVIDERS, help="透過指定模型重播所選情境")
     parser.add_argument("--strict", action="store_true", help="實機重播時必要來源未被採用則回傳非零結束碼；不等於語意驗收")
     parser.add_argument("--report", type=Path, help="實機重播結果輸出 JSON；含模擬玩家問答與引用")
     parser.add_argument("--gate", action="store_true", help="實機結構性驗收；所有選定試驗通過才回傳 0，仍需人工語意驗收")
@@ -268,30 +287,41 @@ def main():
     if args.live:
         cases += json.loads(Path(__file__).with_name("task_cases.json").read_text(encoding="utf-8"))
     if args.case:
-        cases = [case for case in cases if case["id"] == args.case]
-        if not cases:
-            parser.error("找不到案例 ID，直接執行程式可列出全部案例")
+        known = {case["id"] for case in cases}
+        missing = set(args.case) - known
+        if missing:
+            parser.error("找不到案例 ID：" + "、".join(sorted(missing)))
+        cases = [case for case in cases if case["id"] in args.case]
     if args.live and args.hybrid:
         parser.error("--hybrid 用於離線題集比對；聊天實測請設定 EVENT_SUPPORT_AGENT_RETRIEVAL=hybrid")
     if args.strict and not args.live:
         parser.error("--strict 需要搭配 --live")
     if args.live:
         reports, details = [], []
+        run = report_metadata(args.live)
+        expected_trials = len(cases) * args.repeat
         for case in cases:
             for trial in range(1, args.repeat + 1):
+                print(f"\n[{len(details) + 1}/{expected_trials}] {case['id']} · trial {trial}", flush=True)
                 turns = []
-                result = asyncio.run(replay(case, args.live, report_turns=turns))
-                reports.append(result)
-                issues = structural_gate(case, turns, result)
+                error_type = None
+                try:
+                    result = asyncio.run(replay(case, args.live, report_turns=turns))
+                    issues = structural_gate(case, turns, result)
+                    reports.append(result)
+                except Exception as error:
+                    # 記錄失敗類型，不將可能含有連線憑證的例外原文寫入報告。
+                    result = None
+                    error_type = type(error).__name__
+                    issues = ["evaluation execution error: " + error_type]
                 details.append({"case": case["id"], "trial": trial, "player": case.get("player", "A"),
                                 "expected_editions": case["editions"], "reference": case["reference"],
                                 "coverage": result, "turns": turns, "gate_issues": issues,
-                                "semantic_review": "not_run"})
+                                "execution_error": error_type, "semantic_review": "not_run"})
                 print("結構驗收", "PASS" if not issues else "FAIL: " + "; ".join(issues))
+                if args.report:
+                    save_report(args.report, run, details, expected_trials)
         if args.report:
-            args.report.parent.mkdir(parents=True, exist_ok=True)
-            args.report.write_text(json.dumps({"run": report_metadata(args.live), "cases": details},
-                                               ensure_ascii=False, indent=2), encoding="utf-8")
             print("實機評測報告", args.report)
         labelled = [row for row in reports if row["required"]]
         summary("實機可用檢索證據", [(set(r["required"]), set(r["usable"])) for r in labelled])
@@ -299,6 +329,8 @@ def main():
         print(f"無指定必要段落、需另行人工驗收：{len(reports) - len(labelled)} 題")
         print("結構驗收通過", sum(not d["gate_issues"] for d in details), "/", len(details))
         print("語意驗收尚未執行：請逐題對照 reference，不將 PASS 視為語意正確。")
+        if any(d["execution_error"] for d in details):
+            raise SystemExit(1)
         if args.gate and any(d["gate_issues"] for d in details):
             raise SystemExit(1)
         if args.strict and any(r["missing_answer"] or r["missing_retrieval"] for r in labelled):

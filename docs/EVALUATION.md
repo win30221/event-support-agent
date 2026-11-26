@@ -252,3 +252,15 @@ macOS/Linux 改用 `./.venv/bin/python`。不指定 `--suite` 仍測原 baseline
 ## Single Agent：證據依賴展開
 
 最終回答可只引用已取得的計算結果短 ID。主機依本輪可信證據內的 `運算依據` 展開多層來源，去重並保留穩定順序，再執行原有引用及適用條件驗證。未知 ID、缺失原文、循環或不合法依賴會使受影響的子問題降級；不新增模型呼叫，不自動引入未被引用的計算。舊 `legacy_answer`、`intent_answer` 的引用契約不變。此機制僅保證來源追溯，不證明運算式選擇、數字來源或回答語意正確。測試：`python -m unittest tests.test_evidence_dependencies tests.test_single_agent -v`。
+
+
+## NVIDIA 端到端批次評測
+
+在 `research/nvidia-provider` 分支，保留原本 27 個 RAG 情境與 4 個業務案例及正式 Single Agent 流程。評測會依序呼叫同一個 `agent.answer`，每個案例重設對話，保留案例內的多輪歷史。先使用原 Demo PostgreSQL DSN，確保模型服務及資料查詢皆正常，再於同一終端執行（不需 Streamlit）。
+
+```powershell
+.\.venv\Scripts\python.exe -m evaluations.eval_rag --live nvidia --case redemption-gap --case compare-months --case mixed-operation --case unknown-item-price --case another-player --case midnight --report reports/nvidia-smoke.json
+.\.venv\Scripts\python.exe -m evaluations.eval_rag --live nvidia --report reports/nvidia-all.json
+```
+
+macOS/Linux 使用 `./.venv/bin/python`。需先設定 NVIDIA_API_KEY、NVIDIA_MODEL（選用）及 EVENT_SUPPORT_AGENT_PG_DSN。使用原 Demo 資料，勿提交含敏感資料的工程報告。每題完成即原子更新報告，可保留中斷前的結果；每題記錄模型回報 token、模型與工具耗時、工具呼叫、完整工程事件、必要來源及結構驗收。失敗案例保留錯誤類型，不將例外原文寫進報告。結構驗收通過不等於語意正確，必須逐題核對 reference；部分來源覆蓋要求可能比基本回答更嚴格。模型、供應商、取樣設定及運行環境不同，並非單變因效能實驗。先跑代表案例，再視結果跑全量 31 題。完整批次尚未實機驗證。
