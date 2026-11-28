@@ -178,6 +178,8 @@ class ToolRegistry:
             return {"expression": args["expression"], "result": calculate(args["expression"]),
                     "source_ids": args["source_ids"]}
         alternates = args.pop("alternate_queries", []) if name == "find_rules" else []
+        if name == "find_rules":
+            args.pop("confirmed_issue", None)
         if args.keys() != tool.properties.keys() or args.get("edition") not in CATALOG.editions:
             raise ValueError("工具參數未通過驗證。")
         for key, value in args.items():
@@ -209,14 +211,21 @@ def evidence_for(name, args, result, question):
     if name == "find_rules":
         for passage in result:
             requirements = passage.get("適用條件", [])
+            issue = args.get("confirmed_issue") or {}
+            # 只有主機核對過且由本次查詢明確延續的同一段公告可以使用前次條件。
+            carry = issue.get("terms", []) if issue.get("id") == passage["段落ID"] else []
             missing = [condition["label"] for condition in requirements if not any(
-                mentions_identifier(question, value) for value in condition["mentions_any"])]
+                mentions_identifier(question, value) or value in carry for value in condition["mentions_any"])]
             if missing:
                 withheld.append({"段落ID": passage["段落ID"], "缺少": missing})
                 continue
             row = {field: passage[field] for field in ("段落ID", "檔期", "文件ID", "文件", "章節", "來源", "發布日", "原文")}
             if requirements:
                 row["適用條件"] = requirements
+                terms = [v for condition in requirements for v in condition["mentions_any"]
+                         if mentions_identifier(question, v) or v in carry]
+                source.setdefault("已核對公告條件", []).append(
+                    {"id": passage["段落ID"], "edition": edition, "terms": terms})
             if "檢索角色" in passage:
                 row["檢索角色"] = passage["檢索角色"]
             rows.append(row)

@@ -3,27 +3,21 @@
 [返回 README](../README.md) · [資料與工具](DATA_AND_TOOLS.md) · [設計決策](DESIGN_DECISIONS.md)
 
 
-## Single Agent Loop 分支（目前預設）
+## 活動客服的預設入口
 
-本分支 `refactor/single-agent-loop` 從 `refactor/intent-task-simple` 的 8b6fdd0 建立。預設 `agent.answer` 改為 `single_agent.py`：同一模型角色以 native tool_calls 取得工具結果，或直接輸出最終回答。保留 LangGraph ToolNode、ToolRegistry、資料庫、RAG、參數驗證、快取、適用條件及引用驗證；不呼叫原分類、Audit、獨立證據評估、停止審查或回答品質審查。舊 `intent_answer`、`legacy_answer` 與歷史題庫保留，以下舊流程章節只供歷史參考。
+`app.py` 與批次評測皆呼叫 `agent.answer`。一個語意決策即可直接提出業務查詢。舊的五類分類及 Audit 只有在明確呼叫 `intent_answer` 時才會執行。
 
-工具輪數 3、單批 6、累計嘗試 12、模型請求 5（含最多一次格式修正）、Ollama 每次 num_predict 2048。這是本專案實驗上限，不是官方推薦通用數值。原生工具結果以短 ID 回傳，calculate 的來源 ID 經主機對照。正常路徑以同一 Agent 的原生終止工具 submit_answer（JSON Schema）提交 results，移除 action/missing，將 unavailable 合併至 no_evidence；不計入資料工具預算。終止工具必須單獨提交才可能被接受；混合批次保留全部呼叫 ID，資料工具各自依原有權限、參數及預算核准，終止提案回傳拒絕結果而不執行、不計入資料工具嘗試。整批封套不合法、截斷或超額仍不執行。只有回傳契約失敗、重複查詢停止或達到預算時，使用無工具的供應商 JSON Schema 結構化回答，仍受原有模型呼叫上限及一次格式修正限制。主機驗證引用、運算依據及格式，不代表語意完整性。帳號仍由主機選定，不接受任意帳號 ID；明示 other/unclear 拒絕，但模型誤標 self、漏查商品或漏答的語意問題尚未被確定性驗證。商品依賴順序由 Agent 指引，不再有舊的逐需求槽位強制控制。正式認證與語意驗收仍需補足。
+| 使用者需求 | 資料與執行方式 |
+| --- | --- |
+| 本人餘額 | 讀取登入者、指定檔期的 PostgreSQL 紀錄，保留日期 |
+| 商品售價或完整商城清單 | 依檔期核對商城，直接呈現售價或指定品名查無 |
+| 本人距離指定商品的差額 | 先確認品項，才允許讀本人餘額。Python 計算價格差，附商品與本人兩份引用 |
+| 規則、資格或診斷 | Agent 檢索本輪公告及必要證據，提交可逐項核對的主張 |
+| 要求加幣、代換或查其他帳號 | 由主機呈現服務或帳號限制，其他獨立的查詢仍可完成 |
 
-工程觀測新增每次模型的配置/回報名稱、配置 Context（非實際伺服器容量）、訊息與工具結果字元數、供應商 Token、停止原因及耗時；新增實際資料工具耗時及公開 RAG 候選排序、分數、採用狀態。缺少供應商資訊時不猜測；不將字元數換算為 Token，不新增模型請求或調整檢索策略。主機格式修復與停止指令只附加於該次 system 請求，合法終止封套驗證失敗則回傳對應 ToolMessage。現有完整工程紀錄仍屬本機 Demo，正式環境須限制存取、遮罩及保留期限。
+一批最多六個原生工具提案。業務工具將每個固定需求展開成至多兩個唯讀查詢，沿用既有 ToolNode、參數驗證、去重與每輪對話累計十二次底層工具嘗試的上限。固定業務結果涵蓋原問即可結束。混合題保存已核對部分，再由同一 Agent 處理其他需求。
 
-測試（已啟動原有 PostgreSQL/Ollama 並沿用原 DSN，無需重新建立資料庫）：
-
-```powershell
- git fetch origin
- git switch --track origin/refactor/single-agent-loop
- .\.venv\Scripts\python.exe -m unittest tests.test_single_agent -v
- .\.venv\Scripts\python.exe -m evaluations.eval_rag --live ollama --case redemption-gap --report reports/single-agent-gap.json
- .\.venv\Scripts\python.exe -m evaluations.eval_rag --live ollama --report reports/single-agent-all.json
-```
-
-已存在本機分支時用 `git switch refactor/single-agent-loop` 與 `git pull --ff-only`。macOS/Linux 改用 `./.venv/bin/python`。新單元測試使用腳本模型，不代表實機理解正確；實機以既有 RAG/業務端到端題庫驗證，包含實際查詢及最終回答、呼叫次數、耗時、來源及人工驗收要點。原第一、二層獨立評測不必重跑；其分數不可與端到端結果直接比較。實機結果尚未驗證。
-
-參考：[OpenAI Function Calling](https://developers.openai.com/api/docs/guides/function-calling)、[OpenAI Agents SDK: running agents](https://openai.github.io/openai-agents-python/running_agents/)、[Anthropic 客服範例](https://github.com/anthropics/claude-cookbooks/blob/main/tool_use/customer_service_agent.ipynb)、[Anthropic Building effective agents](https://www.anthropic.com/engineering/building-effective-agents)。參考工具循環而非複製特定 SDK；現有 LangChain / LangGraph 依賴不變。
+多輪商品指涉可以使用上一輪在同檔期唯一核對的指定商品。公告的適用條件可以用上一輪實際採用的同檔期段落延續，仍須重新取得本輪來源。每次本人查詢都從本輪讀取結果取值。
 
 ## 1. 設計目標
 

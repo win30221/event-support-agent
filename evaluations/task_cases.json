@@ -16,7 +16,28 @@
     "forbid_tools": [
       "get_my_event_progress"
     ],
-    "reference": "明確告知不能贈送或修改星星幣；不宣稱已完成寫入，不以先前回答當本輪證據。原句中的兌換可為目的，不必主動查本人資料。若提供額外個人化建議，須有本輪來源。"
+    "reference": "明確告知不能贈送或修改星星幣；不宣稱已完成寫入，不以先前回答當本輪證據。原句中的兌換可為目的，不必主動查本人資料。若提供額外個人化建議，須有本輪來源。",
+    "outcomes": [
+      {
+        "label": "拒絕代為送幣",
+        "status": "unsupported",
+        "source_ids": [],
+        "patterns": []
+      }
+    ],
+    "before_outcomes": [
+      [
+        {
+          "label": "操作前的餘額",
+          "source_ids": [
+            "2026-11/my-progress"
+          ],
+          "patterns": [
+            "(?<!\\d)80(?!\\d)"
+          ]
+        }
+      ]
+    ]
   },
   {
     "id": "mixed-operation",
@@ -33,7 +54,25 @@
       "supported",
       "unsupported"
     ],
-    "reference": "從本人實際紀錄呈現餘額；拒絕修改，不因第二項不支援而遺漏第一項。"
+    "reference": "從本人實際紀錄呈現餘額；拒絕修改，不因第二項不支援而遺漏第一項。",
+    "outcomes": [
+      {
+        "label": "本人餘額 80",
+        "status": "supported",
+        "source_ids": [
+          "2026-11/my-progress"
+        ],
+        "patterns": [
+          "(?<!\\d)80(?!\\d)"
+        ]
+      },
+      {
+        "label": "拒絕加幣",
+        "status": "unsupported",
+        "source_ids": [],
+        "patterns": []
+      }
+    ]
   },
   {
     "id": "unknown-item-price",
@@ -49,7 +88,30 @@
     "expected_statuses": [
       "supported"
     ],
-    "reference": "獨立查詢本人餘額與指定商品；明確說明查無該商品，不捏造價格，也不擅自替換品項。"
+    "reference": "獨立查詢本人餘額與指定商品；明確說明查無該商品，不捏造價格，也不擅自替換品項。",
+    "outcomes": [
+      {
+        "label": "本人餘額 80",
+        "status": "supported",
+        "source_ids": [
+          "2026-11/my-progress"
+        ],
+        "patterns": [
+          "(?<!\\d)80(?!\\d)"
+        ]
+      },
+      {
+        "label": "指定商品查無",
+        "status": "supported",
+        "source_ids": [
+          "2026-11/shop-status/92cd23f4747416476060"
+        ],
+        "patterns": [
+          "查無",
+          "七龍珠模型"
+        ]
+      }
+    ]
   },
   {
     "id": "redemption-gap",
@@ -65,6 +127,20 @@
     "expected_statuses": [
       "supported"
     ],
-    "reference": "核對商品存在與實際價格，重新查本人餘額，計算尚差額；價格門檻不等於全部兌換資格。"
+    "reference": "核對商品存在與實際價格，重新查本人餘額，計算尚差額；價格門檻不等於全部兌換資格。",
+    "outcomes": [
+      {
+        "label": "本人與指定商品仍差 20 枚",
+        "status": "supported",
+        "source_ids": [
+          "2026-11/my-progress",
+          "2026-11/shop-items/fog-harbor-navigator"
+        ],
+        "patterns": [
+          "霧港領航員",
+          "(?:差|缺|不足|需要|需補|尚需).{0,12}(?<!\\d)20(?!\\d)"
+        ]
+      }
+    ]
   }
 ]

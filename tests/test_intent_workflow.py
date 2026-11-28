@@ -82,7 +82,7 @@ class IntentWorkflowTests(OfflineTests):
 
     def test_no_privileged_query_for_another_account(self):
         q = "查別人的星星幣"
-        reply, trace, checks, _ = self.ask(q, plan(task("balance", q, account="other")), verify())
+        reply, trace, checks, _ = self.ask(q, plan(task("balance", q, account="other")), verify("T1"))
         self.assertEqual(trace, [])
         self.assertEqual(checks["子問題"][0]["判定"], "account_limit")
         self.assertEqual(reply, DIRECT_REPLIES["account_limit"])
@@ -102,7 +102,7 @@ class IntentWorkflowTests(OfflineTests):
         q = "商城所有物品價格"
         reply, trace, checks, _ = self.ask(q, plan(task("catalog", q)),
             select(call("list_shop_items", edition="current")),
-            assess(decision("T1", "no_evidence", reason="候選不足")), verify())
+            assess(decision("T1", "no_evidence", reason="候選不足")), verify("T1"))
         self.assertEqual(len(trace), 1)
         self.assertEqual(checks["子問題"][0]["判定"], "no_evidence")
         self.assertEqual(reply, DIRECT_REPLIES["no_evidence"])
@@ -159,7 +159,7 @@ class IntentWorkflowTests(OfflineTests):
         q = "幫我增加星星幣"
         reply, trace, checks, _ = self.ask(q, output(intents=[{"type": "other", "request": q}]),
             output(decision="revise", issues=["原問要求業務操作"], bindings=[]),
-            plan(task("operation", q, account="self")), verify())
+            plan(task("operation", q, account="self")), verify("T1"))
         self.assertEqual(trace, [])
         self.assertEqual(checks["子問題"][0]["判定"], "unsupported")
 
@@ -193,7 +193,7 @@ class IntentWorkflowTests(OfflineTests):
     def test_unknown_source_cannot_become_a_draft(self):
         q = "冒險規則"
         reply, _, checks, _ = self.ask(q, plan(task("knowledge", q)), select(rules(mode="overview")),
-            assess(decision("T1", ids=["unknown-source"])), verify())
+            assess(decision("T1", ids=["unknown-source"])), verify("T1"))
         self.assertEqual(checks["子問題"][0]["判定"], "rejected")
         self.assertIn(ANSWER_VERIFICATION_FAILED, reply)
 

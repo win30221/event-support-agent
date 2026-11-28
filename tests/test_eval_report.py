@@ -76,9 +76,9 @@ class EvalReportTests(unittest.TestCase):
             n = by_id[c["id"]]
             self.assertEqual(c["legacy_sources"], n["legacy_sources"])
             for before, after in zip(c["turns"], n["turns"]):
-                for key in ("question", "reference", "editions", "expected_statuses",
-                            "forbidden_statuses", "required_tools", "forbidden_tools"):
+                for key in ("question", "reference", "editions", "expected_statuses", "required_tools", "forbidden_tools"):
                     self.assertEqual(before[key], after[key])
+                self.assertEqual(before.get("forbidden_statuses", []), after.get("forbidden_statuses", []))
         wallet = by_id["wallet-b"]["turns"][0]
         price = "2026-11/shop-items/fog-harbor-navigator"
         ids = {price, "2026-11/launch/玩法", "2026-11/my-progress"}

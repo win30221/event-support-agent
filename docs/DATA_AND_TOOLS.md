@@ -62,7 +62,13 @@ Hybrid：以 Ollama /api/embed（bge-m3）向量化檔期、文件、發布日�
 | computed | 運算結果，須同時引用原始依據 |
 | invalid_arguments / tool_error / budget_exhausted | 參數、執行或預算問題，不是查無事實 |
 
-## 4. 新分支的任務及回答契約
+## 活動業務工具
+
+`answer_event_fact` 接受一項實際需求。可選餘額、商品售價、商城清單、價格差額或不支援的代辦操作。固定查詢透過既有的 `find_shop_item`、`list_shop_items` 和 `get_my_event_progress` 執行。工具輸入只有帳號範圍，實際帳號由伺服器綁定。商品不明時先釐清品名，獨立詢價只讀公開資料。
+
+`find_rules.previous_issue` 可引用前一輪已核對的公告段落。主機核對同一檔期與段落條件，再把查到的本輪原文送入引用驗證。
+
+## 4. 歷史意圖流程的任務及回答契約
 
 目前第一層 SimpleIntentPlan 每項只含 type 與逐字 request，主機配置任務 ID；IntentAudit 再核定 kind、editions、product、account。主機形成含 goal、depends_on 的內部 TaskProposal 並核對能力及指涉。第一層只分類最終目的，不判斷權限或選工具；輸入玩家原問、公開服務上下文、近期對話及既有修正回饋，不接收工具能力或權限清單。原能力資料留在第二層。TaskState 為主機內部資料，不接受模型直接改寫。EvidenceAssessment 逐項回傳 ready、needs_retrieval、no_evidence、clarify 或 unavailable；補查提出可用工具、檔期及具體缺口，主機結合必要資料及預算判斷。DraftBundle 只提供知識回答及短來源 ID；VerificationResult 提供需求覆蓋與個別草稿 verdict/issues。所有請求與權限仍由主機核定。unsupported 代表沒有該操作能力，而非服務異常。
 

@@ -1,0 +1,249 @@
+[
+  {
+    "id": "business-price",
+    "question": "霧潮貼圖要幾枚星星幣？",
+    "reference": "從本期商城確認售價，不查本人。",
+    "editions": [
+      "2026-11"
+    ],
+    "mode": "mixed",
+    "sources": [],
+    "outcomes": [
+      {
+        "label": "貼圖價格 20",
+        "status": "supported",
+        "source_ids": [
+          "2026-11/shop-items/mist-tide-sticker"
+        ],
+        "patterns": [
+          "霧潮貼圖",
+          "(?<!\\d)20(?!\\d)"
+        ]
+      }
+    ],
+    "forbid_tools": [
+      "get_my_event_progress"
+    ]
+  },
+  {
+    "id": "business-catalog",
+    "question": "這期商城所有商品和價格請列給我。",
+    "reference": "完整列出示範檔期的五種商品及各自售價。",
+    "editions": [
+      "2026-11"
+    ],
+    "mode": "shop",
+    "sources": [],
+    "outcomes": [
+      {
+        "label": "霧港領航員售價",
+        "status": "supported",
+        "source_ids": [
+          "2026-11/shop-items/fog-harbor-navigator"
+        ],
+        "patterns": [
+          "霧港領航員[^\\d\\n]{0,24}(?<!\\d)100(?!\\d)"
+        ]
+      },
+      {
+        "label": "霧潮貼圖售價",
+        "status": "supported",
+        "source_ids": [
+          "2026-11/shop-items/mist-tide-sticker"
+        ],
+        "patterns": [
+          "霧潮貼圖[^\\d\\n]{0,24}(?<!\\d)20(?!\\d)"
+        ]
+      },
+      {
+        "label": "海圖航線框售價",
+        "status": "supported",
+        "source_ids": [
+          "2026-11/shop-items/sea-chart-frame"
+        ],
+        "patterns": [
+          "海圖航線框[^\\d\\n]{0,24}(?<!\\d)35(?!\\d)"
+        ]
+      },
+      {
+        "label": "霧港守燈者售價",
+        "status": "supported",
+        "source_ids": [
+          "2026-11/shop-items/fog-lighthouse-title"
+        ],
+        "patterns": [
+          "霧港守燈者[^\\d\\n]{0,24}(?<!\\d)60(?!\\d)"
+        ]
+      },
+      {
+        "label": "月港夜色售價",
+        "status": "supported",
+        "source_ids": [
+          "2026-11/shop-items/moon-quay-background"
+        ],
+        "patterns": [
+          "月港夜色[^\\d\\n]{0,24}(?<!\\d)75(?!\\d)"
+        ]
+      }
+    ],
+    "forbid_tools": [
+      "get_my_event_progress"
+    ]
+  },
+  {
+    "id": "business-zero-balance-gap",
+    "question": "我離換到霧潮貼圖還差多少？",
+    "reference": "C 的紀錄為 0，與貼圖價格相差 20。",
+    "editions": [
+      "2026-11"
+    ],
+    "mode": "mixed",
+    "sources": [],
+    "outcomes": [
+      {
+        "label": "零餘額的價格差",
+        "status": "supported",
+        "source_ids": [
+          "2026-11/my-progress",
+          "2026-11/shop-items/mist-tide-sticker"
+        ],
+        "patterns": [
+          "(?:差|缺|不足|尚需|還要).{0,12}20(?!\\d)"
+        ]
+      }
+    ],
+    "player": "C",
+    "progress": true
+  },
+  {
+    "id": "business-unknown-dependent",
+    "question": "我的星星幣夠換星際飛船模型嗎？",
+    "reference": "先核對品名。查無後不讀本人的餘額。",
+    "editions": [
+      "2026-11"
+    ],
+    "mode": "mixed",
+    "sources": [],
+    "outcomes": [
+      {
+        "label": "只確認指定商品查無",
+        "status": "supported",
+        "source_ids": [
+          "2026-11/shop-status/0e551109ec0ed29d762b"
+        ],
+        "patterns": [
+          "查無",
+          "星際飛船模型"
+        ]
+      }
+    ],
+    "forbid_tools": [
+      "get_my_event_progress"
+    ]
+  },
+  {
+    "id": "business-followup-product",
+    "question": "那以我現在的餘額還差多少？",
+    "reference": "延續上一輪唯一查到的商品，重查本人餘額。",
+    "editions": [
+      "2026-11"
+    ],
+    "mode": "mixed",
+    "sources": [],
+    "outcomes": [
+      {
+        "label": "價格門檻已達",
+        "status": "supported",
+        "source_ids": [
+          "2026-11/my-progress",
+          "2026-11/shop-items/mist-tide-sticker"
+        ],
+        "patterns": [
+          "霧潮貼圖",
+          "(?:已達|已經足夠|足夠|夠換|不(?:用|必|需)再|差.{0,4}0(?!\\d))"
+        ]
+      }
+    ],
+    "before": [
+      "本期的霧潮貼圖多少錢？"
+    ],
+    "progress": true,
+    "before_outcomes": [
+      [
+        {
+          "label": "前一輪指定的貼圖價格",
+          "source_ids": [
+            "2026-11/shop-items/mist-tide-sticker"
+          ],
+          "patterns": [
+            "霧潮貼圖",
+            "(?<!\\d)20(?!\\d)"
+          ]
+        }
+      ]
+    ]
+  },
+  {
+    "id": "business-followup-order",
+    "question": "那我要去哪裡查這筆兌換？",
+    "reference": "同一筆 SG-204 要到兌換紀錄看狀態。只能說明查詢方式。",
+    "editions": [
+      "2026-11"
+    ],
+    "mode": "search",
+    "sources": [
+      "2026-11/shop/訂單處理中"
+    ],
+    "outcomes": [
+      {
+        "label": "同筆兌換的查詢位置",
+        "status": "supported",
+        "source_ids": [
+          "2026-11/shop/訂單處理中"
+        ],
+        "patterns": [
+          "兌換紀錄"
+        ]
+      }
+    ],
+    "before": [
+      "霧港商城顯示 SG-204，代表什麼意思？"
+    ],
+    "forbid_tools": [
+      "get_my_event_progress"
+    ],
+    "before_outcomes": [
+      [
+        {
+          "label": "前一輪指定的訂單提示",
+          "source_ids": [
+            "2026-11/shop/訂單處理中"
+          ],
+          "patterns": [
+            "SG-204",
+            "處理"
+          ]
+        }
+      ]
+    ]
+  },
+  {
+    "id": "business-other-account",
+    "question": "可以幫我查朋友帳號裡還剩多少星星幣嗎？",
+    "reference": "只提供目前登入帳號的查詢服務。",
+    "editions": [],
+    "mode": "outside-account",
+    "sources": [],
+    "outcomes": [
+      {
+        "label": "帳號範圍",
+        "status": "account_limit",
+        "source_ids": [],
+        "patterns": []
+      }
+    ],
+    "forbid_tools": [
+      "get_my_event_progress"
+    ]
+  }
+]

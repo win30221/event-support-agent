@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import platform
+import re
 import subprocess
 from datetime import datetime, timezone
 from time import perf_counter
@@ -176,7 +177,7 @@ def turn_metrics(events, trace, elapsed):
                 for m in metadata]}
 
 
-def report_metadata(provider):
+def report_metadata(provider, workflow="business"):
     from hashlib import sha256
     from model_client import configured_model
     from embedding_client import resolve_embedding
@@ -187,7 +188,7 @@ def report_metadata(provider):
             capture_output=True, text=True, check=True, timeout=5).stdout.strip()
     except (OSError, subprocess.SubprocessError):
         commit = None
-    return {"timestamp_utc": datetime.now(timezone.utc).isoformat(), "commit": commit,
+    run = {"timestamp_utc": datetime.now(timezone.utc).isoformat(), "commit": commit,
             "python": platform.python_version(), "os": platform.platform(), "provider": provider,
             "configured_model": configured_model(provider),
             "nvidia_request_pacing_rpm": configured_rpm(),
@@ -200,18 +201,25 @@ def report_metadata(provider):
             "ollama_reasoning": os.getenv("EVENT_SUPPORT_AGENT_OLLAMA_REASONING"),
             "ollama_timeout": os.getenv("EVENT_SUPPORT_AGENT_OLLAMA_TIMEOUT_SECONDS", "120"),
             "stop_gate": "not_used",
-            "semantic_review": "not_run", "workflow": "single-agent-loop",
+            "semantic_review": "not_run", "workflow": "event-business-tools",
             "online_verifier": "off", "max_model_calls": MAX_MODEL_CALLS,
             "num_predict": NUM_PREDICT if provider == "ollama" else None,
             "prompt_sha256": sha256(SINGLE_AGENT_PROMPT.encode()).hexdigest(),
             "final_output": "native_split_claims_with_schema_fallback",
             "final_contract_version": 2,
             "final_schema_sha256": sha256(json.dumps(FINAL_SCHEMA, sort_keys=True).encode()).hexdigest()}
+    if workflow == "intent":
+        for key in ("max_model_calls", "num_predict", "prompt_sha256", "final_output",
+                    "final_contract_version", "final_schema_sha256", "online_verifier", "answer_review"):
+            run.pop(key)
+        run.update(workflow="intent-task", online_verifier="on")
+    return run
 
 
 # 真實模型重播同一題集及多輪歷史，記錄證據覆蓋、工具及人工驗收要點。
-async def replay(case, provider, report_turns=None):
-    from agent import answer
+async def replay(case, provider, report_turns=None, *, workflow="business"):
+    from agent import answer, intent_answer
+    respond = intent_answer if workflow == "intent" else answer
 
     player = case.get("player", "A")
     history = []
@@ -223,7 +231,7 @@ async def replay(case, provider, report_turns=None):
             if title in ("Python 工具批次", "Python 工具驗證失敗", "Python 接受補查需求",
                          "Python 啟動回答品質審查", "Python 回答品質審查結果", "Python 檢查回答依據",
                          "Python 單一 Agent 回傳驗證失敗", "Python 查詢進展", "Python 檢索快取統計",
-                         "Python 終止契約版本", "Python 商品依賴核對", "Python 本人查詢依賴契約"):
+                         "Python 終止契約版本", "Python 商品依賴核對", "Python 本人查詢依賴契約", "Python 活動業務回答"):
                 print(title, json.dumps(data, ensure_ascii=False))
             if title == "Python 單一 Agent 輪次" and not data.get("允許工具"):
                 print(title, json.dumps(data, ensure_ascii=False))
@@ -238,7 +246,7 @@ async def replay(case, provider, report_turns=None):
         started = perf_counter()
         with capture_transport() as transport:
             try:
-                reply, trace = await answer(player, provider, history[-8:], question, observe=observe)
+                reply, trace = await respond(player, provider, history[-8:], question, observe=observe)
             except Exception as error:
                 if report_turns is not None:
                     metrics = turn_metrics(events, [], perf_counter() - started)
@@ -265,6 +273,25 @@ async def replay(case, provider, report_turns=None):
     return coverage
 
 
+def missing_outcomes(case, checks):
+    """Each expected outcome needs the displayed claim and its own adopted evidence."""
+    issues = []
+    for outcome in case.get("outcomes", []):
+        matched = False
+        for part in checks:
+            if part.get("判定") != outcome.get("status", "supported"):
+                continue
+            ids = {cite["id"] for cite in part.get("採用段落", [])}
+            text = part.get("呈現主張", "")
+            if (set(outcome.get("source_ids", [])) <= ids
+                    and all(re.search(pattern, text) for pattern in outcome.get("patterns", []))):
+                matched = True
+                break
+        if not matched:
+            issues.append("missing outcome: " + outcome["label"])
+    return issues
+
+
 def structural_gate(case, turns, coverage):
     """Deterministic live acceptance only; semantic correctness needs separate review."""
     from answering import ANSWER_VERIFICATION_FAILED
@@ -274,6 +301,11 @@ def structural_gate(case, turns, coverage):
     issues = []
     checks = final["checks"][-1]["子問題"] if final["checks"] else []
     statuses = {part["判定"] for part in checks}
+    issues.extend(missing_outcomes(case, checks))
+    for index, required in enumerate(case.get("before_outcomes", [])):
+        earlier = turns[index].get("checks") if index < len(turns) - 1 else []
+        issues.extend(f"turn {index + 1} {issue}" for issue in
+                      missing_outcomes({"outcomes": required}, earlier[-1]["子問題"] if earlier else []))
     names = {tool["name"] for tool in final["tools"]}
     editions = {tool["arguments"]["edition"] for tool in final["tools"] if "edition" in tool["arguments"]}
     if not checks or any(ANSWER_VERIFICATION_FAILED in t["reply"] for t in turns) or "rejected" in statuses:
@@ -285,11 +317,13 @@ def structural_gate(case, turns, coverage):
     if coverage["missing_retrieval"] or coverage["missing_answer"]:
         issues.append("required evidence missing")
     expected = set(case.get("expected_statuses", []))
+    dispatched = {e["title"].removeprefix("呼叫工具 · ") for e in final.get("events", [])
+                  if e["title"].startswith("呼叫工具 · ")}
+    if (names | dispatched) & set(case.get("forbid_tools", [])):
+        issues.append("unexpected tool for terminal task")
     if expected:
         if not expected <= statuses:
             issues.append("expected task status missing")
-        if names & set(case.get("forbid_tools", [])):
-            issues.append("unexpected tool for terminal task")
     elif case["mode"] == "outside-account":
         if any(tool["name"] == "get_my_event_progress" for turn in turns for tool in turn["tools"]):
             issues.append("private lookup outside account")
@@ -322,8 +356,10 @@ def main():
     from model_client import PROVIDERS
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--case", action="append", help="指定案例 ID；可重複指定")
-    parser.add_argument("--suite", choices=("baseline", "holdout", "generalization"), default="baseline",
-                        help="baseline 31 題；holdout 9 題；generalization 另編泛化題，後兩者僅實機")
+    parser.add_argument("--suite", choices=("baseline", "holdout", "generalization", "business"), default="baseline",
+                        help="預設既有基準；business 驗證活動業務成果，holdout/generalization 用於泛化測試")
+    parser.add_argument("--workflow", choices=("business", "intent"), default="business",
+                        help="實機對照：business 為聊天入口，intent 為舊五類意圖流程")
     parser.add_argument("--hybrid", action="store_true", help="用已建好的 pgvector 索引額外比較混合檢索")
     parser.add_argument("--live", choices=PROVIDERS, help="透過指定模型重播所選情境")
     parser.add_argument("--strict", action="store_true", help="實機重播時必要來源未被採用則回傳非零結束碼；不等於語意驗收")
@@ -352,10 +388,14 @@ def main():
         parser.error("--gate/--repeat 需要 --live")
     if args.report and not args.live:
         parser.error("--report 需要搭配 --live")
-    if args.suite in ("holdout", "generalization"):
+    if args.workflow != "business" and not args.live:
+        parser.error("--workflow 需要 --live")
+    if args.suite in ("holdout", "generalization", "business"):
         if not args.live:
             parser.error("--suite " + args.suite + " 需要 --live")
         cases = json.loads(Path(__file__).with_name(args.suite + "_cases.json").read_text(encoding="utf-8"))
+        if args.suite == "business":
+            cases = json.loads(Path(__file__).with_name("task_cases.json").read_text(encoding="utf-8")) + cases
     else:
         cases = json.loads(Path(__file__).with_name("rag_cases.json").read_text(encoding="utf-8"))
         if args.live:
@@ -372,7 +412,7 @@ def main():
         parser.error("--strict 需要搭配 --live")
     if args.live:
         reports, details = [], []
-        run = report_metadata(args.live)
+        run = report_metadata(args.live, args.workflow)
         run["suite"] = args.suite
         run["transport_observation_version"] = 1
         expected_trials = len(cases) * args.repeat
@@ -382,7 +422,7 @@ def main():
                 turns = []
                 error_type = None
                 try:
-                    result = asyncio.run(replay(case, args.live, report_turns=turns))
+                    result = asyncio.run(replay(case, args.live, report_turns=turns, workflow=args.workflow))
                     issues = structural_gate(case, turns, result)
                     reports.append(result)
                 except Exception as error:
@@ -405,7 +445,7 @@ def main():
         print(f"無指定必要段落、需另行人工驗收：{len(reports) - len(labelled)} 題")
         print("結構驗收通過", sum(not d["gate_issues"] for d in details), "/", len(details))
         print("語意驗收尚未執行：請逐題對照 reference，不將 PASS 視為語意正確。")
-        if args.report:
+        if args.report and args.suite != "business":
             print("可使用 python -m evaluations.eval_report 重新評分，不重新呼叫模型。")
         if any(d["execution_error"] for d in details):
             raise SystemExit(1)

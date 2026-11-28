@@ -196,6 +196,12 @@ def validate_part(part, evidence):
     if part["status"] == "rejected":
         raise ValueError(part.get("reason", "子問題驗證失敗。"))
     if part["status"] != "supported":
+        if part["status"] == "clarify":
+            prompts = {"product": "你想查哪一件商城商品？請提供商品名稱。",
+                       "edition": "你想查哪一期的活動？請提供活動名稱或月份。",
+                       "account": "你想查目前登入帳號的活動紀錄嗎？"}
+            if part.get("missing_slot") in prompts:
+                return prompts[part["missing_slot"]], []
         return DIRECT_REPLIES[part["status"]], []
     adopted = []
     citations = part["citations"]

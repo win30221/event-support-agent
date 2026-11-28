@@ -278,6 +278,8 @@ class TurnRuntime:
                             self.observe("Python 核對公告適用條件", {"未採用段落": artifact["withheld"]})
                         trace.append({"工具": name, "參數": dict(plan["args"]),
                                       "結果": "\n".join(content), "商品參照": artifact["refs"]})
+                        if payload.get("已核對公告條件"):
+                            trace[-1]["已核對公告條件"] = payload["已核對公告條件"]
                         sources.append(payload)
                         for row in payload["段落"]:
                             evidence.setdefault(row["段落ID"], row)

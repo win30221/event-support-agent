@@ -406,6 +406,8 @@ class IntentRuntime(TurnRuntime):
             else:
                 status, text, cites = "no_evidence", terminal_message(record("no_evidence")), []
             checks.append({"任務ID": task["id"], "問題": task["goal"], "判定": status, "採用段落": cites})
+            if status == "supported":
+                checks[-1]["呈現主張"] = text
             texts.append(f"**{task['goal']}**\n\n{text}" if len(state["tasks"]) > 1 else text)
         # 同一限制不要因多個無效任務重複輸出；未核定需求不顯示模型自行創造的標題。
         if state["coverage"] != "complete" and checks and not any(c["判定"] == "supported" for c in checks):

@@ -1,5 +1,7 @@
 """Request-scoped context. Prior model prose is never a source of verified facts."""
 from dataclasses import dataclass
+import re
+import unicodedata
 
 from guide import CATALOG, mentions_identifier, normalize_item_name, shop_catalog
 
@@ -11,6 +13,8 @@ class RequestContext:
     previous_editions: tuple
     product_refs: tuple
     previous_user: str
+    focused_products: tuple
+    issue_refs: tuple
 
     @classmethod
     # 近期歷史只供解析指涉；可信商品及檔期候選來自上一輪實際工具 trace。
@@ -19,7 +23,7 @@ class RequestContext:
                  and isinstance(turn.get("content"), str)][-8:]
         recent = next((turn for turn in reversed(turns) if turn["role"] == "assistant"), {})
         previous_user = next((turn["content"] for turn in reversed(turns) if turn["role"] == "user"), "")
-        periods, refs = [], []
+        periods, refs, focused, issues = [], [], [], []
         for call in recent.get("trace") or []:
             args = call.get("參數") or {}
             edition = args.get("edition")
@@ -36,8 +40,41 @@ class RequestContext:
                            "aliases": item["aliases"]}
                     if ref not in refs:
                         refs.append(ref)
+                    if call.get("工具") == "find_shop_item" and len(ids) == 1 and ref not in focused:
+                        focused.append(ref)
+            for issue in call.get("已核對公告條件", []):
+                if issue.get("edition") == edition and issue not in issues:
+                    issues.append(issue)
         messages = tuple({"role": turn["role"], "content": turn["content"]} for turn in turns)
-        return cls(question, messages, tuple(periods), tuple(refs), previous_user)
+        return cls(question, messages, tuple(periods), tuple(refs), previous_user, tuple(focused), tuple(issues))
+
+    def previous_product(self, edition):
+        matches = [r["name"] for r in self.focused_products if r["edition"] == edition]
+        return matches[0] if len(matches) == 1 else ""
+
+    def previous_issue(self, reference, edition):
+        issue = next((r for r in self.issue_refs if r["id"] == reference and r["edition"] == edition), None)
+        if issue is None:
+            return None
+        # 原問另報錯誤碼時，不能把上一筆訂單的條件套用到新代碼。
+        code = r"(?<![a-z0-9_-])[a-z]+[-_][0-9]+(?![a-z0-9_-])"
+        previous_codes = {v.casefold() for v in issue["terms"] if re.fullmatch(code, v.casefold())}
+        current_codes = set(re.findall(code, unicodedata.normalize("NFKC", self.question).casefold()))
+        return None if previous_codes and current_codes - previous_codes else issue
+
+    def product_for_request(self, name, edition, question, *, follow_up):
+        if mentions_identifier(question, name):
+            return True
+        wanted = normalize_item_name(name)
+        items = shop_catalog(edition)["items"]
+        mentioned = {i["id"] for i in items if any(
+            mentions_identifier(question, v) for v in (i["id"], i["name"], *i["aliases"]))}
+        for item in items:
+            names = (item["id"], item["name"], *item["aliases"])
+            if wanted in {normalize_item_name(v) for v in names}:
+                return (item["id"] in mentioned
+                        or follow_up and not mentioned and item["name"] == self.previous_product(edition))
+        return False
 
     def resolve_edition(self, reference):
         if not isinstance(reference, str):
@@ -78,4 +115,6 @@ class RequestContext:
                          for row in CATALOG.editions.values()],
                 "本期": CATALOG.current, "上期": CATALOG.previous,
                 "前一輪檔期": list(self.previous_editions),
-                "前一輪可信商品候選": list(self.product_refs)}
+                "前一輪可信商品候選": list(self.product_refs),
+                "前一輪單品查詢": list(self.focused_products),
+                "前一輪已核對公告條件": list(self.issue_refs)}
