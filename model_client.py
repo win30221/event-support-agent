@@ -12,6 +12,7 @@ from langchain_openai import ChatOpenAI
 from ollama import ResponseError
 from openai import APIConnectionError, APIStatusError
 
+from ollama_native_tools import native_tool_reply
 from request_pacing import note_rate_limit, pace_request
 from transport_observation import record_transport
 
@@ -49,6 +50,10 @@ def model_for(provider, *, num_predict=None):
                           timeout=120, max_retries=0, use_responses_api=False)
     if provider != "ollama":
         raise ValueError("未知模型服務。")
+    return ChatOllama(**ollama_settings(num_predict))
+
+
+def ollama_settings(num_predict=None):
     setting = os.getenv("EVENT_SUPPORT_AGENT_OLLAMA_TIMEOUT_SECONDS", "120").strip()
     if not setting.isdecimal():
         raise ValueError("EVENT_SUPPORT_AGENT_OLLAMA_TIMEOUT_SECONDS 請填 0 或正整數秒數。")
@@ -56,7 +61,7 @@ def model_for(provider, *, num_predict=None):
     base = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
     if base.endswith("/v1"):
         base = base[:-3]
-    options = {"model": configured_model(provider),
+    options = {"model": configured_model("ollama"),
                "base_url": base, "temperature": 0,
                "client_kwargs": {"timeout": int(setting) or None}}
     context = os.getenv("EVENT_SUPPORT_AGENT_OLLAMA_NUM_CTX", "").strip()
@@ -71,7 +76,7 @@ def model_for(provider, *, num_predict=None):
         options["reasoning"] = {"true": True, "false": False}.get(reasoning, reasoning)
     if num_predict is not None:
         options["num_predict"] = num_predict
-    return ChatOllama(**options)
+    return options
 
 
 def bound_model(provider, tools, response_schema, *, num_predict=None):
@@ -175,8 +180,13 @@ def completion(provider, messages, tools, *, response_schema=None):
         raise transport_error(error, provider) from error
 
 
-async def acompletion(provider, messages, tools, *, response_schema=None, num_predict=None):
+async def acompletion(provider, messages, tools, *, response_schema=None, num_predict=None, native_ollama=False):
     try:
+        if native_ollama and provider == "ollama" and tools and response_schema is None:
+            record_transport(provider, "chat", "attempt")
+            reply = await native_tool_reply(ollama_settings(num_predict), messages, tools)
+            record_transport(provider, "chat", "success")
+            return reply
         model = (bound_model(provider, tools, response_schema) if num_predict is None else
                  bound_model(provider, tools, response_schema, num_predict=num_predict))
         if provider == "nvidia":
@@ -222,7 +232,7 @@ def response_metrics(reply):
 
 
 async def model_step(provider, messages, tools, complete, observe, stage, *, response_schema=None,
-                     num_predict=None):
+                     num_predict=None, native_ollama=False):
     request = {"服務": provider, "messages": deepcopy(messages), "tools": deepcopy(tools)}
     if response_schema is not None:
         request["預期回答格式"] = response_schema
@@ -234,6 +244,8 @@ async def model_step(provider, messages, tools, complete, observe, stage, *, res
     try:
         if complete is completion:
             options = {"response_schema": response_schema}
+            if native_ollama and provider == "ollama" and tools:
+                options["native_ollama"] = True
             if num_predict is not None:
                 options["num_predict"] = num_predict
             reply = await acompletion(provider, messages, tools, **options)

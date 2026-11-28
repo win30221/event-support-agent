@@ -6,6 +6,7 @@
 - LangChain 說明可以在一個工作流程結合程式函式與模型節點。本專案保留 LangGraph，在固定業務結果已有完整來源時直接完成回答。[LangChain Custom workflow](https://docs.langchain.com/oss/python/langchain/multi-agent/custom-workflow)
 - OpenAI 建議把應用程式已知的資訊留在程式，並合併固定要連續執行的操作。本專案在主機綁定登入者，將查價與讀取本人餘額組成差額查詢。[Function calling](https://developers.openai.com/api/docs/guides/function-calling)
 - Anthropic 的客服範例讓客服直接選擇業務工具。本專案依活動服務範圍決定工具及唯讀權限。[Customer service agent](https://github.com/anthropics/claude-cookbooks/blob/main/tool_use/customer_service_agent.ipynb)
+- Ollama 的聊天端點接受工具定義。多工具回合會傳回助理的工具提案及已執行工具的結果。預設活動流程送出完整工具 Schema，並以原生回傳的 `tool_calls` 進行主機驗證。[Ollama Chat API](https://docs.ollama.com/api/chat) · [工具呼叫與結果回填](https://docs.ollama.com/capabilities/tool-calling)
 
 [返回 README](../README.md) · [設計決策](DESIGN_DECISIONS.md)
 

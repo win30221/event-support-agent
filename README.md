@@ -14,7 +14,7 @@
 python -m evaluations.eval_rag --live ollama --suite business --gate --report reports/business.json
 ```
 
-[Windows 安裝與啟動](docs/QUICKSTART.md) · [批次測試、失敗明細與舊流程比較](docs/TESTING.md) · [架構](docs/ARCHITECTURE.md)
+[Windows 安裝與啟動](docs/QUICKSTART.md) · [批次測試、失敗明細與舊流程比較](docs/TESTING.md) · [架構](docs/ARCHITECTURE.md) · [重構交接紀錄](docs/EVENT_SUPPORT_HANDOFF.md)
 
 ## 回覆完成音效
 

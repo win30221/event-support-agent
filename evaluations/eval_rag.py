@@ -213,6 +213,8 @@ def report_metadata(provider, workflow="business"):
                     "final_contract_version", "final_schema_sha256", "online_verifier", "answer_review"):
             run.pop(key)
         run.update(workflow="intent-task", online_verifier="on")
+    elif provider == "ollama":
+        run["tool_transport"] = "ollama_api_chat_full_schema"
     return run
 
 

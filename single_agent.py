@@ -224,7 +224,8 @@ class SingleAgentRuntime(TurnRuntime):
                                      [FACT_DEFINITION, *definitions, FINAL_DEFINITION] if allow_tools else [],
                                      self.complete, self.observe, "單一 Agent",
                                      response_schema=None if allow_tools else FINAL_SCHEMA,
-                                     num_predict=NUM_PREDICT if self.provider == "ollama" else None)
+                                     num_predict=NUM_PREDICT if self.provider == "ollama" else None,
+                                     native_ollama=True)
         except RuntimeError:
             if not state["direct_parts"]:
                 raise
